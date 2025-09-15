@@ -326,6 +326,18 @@ app.get('/api/groups', (req, res) => {
   res.json(groups);
 });
 
+// 获取单个团组
+app.get('/api/groups/:id', (req, res) => {
+  const groupId = parseInt(req.params.id);
+  const group = groups.find(g => g.id === groupId);
+
+  if (group) {
+    res.json(group);
+  } else {
+    res.status(404).json({ error: '团组不存在' });
+  }
+});
+
 // 自动生成团组基础卡片的函数
 function generateGroupBaseActivities(group) {
   const startDate = new Date(group.startDate || group.start_date);
@@ -608,6 +620,113 @@ app.delete('/api/activities/:id', (req, res) => {
   
   activities.splice(index, 1);
   res.json({ success: true, message: '活动已删除' });
+});
+
+// 日程管理路由（V2新增）
+let schedules = [];
+let scheduleIdCounter = 1;
+
+// 获取指定团组的所有日程
+app.get('/api/groups/:groupId/schedules', (req, res) => {
+  const groupId = parseInt(req.params.groupId);
+  const groupSchedules = schedules.filter(s => s.groupId === groupId);
+  res.json(groupSchedules);
+});
+
+// 获取所有日程
+app.get('/api/schedules', (req, res) => {
+  res.json(schedules);
+});
+
+// 创建新日程
+app.post('/api/schedules', (req, res) => {
+  const schedule = {
+    id: scheduleIdCounter++,
+    groupId: req.body.groupId,
+    date: req.body.date,
+    startTime: req.body.startTime,
+    endTime: req.body.endTime,
+    type: req.body.type,
+    title: req.body.title,
+    location: req.body.location,
+    description: req.body.description,
+    color: req.body.color,
+    createdAt: new Date().toISOString()
+  };
+
+  schedules.push(schedule);
+  res.json(schedule);
+});
+
+// 更新日程
+app.put('/api/schedules/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const index = schedules.findIndex(s => s.id === id);
+
+  if (index === -1) {
+    return res.status(404).json({ error: '日程不存在' });
+  }
+
+  schedules[index] = {
+    ...schedules[index],
+    ...req.body,
+    id: id,
+    updatedAt: new Date().toISOString()
+  };
+
+  res.json(schedules[index]);
+});
+
+// 删除日程
+app.delete('/api/schedules/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const index = schedules.findIndex(s => s.id === id);
+
+  if (index === -1) {
+    return res.status(404).json({ error: '日程不存在' });
+  }
+
+  schedules.splice(index, 1);
+  res.json({ success: true, message: '日程已删除' });
+});
+
+// 批量更新日程
+app.post('/api/schedules/batch', (req, res) => {
+  const { groupId, scheduleList } = req.body;
+
+  // 删除该团组的旧日程
+  schedules = schedules.filter(s => s.groupId !== groupId);
+
+  // 添加新日程
+  const newSchedules = scheduleList.map(s => ({
+    ...s,
+    id: s.id || scheduleIdCounter++,
+    groupId: groupId,
+    createdAt: s.createdAt || new Date().toISOString()
+  }));
+
+  schedules.push(...newSchedules);
+  res.json(newSchedules);
+});
+
+// 检查时间冲突
+app.post('/api/schedules/conflicts', (req, res) => {
+  const { groupId, date, startTime, endTime, excludeId } = req.body;
+
+  const conflicts = schedules.filter(s => {
+    if (s.groupId !== groupId || s.date !== date) return false;
+    if (excludeId && s.id === excludeId) return false;
+
+    // 简单的时间冲突检测
+    const newStart = parseInt(startTime.replace(':', ''));
+    const newEnd = parseInt(endTime.replace(':', ''));
+    const sStart = parseInt(s.startTime.replace(':', ''));
+    const sEnd = parseInt(s.endTime.replace(':', ''));
+
+    return (newStart < sEnd && newEnd > sStart);
+  });
+
+  res.json({ hasConflicts: conflicts.length > 0, conflicts });
 });
 
 // 统计路由

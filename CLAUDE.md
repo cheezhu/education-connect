@@ -5,7 +5,7 @@
 Education Connect 是一个专为香港研学团组设计的行程管理系统，支持多团组并发管理、可视化日历、拖拽操作、当日时间线显示和冲突检测。
 
 ## 最新更新 (2025年1月)
-
+  V2版本采用渐进式开发，不影响V1功能正常使用。
 ### UI/UX 重大升级
 - **导航布局改版**: 从左侧边栏改为顶部紧凑导航栏（仅42px高度）
 - **品牌更新**: 系统更名为 "Education Connect" (简称 EC)
@@ -260,6 +260,55 @@ A: 当前版本使用内存存储，重启服务器会重置数据
 8. **时区问题**: 所有日期使用本地时区，注意日期格式一致性
 9. **拖拽功能**: 行程设计器支持HTML5拖拽API，需现代浏览器支持
 
+## 版本控制 (Git & GitHub)
+
+### 仓库信息
+- **GitHub仓库**: https://github.com/cheezhu/education-connect
+- **主分支**: main
+- **仓库状态**: 已初始化并同步
+- **最新提交**: Initial commit - Education Connect 研学行程管理系统
+
+### Git配置
+```bash
+# 远程仓库
+origin  https://github.com/cheezhu/education-connect.git
+
+# 本地仓库路径
+/Users/mac/Desktop/travel_plan/.git
+```
+
+### 版本历史
+- **2025-01-15**: 初始版本发布
+  - 完整V1功能实现
+  - 清理所有V2测试代码
+  - 保留V2需求文档供未来参考
+
+### Git工作流
+```bash
+# 查看状态
+git status
+
+# 添加变更
+git add .
+
+# 提交变更
+git commit -m "描述变更内容"
+
+# 推送到GitHub
+git push origin main
+
+# 拉取最新代码
+git pull origin main
+```
+
+### .gitignore配置
+项目已配置忽略以下文件：
+- `node_modules/` - 依赖包
+- `dist/`, `build/` - 构建输出
+- `.env*` - 环境变量文件
+- `.DS_Store` - macOS系统文件
+- `*.log` - 日志文件
+
 ## 扩展计划
 
 1. **数据库集成**: 替换内存存储为SQLite/PostgreSQL
@@ -267,7 +316,7 @@ A: 当前版本使用内存存储，重启服务器会重置数据
 3. **导出功能**: 支持Excel/PDF格式导出
 4. **移动端适配**: 响应式设计优化
 5. **实时协作**: WebSocket支持多用户实时编辑
-时间线显示团组具体安排
+
 ---
 
 💡 **提示**: 使用 `/check-system` 检查系统状态，使用 `/add-group` 快速添加团组
