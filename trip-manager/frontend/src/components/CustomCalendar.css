@@ -1,0 +1,326 @@
+/* 自定义日历容器 */
+.custom-calendar {
+  width: 100%;
+  max-width: 100%;
+  background: white;
+  border-radius: 8px;
+}
+
+/* 星期标题行 */
+.calendar-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: #f0f0f0;
+  border-radius: 8px 8px 0 0;
+}
+
+.week-day-header {
+  background: #fafafa;
+  padding: 12px 8px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 14px;
+  color: #666;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+/* 日历网格 */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: #f0f0f0;
+  border-radius: 0 0 8px 8px;
+}
+
+/* 日期格子 */
+.calendar-day {
+  background: white;
+  min-height: 140px;
+  padding: 4px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s ease;
+}
+
+.calendar-day.other-month {
+  background: #f9f9f9;
+  opacity: 0.6;
+}
+
+.calendar-day:hover {
+  background: #f5f5f5;
+}
+
+/* 日期数字 */
+.day-number {
+  font-weight: bold;
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 4px;
+  text-align: left;
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  z-index: 1;
+}
+
+.calendar-day.other-month .day-number {
+  color: #ccc;
+}
+
+/* 时间段容器 */
+.time-slot {
+  flex: 1;
+  min-height: 35px;
+  margin: 2px 0;
+  margin-top: 20px; /* 为日期数字留出空间 */
+  border-radius: 4px;
+  padding: 2px 4px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-style: dashed;
+  border-width: 1px;
+}
+
+.time-slot:first-of-type {
+  margin-top: 24px; /* 第一个时间段需要更多空间给日期数字 */
+}
+
+.time-slot:hover {
+  border-style: solid;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transform: translateY(-1px);
+}
+
+/* 拖拽目标高亮 */
+.time-slot.drag-over {
+  border-style: solid !important;
+  border-width: 2px !important;
+  box-shadow: inset 0 0 10px rgba(24, 144, 255, 0.3);
+  transform: scale(1.02);
+}
+
+/* 时间段标签 */
+.slot-label {
+  font-size: 10px;
+  font-weight: bold;
+  color: #666;
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  background: rgba(255,255,255,0.8);
+  padding: 0 2px;
+  border-radius: 2px;
+  z-index: 2;
+}
+
+/* 时间段事件容器 */
+.slot-events {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+}
+
+/* 活动项目 */
+.event-item {
+  font-size: 9px;
+  padding: 1px 3px;
+  border-radius: 3px;
+  color: white;
+  text-shadow: 0 0 2px rgba(0,0,0,0.5);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  line-height: 1.2;
+  min-height: 14px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.event-item:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* 拖拽时的样式 */
+.event-item[draggable="true"]:hover {
+  cursor: grab;
+}
+
+.event-item[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* 拖拽中的活动样式 */
+.event-item.dragging {
+  opacity: 0.5 !important;
+  transform: scale(1.05);
+  z-index: 999;
+  border: 1px solid #1890ff;
+}
+
+/* 上午时段样式 */
+.morning-slot {
+  background-color: #e6f7ff;
+  border-color: #1890ff;
+}
+
+.morning-slot .slot-label {
+  color: #1890ff;
+}
+
+/* 下午时段样式 */
+.afternoon-slot {
+  background-color: #f6ffed;
+  border-color: #52c41a;
+}
+
+.afternoon-slot .slot-label {
+  color: #52c41a;
+}
+
+/* 晚上时段样式 */
+.evening-slot {
+  background-color: #fff2e8;
+  border-color: #fa8c16;
+}
+
+.evening-slot .slot-label {
+  color: #fa8c16;
+}
+
+/* 今日高亮 */
+.calendar-day.today {
+  background: #fff7e6 !important;
+}
+
+.calendar-day.today .day-number {
+  color: #fa8c16;
+  font-weight: bold;
+  background: #fa8c16;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+/* 周末样式 */
+.calendar-day.weekend {
+  background: #fafafa !important;
+}
+
+/* 响应式调整 */
+@media (max-width: 1200px) {
+  .calendar-day {
+    min-height: 120px;
+  }
+  
+  .slot-label {
+    font-size: 9px;
+  }
+  
+  .event-item {
+    font-size: 8px;
+    min-height: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .calendar-day {
+    min-height: 100px;
+  }
+  
+  .time-slot {
+    min-height: 25px;
+  }
+  
+  .slot-label {
+    font-size: 8px;
+  }
+  
+  .event-item {
+    font-size: 7px;
+    min-height: 10px;
+    padding: 0 2px;
+  }
+  
+  .day-number {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .calendar-day {
+    min-height: 80px;
+  }
+  
+  .time-slot {
+    min-height: 20px;
+    margin: 1px 0;
+  }
+  
+  .time-slot:first-of-type {
+    margin-top: 18px;
+  }
+  
+  .slot-events {
+    margin-top: 8px;
+  }
+}
+
+/* 动画效果 */
+@keyframes dropSuccess {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.time-slot.drop-success {
+  animation: dropSuccess 0.3s ease;
+}
+
+/* 禁用状态 */
+.time-slot.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f5f5f5 !important;
+}
+
+.time-slot.disabled:hover {
+  transform: none;
+  box-shadow: none;
+  border-style: dashed;
+}
+
+/* 加载状态 */
+.custom-calendar.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.custom-calendar.loading::after {
+  content: '加载中...';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255,255,255,0.9);
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  z-index: 1000;
+}

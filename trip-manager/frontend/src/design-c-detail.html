@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>方案C - 紧凑型顶部导航详细设计</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #f0f2f5;
+        }
+
+        /* 完整页面布局 */
+        .app-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+
+        /* 紧凑导航栏 - 40px高度 */
+        .compact-navbar {
+            height: 40px;
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+
+        /* Logo区域 */
+        .logo-area {
+            display: flex;
+            align-items: center;
+            margin-right: 24px;
+        }
+
+        .mini-logo {
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .brand-text {
+            color: rgba(255,255,255,0.9);
+            font-size: 13px;
+            font-weight: 500;
+            display: none;
+        }
+
+        /* 导航菜单 - 纯图标 */
+        .icon-nav {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            flex: 1;
+        }
+
+        .nav-icon-item {
+            width: 36px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255,255,255,0.6);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .nav-icon-item:hover {
+            background: rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.95);
+        }
+
+        .nav-icon-item.active {
+            background: rgba(102,126,234,0.15);
+            color: #667eea;
+        }
+
+        .nav-icon-item.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 2px;
+            background: #667eea;
+            border-radius: 1px;
+        }
+
+        /* 图标样式 */
+        .nav-icon {
+            font-size: 16px;
+        }
+
+        /* 工具提示 */
+        .tooltip {
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-top: 8px;
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 1001;
+        }
+
+        .tooltip::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-bottom: 4px solid rgba(0,0,0,0.9);
+        }
+
+        .nav-icon-item:hover .tooltip {
+            opacity: 1;
+        }
+
+        /* 右侧工具区 */
+        .navbar-tools {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .tool-icon {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255,255,255,0.6);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .tool-icon:hover {
+            background: rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.9);
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 6px;
+            height: 6px;
+            background: #ff4757;
+            border-radius: 50%;
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .user-menu:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .user-avatar {
+            width: 22px;
+            height: 22px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .user-name {
+            color: rgba(255,255,255,0.8);
+            font-size: 12px;
+            display: none;
+        }
+
+        /* 面包屑导航 */
+        .breadcrumb-bar {
+            height: 32px;
+            background: white;
+            border-bottom: 1px solid #e8e8e8;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            margin-top: 40px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .breadcrumb-item {
+            color: #999;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .breadcrumb-item:hover {
+            color: #667eea;
+        }
+
+        .breadcrumb-separator {
+            margin: 0 8px;
+            color: #d9d9d9;
+        }
+
+        .breadcrumb-current {
+            color: #333;
+            font-weight: 500;
+        }
+
+        /* 主内容区 */
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            background: #f5f7fa;
+            overflow-y: auto;
+        }
+
+        /* 页面标题栏 */
+        .page-header {
+            background: white;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .page-title {
+            font-size: 18px;
+            font-weight: 500;
+            color: #1a1a1a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .page-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            height: 32px;
+            padding: 0 16px;
+            background: white;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .action-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .action-btn.primary {
+            background: #667eea;
+            border-color: #667eea;
+            color: white;
+        }
+
+        .action-btn.primary:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(102,126,234,0.3);
+        }
+
+        /* 内容卡片 */
+        .content-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+
+        /* 演示时间轴 */
+        .demo-timeline {
+            display: grid;
+            grid-template-columns: 80px repeat(7, 1fr);
+            gap: 1px;
+            background: #e8e8e8;
+            border: 1px solid #e8e8e8;
+            border-radius: 6px;
+            overflow: hidden;
+            font-size: 12px;
+        }
+
+        .timeline-cell {
+            background: white;
+            padding: 8px;
+            min-height: 60px;
+        }
+
+        .timeline-header {
+            background: #f5f7fa;
+            font-weight: 500;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            font-size: 11px;
+        }
+
+        .activity-chip {
+            display: inline-block;
+            padding: 3px 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            font-size: 11px;
+            margin: 2px;
+        }
+
+        /* 统计卡片 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+
+        /* 响应式设计 */
+        @media (min-width: 768px) {
+            .compact-navbar {
+                padding: 0 20px;
+            }
+
+            .brand-text {
+                display: block;
+            }
+
+            .user-name {
+                display: block;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .demo-timeline {
+                grid-template-columns: 60px repeat(3, 1fr);
+            }
+        }
+
+        /* 特色功能提示 */
+        .feature-callout {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .feature-icon {
+            font-size: 20px;
+        }
+
+        .feature-text {
+            flex: 1;
+            font-size: 13px;
+        }
+
+        .feature-close {
+            cursor: pointer;
+            opacity: 0.8;
+        }
+
+        .feature-close:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 紧凑型导航栏 -->
+        <nav class="compact-navbar">
+            <div class="logo-area">
+                <div class="mini-logo">TM</div>
+                <span class="brand-text">研学行程</span>
+            </div>
+
+            <div class="icon-nav">
+                <div class="nav-icon-item">
+                    <span class="nav-icon">📅</span>
+                    <span class="tooltip">日历视图</span>
+                </div>
+                <div class="nav-icon-item active">
+                    <span class="nav-icon">🎯</span>
+                    <span class="tooltip">行程设计器</span>
+                </div>
+                <div class="nav-icon-item">
+                    <span class="nav-icon">👥</span>
+                    <span class="tooltip">团组管理</span>
+                </div>
+                <div class="nav-icon-item">
+                    <span class="nav-icon">📍</span>
+                    <span class="tooltip">地点管理</span>
+                </div>
+                <div class="nav-icon-item">
+                    <span class="nav-icon">📊</span>
+                    <span class="tooltip">统计报表</span>
+                </div>
+            </div>
+
+            <div class="navbar-tools">
+                <div class="tool-icon">
+                    <span>🔍</span>
+                    <span class="tooltip">搜索</span>
+                </div>
+                <div class="tool-icon">
+                    <span>💾</span>
+                    <span class="tooltip">快速导出</span>
+                </div>
+                <div class="tool-icon">
+                    <span>🔔</span>
+                    <span class="notification-badge"></span>
+                    <span class="tooltip">通知中心</span>
+                </div>
+                <div class="tool-icon">
+                    <span>⚙️</span>
+                    <span class="tooltip">设置</span>
+                </div>
+                <div class="user-menu">
+                    <div class="user-avatar">管</div>
+                    <span class="user-name">管理员</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 面包屑导航 -->
+        <div class="breadcrumb-bar">
+            <a href="#" class="breadcrumb-item">首页</a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="#" class="breadcrumb-item">行程管理</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">行程设计器</span>
+        </div>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 功能提示 -->
+            <div class="feature-callout">
+                <span class="feature-icon">💡</span>
+                <span class="feature-text">提示：使用拖拽功能可以快速调整活动时间，点击空白时段添加新活动</span>
+                <span class="feature-close">✕</span>
+            </div>
+
+            <!-- 页面标题栏 -->
+            <div class="page-header">
+                <div class="page-title">
+                    <span>🎯</span>
+                    <span>行程设计器 - 2025年9月第2周</span>
+                </div>
+                <div class="page-actions">
+                    <button class="action-btn">
+                        <span>◀</span>
+                        <span>上一周</span>
+                    </button>
+                    <button class="action-btn">
+                        <span>下一周</span>
+                        <span>▶</span>
+                    </button>
+                    <button class="action-btn">批量操作</button>
+                    <button class="action-btn primary">
+                        <span>➕</span>
+                        <span>添加活动</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 统计卡片 -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">7</div>
+                    <div class="stat-label">活跃团组</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">24</div>
+                    <div class="stat-label">本周活动</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">85%</div>
+                    <div class="stat-label">场地利用率</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">326</div>
+                    <div class="stat-label">参与学生</div>
+                </div>
+            </div>
+
+            <!-- 时间轴内容 -->
+            <div class="content-card">
+                <div class="demo-timeline">
+                    <div class="timeline-header">时段</div>
+                    <div class="timeline-header">
+                        <div>9月12日</div>
+                        <div style="color: #999; font-size: 10px;">周一</div>
+                    </div>
+                    <div class="timeline-header">
+                        <div>9月13日</div>
+                        <div style="color: #999; font-size: 10px;">周二</div>
+                    </div>
+                    <div class="timeline-header">
+                        <div>9月14日</div>
+                        <div style="color: #999; font-size: 10px;">周三</div>
+                    </div>
+                    <div class="timeline-header">
+                        <div>9月15日</div>
+                        <div style="color: #999; font-size: 10px;">周四</div>
+                    </div>
+                    <div class="timeline-header">
+                        <div>9月16日</div>
+                        <div style="color: #999; font-size: 10px;">周五</div>
+                    </div>
+                    <div class="timeline-header">
+                        <div>9月17日</div>
+                        <div style="color: #999; font-size: 10px;">周六</div>
+                    </div>
+                    <div class="timeline-header">
+                        <div>9月18日</div>
+                        <div style="color: #999; font-size: 10px;">周日</div>
+                    </div>
+
+                    <!-- 上午时段 -->
+                    <div class="timeline-cell timeline-header">
+                        <div>上午</div>
+                        <div style="color: #999; font-size: 10px;">9:00-12:00</div>
+                    </div>
+                    <div class="timeline-cell">
+                        <div class="activity-chip">深圳实验</div>
+                    </div>
+                    <div class="timeline-cell">
+                        <div class="activity-chip">广州中学</div>
+                    </div>
+                    <div class="timeline-cell"></div>
+                    <div class="timeline-cell">
+                        <div class="activity-chip">北师大附小</div>
+                    </div>
+                    <div class="timeline-cell"></div>
+                    <div class="timeline-cell">
+                        <div class="activity-chip">杭州学军</div>
+                    </div>
+                    <div class="timeline-cell"></div>
+
+                    <!-- 下午时段 -->
+                    <div class="timeline-cell timeline-header">
+                        <div>下午</div>
+                        <div style="color: #999; font-size: 10px;">14:00-17:00</div>
+                    </div>
+                    <div class="timeline-cell"></div>
+                    <div class="timeline-cell">
+                        <div class="activity-chip">华东师大</div>
+                    </div>
+                    <div class="timeline-cell">
+                        <div class="activity-chip">南京师大</div>
+                    </div>
+                    <div class="timeline-cell"></div>
+                    <div class="timeline-cell">
+                        <div class="activity-chip">武汉华师</div>
+                    </div>
+                    <div class="timeline-cell"></div>
+                    <div class="timeline-cell"></div>
+
+                    <!-- 晚上时段 -->
+                    <div class="timeline-cell timeline-header">
+                        <div>晚上</div>
+                        <div style="color: #999; font-size: 10px;">19:00-21:00</div>
+                    </div>
+                    <div class="timeline-cell"></div>
+                    <div class="timeline-cell"></div>
+                    <div class="timeline-cell"></div>
+                    <div class="timeline-cell"></div>
+                    <div class="timeline-cell"></div>
+                    <div class="timeline-cell"></div>
+                    <div class="timeline-cell"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div style="background: white; padding: 40px; margin-top: 40px;">
+        <h2 style="color: #1a1a1a; margin-bottom: 20px;">🎨 方案C 设计特点</h2>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            <div style="padding: 20px; background: #f5f7fa; border-radius: 8px;">
+                <h3 style="color: #667eea; margin-bottom: 12px;">📏 极致紧凑</h3>
+                <ul style="list-style: none; padding: 0; color: #666; font-size: 14px; line-height: 1.8;">
+                    <li>✓ 导航栏仅40px高度</li>
+                    <li>✓ 面包屑辅助32px</li>
+                    <li>✓ 内容区域最大化</li>
+                    <li>✓ 适合1080p屏幕</li>
+                </ul>
+            </div>
+
+            <div style="padding: 20px; background: #f5f7fa; border-radius: 8px;">
+                <h3 style="color: #667eea; margin-bottom: 12px;">🎯 图标导航</h3>
+                <ul style="list-style: none; padding: 0; color: #666; font-size: 14px; line-height: 1.8;">
+                    <li>✓ 纯图标设计简洁</li>
+                    <li>✓ 悬停显示工具提示</li>
+                    <li>✓ 当前项底部高亮</li>
+                    <li>✓ 快速视觉识别</li>
+                </ul>
+            </div>
+
+            <div style="padding: 20px; background: #f5f7fa; border-radius: 8px;">
+                <h3 style="color: #667eea; margin-bottom: 12px;">🔧 工具集成</h3>
+                <ul style="list-style: none; padding: 0; color: #666; font-size: 14px; line-height: 1.8;">
+                    <li>✓ 快速搜索入口</li>
+                    <li>✓ 一键导出功能</li>
+                    <li>✓ 通知红点提示</li>
+                    <li>✓ 设置快捷访问</li>
+                </ul>
+            </div>
+
+            <div style="padding: 20px; background: #f5f7fa; border-radius: 8px;">
+                <h3 style="color: #667eea; margin-bottom: 12px;">📱 响应式</h3>
+                <ul style="list-style: none; padding: 0; color: #666; font-size: 14px; line-height: 1.8;">
+                    <li>✓ 移动端自动适配</li>
+                    <li>✓ 平板横屏优化</li>
+                    <li>✓ 大屏完整显示</li>
+                    <li>✓ 触控友好设计</li>
+                </ul>
+            </div>
+        </div>
+
+        <div style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; color: white;">
+            <h3 style="margin-bottom: 12px;">💡 适用场景</h3>
+            <p style="line-height: 1.6; opacity: 0.95;">
+                方案C特别适合需要<strong>最大化内容展示区域</strong>的场景，导航栏占用空间极小（仅72px = 40px导航 + 32px面包屑），
+                为时间轴网格留出了最大的显示空间。图标化设计让<strong>专业用户</strong>能快速定位功能，
+                同时保持界面的<strong>现代感和专业性</strong>。
+            </p>
+        </div>
+    </div>
+</body>
+</html>

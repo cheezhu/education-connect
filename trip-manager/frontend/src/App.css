@@ -1,0 +1,241 @@
+/* 全局样式重置 */
+* {
+  box-sizing: border-box;
+}
+
+/* 滚动条优化 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+/* 内容区域优化 */
+.ant-layout-content {
+  min-height: calc(100vh - 42px);
+}
+
+/* 卡片样式统一 */
+.ant-card {
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* 表格样式优化 */
+.ant-table {
+  font-size: 13px;
+}
+
+/* 按钮样式优化 */
+.ant-btn {
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+/* 模态框样式优化 */
+.ant-modal-header {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.ant-modal-footer {
+  border-top: 1px solid #f0f0f0;
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+  /* 移动端隐藏面包屑 */
+  .breadcrumb-nav {
+    display: none;
+  }
+
+  /* 移动端隐藏部分快捷操作 */
+  .quick-actions > span:not(:last-child) {
+    display: none;
+  }
+}
+
+/* 页面过渡动画 */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+
+.page-transition-exit {
+  opacity: 1;
+}
+
+.page-transition-exit-active {
+  opacity: 0;
+  transition: opacity 300ms;
+}
+
+/* 紧凑布局优化 */
+.compact-layout {
+  padding-top: 42px;
+}
+
+/* Badge 样式优化 */
+.ant-badge-dot {
+  width: 5px;
+  height: 5px;
+  min-width: 5px;
+  background: #ff4757;
+}
+
+/* Dropdown 样式优化 */
+.ant-dropdown-menu {
+  border-radius: 6px;
+  padding: 4px;
+}
+
+.ant-dropdown-menu-item {
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+/* 导航栏链接防止文字选中 */
+.nav-link {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* 内容区域最大宽度 */
+.content-wrapper {
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* 页面标题样式 */
+.page-header {
+  background: white;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* 统计卡片样式 */
+.stat-card {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* 加载状态 */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.3;
+}
+
+.empty-state-text {
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+/* 错误状态 */
+.error-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #ff4757;
+}
+
+/* 表单样式优化 */
+.ant-form-item-label > label {
+  font-size: 13px;
+}
+
+.ant-input,
+.ant-select-selector,
+.ant-picker {
+  font-size: 13px;
+}
+
+/* 消息提示样式 */
+.ant-message {
+  font-size: 13px;
+}
+
+/* 通知样式 */
+.ant-notification {
+  font-size: 13px;
+}
+
+/* 工具提示样式 */
+.ant-tooltip {
+  font-size: 12px;
+}
+
+/* 时间轴特殊样式 */
+.timeline-grid {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* 活动卡片悬停效果 */
+.activity-card {
+  transition: all 0.2s ease;
+}
+
+.activity-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* 打印样式 */
+@media print {
+  .compact-header,
+  .page-actions,
+  .quick-actions {
+    display: none !important;
+  }
+
+  .ant-layout-content {
+    margin-top: 0 !important;
+    padding: 0 !important;
+  }
+}

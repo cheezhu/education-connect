@@ -1,0 +1,82 @@
+/* 团组管理页面拖拽样式 */
+
+/* 拖拽中的活动卡片样式 */
+.activity-card.dragging {
+  opacity: 0.6 !important;
+  transform: scale(1.05) rotate(2deg);
+  z-index: 1000;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3) !important;
+  border: 2px solid #fff;
+}
+
+/* 拖拽目标区域高亮 */
+.time-slot-container.drag-over .drop-zone {
+  border-color: #1890ff !important;
+  background: rgba(24, 144, 255, 0.1) !important;
+  transform: scale(1.02);
+}
+
+/* 活动卡片悬停效果 */
+.activity-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+}
+
+.activity-card[draggable="true"]:hover {
+  cursor: grab;
+}
+
+.activity-card[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* 放置区域样式 */
+.drop-zone {
+  min-height: 40px;
+}
+
+.drop-zone:empty::before {
+  content: '';
+  display: block;
+  height: 40px;
+}
+
+/* 拖拽动画 */
+@keyframes dropSuccess {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.drop-success {
+  animation: dropSuccess 0.3s ease;
+}
+
+/* 紧凑显示优化 */
+.activity-card .ant-select {
+  background: rgba(255,255,255,0.1) !important;
+  border: 1px solid rgba(255,255,255,0.3) !important;
+}
+
+.activity-card .ant-select .ant-select-selector {
+  background: transparent !important;
+  border: none !important;
+  color: white !important;
+}
+
+.activity-card .ant-select .ant-select-arrow {
+  color: rgba(255,255,255,0.8) !important;
+}
+
+/* 响应式优化 */
+@media (max-width: 1200px) {
+  .activity-card {
+    flex-direction: column;
+    gap: 2px !important;
+    padding: 4px 6px !important;
+  }
+
+  .activity-card .ant-select {
+    width: 100% !important;
+  }
+}
