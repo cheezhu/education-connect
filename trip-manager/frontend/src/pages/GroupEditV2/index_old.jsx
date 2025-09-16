@@ -167,21 +167,10 @@ const GroupEditV2 = () => {
 
   // 更新团组数据
   const updateGroupData = (field, value) => {
-    setGroupData(prev => {
-      const updated = {
-        ...prev,
-        [field]: value
-      };
-
-      // 自动计算天数
-      if (field === 'start_date' || field === 'end_date') {
-        if (updated.start_date && updated.end_date) {
-          updated.duration = dayjs(updated.end_date).diff(dayjs(updated.start_date), 'day') + 1;
-        }
-      }
-
-      return updated;
-    });
+    setGroupData(prev => ({
+      ...prev,
+      [field]: value
+    }));
     setHasChanges(true);
   };
 
@@ -240,7 +229,7 @@ const GroupEditV2 = () => {
             <div
               className={`tab-item ${activeTab === 'info' ? 'active' : ''}`}
               onClick={() => setActiveTab('info')}
-              title="团组信息"
+              title="团组信息与成员"
             >
               <TeamOutlined className="tab-icon" />
               <span className="tab-text">团组信息</span>
@@ -259,12 +248,156 @@ const GroupEditV2 = () => {
         {/* 右侧内容区 */}
         <div className="main-content">
           {activeTab === 'info' && (
-            <GroupInfoSimple
-              groupData={groupData}
-              onUpdate={updateGroupData}
-              handleAutoSave={handleAutoSave}
-              isNew={isNew}
-            />
+            <div className="minimal-info-view">
+              <GroupInfoSimple
+                groupData={groupData}
+                onUpdate={updateGroupData}
+                handleAutoSave={handleAutoSave}
+                isNew={isNew}
+              />
+            </div>
+          )}>
+                  <span className="card-title">团组信息</span>
+                  {groupData.status && (
+                    <span className={`status-badge status-${groupData.status}`}>
+                      {groupData.status}
+                    </span>
+                  )}
+                </div>
+
+                <div className="card-body">
+                  {/* 第一行：名称、类型、颜色 */}
+                  <div className="info-row">
+                    <div className="info-item flex-2">
+                      <label>团组名称</label>
+                      <input
+                        type="text"
+                        value={groupData.name || ''}
+                        onChange={(e) => {
+                          updateGroupData('name', e.target.value);
+                          handleAutoSave();
+                        }}
+                        placeholder="输入团组名称"
+                      />
+                    </div>
+                    <div className="info-item">
+                      <label>类型</label>
+                      <select
+                        value={groupData.type || 'primary'}
+                        onChange={(e) => {
+                          updateGroupData('type', e.target.value);
+                          handleAutoSave();
+                        }}
+                      >
+                        <option value="primary">小学</option>
+                        <option value="secondary">中学</option>
+                      </select>
+                    </div>
+                    <div className="info-item color-picker">
+                      <label>颜色</label>
+                      <input
+                        type="color"
+                        value={groupData.color || '#1890ff'}
+                        onChange={(e) => {
+                          updateGroupData('color', e.target.value);
+                          handleAutoSave();
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 第二行：日期范围 */}
+                  <div className="info-row">
+                    <div className="info-item">
+                      <label>开始日期</label>
+                      <input
+                        type="date"
+                        value={groupData.start_date || ''}
+                        onChange={(e) => {
+                          updateGroupData('start_date', e.target.value);
+                          const duration = dayjs(groupData.end_date).diff(dayjs(e.target.value), 'day') + 1;
+                          updateGroupData('duration', duration);
+                          handleAutoSave();
+                        }}
+                      />
+                    </div>
+                    <div className="info-item">
+                      <label>结束日期</label>
+                      <input
+                        type="date"
+                        value={groupData.end_date || ''}
+                        onChange={(e) => {
+                          updateGroupData('end_date', e.target.value);
+                          const duration = dayjs(e.target.value).diff(dayjs(groupData.start_date), 'day') + 1;
+                          updateGroupData('duration', duration);
+                          handleAutoSave();
+                        }}
+                      />
+                    </div>
+                    <div className="info-item">
+                      <label>行程天数</label>
+                      <div className="duration-display">
+                        <span className="duration-number">{groupData.duration || 0}</span> 天
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 第三行：备注 */}
+                  <div className="info-row">
+                    <div className="info-item full-width">
+                      <label>备注</label>
+                      <textarea
+                        value={groupData.notes || ''}
+                        onChange={(e) => {
+                          updateGroupData('notes', e.target.value);
+                          handleAutoSave();
+                        }}
+                        placeholder="特殊要求、注意事项等"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 团员信息卡片 - 只在非新建模式下显示 */}
+              {!isNew && (
+                <div className="info-card">
+                  <div className="card-header">
+                    <span className="card-title">团员管理</span>
+                    <div className="member-stats">
+                      <span className="stat-item">
+                        <TeamOutlined /> 学生 {groupData.student_count || 0}
+                      </span>
+                      <span className="stat-divider">|</span>
+                      <span className="stat-item">老师 {groupData.teacher_count || 0}</span>
+                      <span className="stat-divider">|</span>
+                      <span className="stat-item total">总计 {(groupData.student_count || 0) + (groupData.teacher_count || 0)}</span>
+                    </div>
+                  </div>
+
+                  <div className="card-body">
+                    <MemberManagement
+                      groupId={id}
+                      groupData={groupData}
+                      members={groupData.members}
+                      onUpdate={(members) => {
+                        updateGroupData('members', members);
+                        // 更新人数统计
+                        const students = members.filter(m => m.role === 'student').length;
+                        const teachers = members.filter(m => m.role === 'teacher').length;
+                        updateMultipleFields({
+                          student_count: students,
+                          teacher_count: teachers
+                        });
+                        handleAutoSave();
+                      }}
+                      compact={true}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {activeTab === 'schedule' && !isNew && (

@@ -70,23 +70,13 @@ const ScheduleManagement = ({ groupId, groupData, schedules, onUpdate }) => {
         />
       )}
 
-      <Card
-        title={
-          <Space>
-            <CalendarOutlined />
-            <span>{groupData.name} - 日程安排</span>
-          </Space>
-        }
-        extra={
-          <Segmented
-            options={[
-              { label: '日历视图', value: 'calendar', icon: <AppstoreOutlined /> },
-              { label: '演示视图', value: 'demo', icon: <UnorderedListOutlined /> }
-            ]}
-            value={viewMode}
-            onChange={setViewMode}
-          />
-        }
+      <div
+        style={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          background: '#fff'
+        }}
       >
         {viewMode === 'calendar' ? (
           <CalendarDaysView
@@ -129,7 +119,7 @@ const ScheduleManagement = ({ groupId, groupData, schedules, onUpdate }) => {
             </div>
           </>
         )}
-      </Card>
+      </div>
     </div>
   );
 };

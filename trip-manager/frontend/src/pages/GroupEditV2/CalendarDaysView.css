@@ -15,9 +15,23 @@
   align-items: center;
 }
 
+/* 紧凑工具栏 */
+.calendar-toolbar-compact {
+  padding: 8px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #e8e8e8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 36px;
+}
+
 .calendar-info {
-  font-size: 14px;
+  font-size: 13px;
   color: #595959;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 /* 日历容器 */
@@ -26,6 +40,9 @@
   background: white;
   overflow: hidden;
   position: relative;
+  height: 100%; /* 使用全部高度 */
+  border-radius: 8px 0 0 0;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.04);
 }
 
 /* 滚动包装器 */
@@ -140,6 +157,7 @@
   cursor: pointer;
   transition: background-color 0.2s;
   position: relative;
+  z-index: 1;
 }
 
 .time-slot:hover {
@@ -150,12 +168,45 @@
   border-bottom: 1px solid #e8e8e8;
 }
 
+/* 拖拽指示器 */
+.drop-indicator {
+  position: relative;
+  transition: none !important;
+}
+
+.drop-indicator::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100vw;
+  right: -100vw;
+  height: 2px;
+  background: #1890ff;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* 拖拽时的活动卡片样式 */
+.calendar-activity.dragging {
+  opacity: 0.5;
+  cursor: grabbing !important;
+}
+
+/* 拖拽时整个网格的样式 */
+.calendar-grid.dragging-active .time-slot {
+  background: transparent;
+}
+
+.calendar-grid.dragging-active .time-slot:hover {
+  background: rgba(24, 144, 255, 0.05);
+}
+
 /* 活动卡片 */
 .calendar-activity {
   margin: 2px;
   padding: 6px 8px;
   border-radius: 4px;
-  cursor: move;
+  cursor: grab;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
   transition: all 0.2s;
   overflow: hidden;
@@ -165,6 +216,10 @@
   justify-content: flex-start;
   user-select: none;
   min-height: 35px;
+}
+
+.calendar-activity:active {
+  cursor: grabbing;
 }
 
 .calendar-activity:hover {
@@ -197,26 +252,54 @@
 /* 时间调整手柄 */
 .resize-handle {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 8px;
+  bottom: -2px;
+  left: 2px;
+  right: 2px;
+  height: 12px;
   cursor: ns-resize;
   background: transparent;
   z-index: 25;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s;
+  border-bottom: 3px solid transparent;
+  transition: all 0.15s ease;
+  border-radius: 0 0 4px 4px;
+  user-select: none;
 }
 
 .resize-handle:hover {
-  background: rgba(255, 255, 255, 0.3);
-  border-bottom: 2px solid rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.25);
+  border-bottom: 3px solid rgba(255, 255, 255, 0.95);
+  height: 14px;
+  transform: translateY(-1px);
 }
 
 .resize-handle.resizing {
-  background: rgba(255, 255, 255, 0.5);
-  height: 10px;
-  border-bottom: 3px solid white;
+  background: rgba(255, 255, 255, 0.45);
+  height: 16px;
+  border-bottom: 4px solid white;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  transform: translateY(-2px);
+}
+
+/* 调整手柄图标 */
+.resize-handle::after {
+  content: '⋯';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 2px;
+}
+
+.resize-handle:hover::after {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.resize-handle.resizing::after {
+  color: white;
+  font-weight: bold;
 }
 
 /* 重合活动并排显示 */
@@ -420,4 +503,108 @@
 
 .quick-actions .ant-btn {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* 最大化日历容器 */
+.calendar-maximized {
+  height: calc(100vh - 90px); /* 只减去紧凑顶部导航和标签页 */
+}
+
+/* 完全最大化日历容器 */
+.calendar-fully-maximized {
+  height: 100%; /* 使用父容器的完整高度 */
+}
+
+/* 日历容器优化全屏显示 */
+.calendar-fully-maximized .calendar-container {
+  height: 100%;
+}
+
+.calendar-fully-maximized .calendar-scroll-wrapper {
+  overflow: auto; /* 始终允许滚动 */
+}
+
+/* 紧凑角落单元格 */
+.corner-cell-compact {
+  grid-column: 1;
+  grid-row: 1;
+  background: linear-gradient(135deg, #f5f5f5 0%, #fafafa 100%);
+  border-right: 1px solid #e8e8e8;
+  border-bottom: 1px solid #e8e8e8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: #8c8c8c;
+  position: sticky;
+  left: 0;
+  top: 0;
+  z-index: 100;
+  height: 35px;
+}
+
+/* 紧凑日期头部 - 压缩高度 */
+.date-header-compact {
+  background: #fafafa;
+  border-bottom: 1px solid #e8e8e8;
+  border-right: 1px solid #f0f0f0;
+  padding: 2px 4px;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 35px;
+  min-height: 35px;
+  position: relative;
+}
+
+/* 单行日期显示 */
+.date-header-compact .date-single-line {
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.date-header-compact .weekday-inline {
+  font-size: 11px;
+  font-weight: 400;
+  color: #8c8c8c;
+  margin-left: 2px;
+}
+
+/* 今天的标记 */
+.date-header-compact.today {
+  background: linear-gradient(180deg, #e6f7ff 0%, #f0f9ff 100%);
+}
+
+.date-header-compact.today .date-single-line {
+  color: #1890ff;
+}
+
+.date-header-compact.today .today-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  font-size: 9px;
+  color: #fff;
+  background: #1890ff;
+  padding: 1px 2px;
+  border-radius: 6px;
+  line-height: 1;
+}
+
+/* 周末样式 */
+.date-header-compact.weekend {
+  background: linear-gradient(180deg, #fff7e6 0%, #fffbe6 100%);
+}
+
+.date-header-compact.weekend .weekday-inline {
+  color: #fa8c16;
 }

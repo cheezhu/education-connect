@@ -1,0 +1,248 @@
+/* 紧凑团组概览样式 */
+.group-overview-compact {
+  background: white;
+  padding: 12px 16px;
+  border-radius: 4px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* 表单行 */
+.group-overview-compact .form-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 表单项基础样式 */
+.group-overview-compact .ant-form-item {
+  margin-bottom: 0 !important;
+  margin-right: 12px;
+}
+
+.group-overview-compact .ant-form-item-label {
+  padding: 0 4px 0 0;
+  min-width: auto;
+}
+
+.group-overview-compact .ant-form-item-label > label {
+  font-size: 13px;
+  color: #595959;
+  height: 28px;
+  line-height: 28px;
+}
+
+.group-overview-compact .ant-form-item-label > label::after {
+  content: '';
+}
+
+/* 不同类型的表单项 */
+.group-overview-compact .form-item-flex {
+  flex: 1;
+  min-width: 200px;
+}
+
+.group-overview-compact .form-item-small {
+  flex: 0 0 auto;
+}
+
+.group-overview-compact .form-item-date {
+  flex: 0 0 auto;
+}
+
+.group-overview-compact .form-item-date .ant-picker {
+  width: 110px;
+}
+
+.group-overview-compact .form-item-number {
+  flex: 0 0 auto;
+}
+
+.group-overview-compact .form-item-number .ant-input-number {
+  width: 80px;
+}
+
+.group-overview-compact .form-item-number .ant-input-number-group-addon {
+  padding: 0 4px;
+  background: transparent;
+  border: none;
+  font-size: 12px;
+}
+
+.group-overview-compact .form-item-contact {
+  flex: 0 0 auto;
+}
+
+.group-overview-compact .form-item-contact .ant-input {
+  width: 120px;
+}
+
+/* 输入框样式 */
+.group-overview-compact .ant-input,
+.group-overview-compact .ant-picker,
+.group-overview-compact .ant-select-selector,
+.group-overview-compact .ant-input-number {
+  height: 28px !important;
+  font-size: 13px;
+}
+
+.group-overview-compact .ant-input-textarea {
+  font-size: 13px;
+}
+
+.group-overview-compact .ant-select-selector {
+  padding: 0 8px !important;
+}
+
+.group-overview-compact .ant-select-selection-item {
+  line-height: 26px !important;
+}
+
+.group-overview-compact .ant-picker-input > input {
+  font-size: 13px;
+}
+
+/* 行程天数显示 */
+.group-overview-compact .duration-display {
+  padding: 0 12px;
+  height: 28px;
+  line-height: 28px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #595959;
+  white-space: nowrap;
+}
+
+.group-overview-compact .duration-number {
+  font-weight: 600;
+  color: #1890ff;
+  margin: 0 4px;
+}
+
+/* 分割线 */
+.group-overview-compact .ant-divider-horizontal {
+  margin: 8px 0;
+}
+
+/* 标签区域 */
+.group-overview-compact .tags-section {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-right: 16px;
+}
+
+.group-overview-compact .tags-section .label {
+  font-size: 13px;
+  color: #595959;
+  margin-right: 8px;
+}
+
+.group-overview-compact .ant-tag {
+  font-size: 12px;
+  line-height: 20px;
+  padding: 0 7px;
+  margin: 2px 2px;
+}
+
+/* 统计栏 */
+.group-overview-compact .stats-bar {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  margin-top: 8px;
+  border-top: 1px solid #f0f0f0;
+  font-size: 12px;
+}
+
+.group-overview-compact .stat-item {
+  display: flex;
+  align-items: center;
+  margin-right: 16px;
+}
+
+.group-overview-compact .stat-label {
+  color: #8c8c8c;
+  margin-right: 4px;
+}
+
+.group-overview-compact .stat-value {
+  color: #262626;
+  font-weight: 500;
+}
+
+.group-overview-compact .stat-divider {
+  color: #d9d9d9;
+  margin: 0 12px;
+}
+
+/* 颜色选择器 */
+.group-overview-compact .ant-color-picker-trigger {
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.group-overview-compact .ant-color-picker-trigger-text {
+  display: none;
+}
+
+/* 响应式 */
+@media (max-width: 1200px) {
+  .group-overview-compact .form-row {
+    flex-wrap: wrap;
+  }
+
+  .group-overview-compact .form-item-contact .ant-input {
+    width: 100px;
+  }
+}
+
+@media (max-width: 768px) {
+  .group-overview-compact {
+    padding: 8px 12px;
+  }
+
+  .group-overview-compact .form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .group-overview-compact .ant-form-item {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 8px !important;
+  }
+
+  .group-overview-compact .form-item-contact .ant-input,
+  .group-overview-compact .form-item-date .ant-picker {
+    width: 100%;
+  }
+
+  .group-overview-compact .stats-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+/* 滚动条美化 */
+.group-overview-compact::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.group-overview-compact::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 3px;
+}
+
+.group-overview-compact::-webkit-scrollbar-thumb {
+  background: #bfbfbf;
+  border-radius: 3px;
+}
+
+.group-overview-compact::-webkit-scrollbar-thumb:hover {
+  background: #8c8c8c;
+}
