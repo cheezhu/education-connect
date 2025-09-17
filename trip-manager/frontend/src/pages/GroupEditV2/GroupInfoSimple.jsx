@@ -88,6 +88,82 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
             </div>
           </div>
 
+          {/* 第三行：人数信息 */}
+          <div className="info-row">
+            <div className="info-item">
+              <label>学生人数</label>
+              <input
+                type="number"
+                value={groupData.student_count || 0}
+                onChange={(e) => {
+                  onUpdate('student_count', parseInt(e.target.value) || 0);
+                  handleAutoSave();
+                }}
+                min="0"
+                placeholder="0"
+              />
+            </div>
+            <div className="info-item">
+              <label>老师人数</label>
+              <input
+                type="number"
+                value={groupData.teacher_count || 0}
+                onChange={(e) => {
+                  onUpdate('teacher_count', parseInt(e.target.value) || 0);
+                  handleAutoSave();
+                }}
+                min="0"
+                placeholder="0"
+              />
+            </div>
+            <div className="info-item">
+              <label>总人数</label>
+              <div className="duration-display">
+                <span className="duration-number">{(groupData.student_count || 0) + (groupData.teacher_count || 0)}</span> 人
+              </div>
+            </div>
+          </div>
+
+          {/* 第四行：联系人信息 */}
+          <div className="info-row">
+            <div className="info-item">
+              <label>联系人</label>
+              <input
+                type="text"
+                value={groupData.contact_person || ''}
+                onChange={(e) => {
+                  onUpdate('contact_person', e.target.value);
+                  handleAutoSave();
+                }}
+                placeholder="联系人姓名"
+              />
+            </div>
+            <div className="info-item">
+              <label>联系电话</label>
+              <input
+                type="tel"
+                value={groupData.contact_phone || ''}
+                onChange={(e) => {
+                  onUpdate('contact_phone', e.target.value);
+                  handleAutoSave();
+                }}
+                placeholder="联系电话"
+              />
+            </div>
+            <div className="info-item">
+              <label>紧急联系人</label>
+              <input
+                type="text"
+                value={groupData.emergency_contact || ''}
+                onChange={(e) => {
+                  onUpdate('emergency_contact', e.target.value);
+                  handleAutoSave();
+                }}
+                placeholder="紧急联系人"
+              />
+            </div>
+          </div>
+
           {/* 第三行：备注 */}
           <div className="info-row">
             <div className="info-item full-width">

@@ -14,69 +14,41 @@ import './CalendarDaysView.css';
 const { TextArea } = Input;
 const { Option } = Select;
 
-// 拖拽影子组件
-const DragGhostOverlay = ({ isDragging, dragGhost, activityTypes }) => {
-  const [position, setPosition] = React.useState({ x: 0, y: 0 });
+// 拖拽影子组件已移除 - 使用简单虚线框代替
 
-  React.useEffect(() => {
-    if (!isDragging || !dragGhost) return;
+// 预设行程资源
+const presetResourcesData = [
+  // 重复性活动（可多次使用）
+  { id: 'meal', type: 'meal', title: '早餐', icon: '🍽️', duration: 1, description: '酒店自助早餐', isUnique: false },
+  { id: 'lunch', type: 'meal', title: '午餐', icon: '🍽️', duration: 1, description: '粤菜午餐', isUnique: false },
+  { id: 'dinner', type: 'meal', title: '晚餐', icon: '🍽️', duration: 1.5, description: '特色晚餐', isUnique: false },
+  { id: 'transport', type: 'transport', title: '大巴交通', icon: '🚌', duration: 1, description: '团组集体交通', isUnique: false },
+  { id: 'rest', type: 'rest', title: '休息', icon: '🏨', duration: 1, description: '酒店休息', isUnique: false },
+  { id: 'free', type: 'free', title: '自由活动', icon: '🚶', duration: 2, description: '自由安排', isUnique: false },
 
-    const handleMouseMove = (e) => {
-      setPosition({
-        x: e.clientX - dragGhost.offsetX,
-        y: e.clientY - dragGhost.offsetY
-      });
-    };
-
-    // 设置初始位置
-    handleMouseMove({ clientX: 0, clientY: 0 });
-
-    document.addEventListener('mousemove', handleMouseMove);
-    return () => document.removeEventListener('mousemove', handleMouseMove);
-  }, [isDragging, dragGhost]);
-
-  if (!isDragging || !dragGhost) return null;
-
-  return (
-    <div
-      className="drag-ghost"
-      style={{
-        position: 'fixed',
-        left: position.x,
-        top: position.y,
-        pointerEvents: 'none',
-        zIndex: 10000,
-        opacity: 0.8,
-        width: dragGhost.width,
-        height: dragGhost.height,
-        background: activityTypes[dragGhost.activity.type].color,
-        borderRadius: '4px',
-        padding: '4px 8px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-        display: 'flex',
-        alignItems: 'center',
-        color: 'white',
-        fontSize: '12px'
-      }}
-    >
-      <span style={{ marginRight: '4px' }}>
-        {activityTypes[dragGhost.activity.type].icon}
-      </span>
-      <span>{dragGhost.activity.title || '未命名'}</span>
-    </div>
-  );
-};
+  // 单一活动（只能使用一次） - 蓝色visit类型
+  { id: 'science', type: 'visit', title: '香港科学馆', icon: '🏛️', duration: 2.5, description: '常设展览参观', isUnique: true },
+  { id: 'ocean', type: 'visit', title: '海洋公园', icon: '🏛️', duration: 4, description: '海洋动物展示', isUnique: true },
+  { id: 'peak', type: 'visit', title: '太平山顶', icon: '🏛️', duration: 3, description: '观光与拍照', isUnique: true },
+  { id: 'university', type: 'visit', title: '香港大学', icon: '🏛️', duration: 2, description: '校园参观', isUnique: true },
+  { id: 'museum', type: 'visit', title: '历史博物馆', icon: '🏛️', duration: 2, description: '文化历史学习', isUnique: true },
+  { id: 'activity', type: 'activity', title: '团队活动', icon: '🎯', duration: 2, description: '互动游戏', isUnique: true }
+];
 
 const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
+  // 管理可用的资源卡片
+  const [availableResources, setAvailableResources] = useState(presetResourcesData);
   const [activities, setActivities] = useState(schedules);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingActivity, setEditingActivity] = useState(null);
   const [draggedActivity, setDraggedActivity] = useState(null);
+  const [draggedResource, setDraggedResource] = useState(null); // 拖拽的资源卡片
+  const [returningActivity, setReturningActivity] = useState(null); // 正在返回的活动
   const dragOffsetRef = useRef({ x: 0, y: 0 }); // 使用ref记录拖拽偏移，避免状态更新延迟
   const [resizingActivity, setResizingActivity] = useState(null);
   const [dragPreview, setDragPreview] = useState(null);
-  const [dragGhost, setDragGhost] = useState(null); // 拖拽影子
+  // dragGhost已移除 - 使用简单虚线框代替
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saved', 'saving', 'error'
   const saveTimeoutRef = useRef(null);
   const [dropIndicator, setDropIndicator] = useState(null); // 拖拽放置指示器
@@ -85,6 +57,25 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
   const [form] = Form.useForm();
   const calendarRef = useRef(null);
   const dragPreviewRef = useRef(null);
+
+  // 全局拖拽结束事件监听 - 确保清理所有拖拽状态
+  useEffect(() => {
+    const handleGlobalDragEnd = () => {
+      // 如果有任何拖拽状态残留，清理它们
+      if (isDragging || draggedActivity || draggedResource) {
+        console.log('全局拖拽结束清理');
+        setDraggedActivity(null);
+        setDraggedResource(null);
+        setReturningActivity(null);
+        dragOffsetRef.current = { x: 0, y: 0 };
+        setDropIndicator(null);
+        setIsDragging(false);
+      }
+    };
+
+    document.addEventListener('dragend', handleGlobalDragEnd);
+    return () => document.removeEventListener('dragend', handleGlobalDragEnd);
+  }, [isDragging, draggedActivity, draggedResource]);
 
   // 活动类型配置
   const activityTypes = {
@@ -96,10 +87,10 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     free: { label: '自由活动', color: '#13c2c2', icon: '🚶' }
   };
 
-  // 生成时间槽（7:00-23:00，每1小时）
+  // 生成时间槽（6:00-20:00，每1小时） - 优化范围完全适应屏幕
   const generateTimeSlots = () => {
     const slots = [];
-    for (let hour = 7; hour <= 23; hour++) {
+    for (let hour = 6; hour <= 20; hour++) {
       slots.push(`${hour.toString().padStart(2, '0')}:00`);
     }
     return slots;
@@ -140,14 +131,14 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
   // 时间转换为网格位置
   const timeToGridRow = (time) => {
     const [hour, minute] = time.split(':').map(Number);
-    const totalMinutes = (hour - 7) * 60 + minute;  // 从7点开始
+    const totalMinutes = (hour - 6) * 60 + minute;  // 从6点开始
     return Math.floor(totalMinutes / 60) + 2; // +2 因为第一行是header，每小时一格
   };
 
   // 网格位置转换为时间
   const gridRowToTime = (row) => {
     const totalMinutes = (row - 2) * 60; // -2 因为第一行是header，每小时一格
-    const hour = Math.floor(totalMinutes / 60) + 7;  // 从7点开始
+    const hour = Math.floor(totalMinutes / 60) + 6;  // 从6点开始
     const minute = totalMinutes % 60;
     return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
   };
@@ -284,11 +275,12 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     const offsetY = e.clientY - rect.top; // 鼠标距离活动卡片顶部的距离
     const offsetX = e.clientX - rect.left;
 
-    console.log('拖拽偏移:', {
-      offsetY,
-      cardHeight: rect.height,
-      mouseY: e.clientY,
-      cardTop: rect.top
+    console.log('📍 拖拽开始偏移记录:', {
+      '鼠标在卡片内Y偏移': offsetY,
+      '卡片高度': rect.height,
+      '鼠标客户端Y': e.clientY,
+      '卡片顶部Y': rect.top,
+      '说明': '偏移量 = 鼠标Y - 卡片顶部Y'
     });
 
     // 使用ref存储偏移，确保立即可用
@@ -308,30 +300,33 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     emptyImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=';
     e.dataTransfer.setDragImage(emptyImg, 0, 0);
 
-    // 创建拖拽影子
-    setDragGhost({
-      activity,
-      width: rect.width,
-      height: rect.height,
-      offsetX,
-      offsetY
-    });
+    // 不再需要创建拖拽影子 - 使用简单虚线框
   };
 
   // 拖拽结束
   const handleDragEnd = (e) => {
     console.log('拖拽结束');
+    // 清除所有拖拽相关状态
     setDraggedActivity(null);
+    setDraggedResource(null);
+    setReturningActivity(null);
     dragOffsetRef.current = { x: 0, y: 0 };
     setDropIndicator(null);
-    setDragGhost(null);
+    // dragGhost已移除
     setIsDragging(false);
+    // 确保清除任何残留的拖拽视觉效果
+    e.dataTransfer.clearData();
   };
 
   // 拖拽悬停
   const handleDragOver = (e) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer.dropEffect = draggedResource ? 'copy' : 'move';
+
+    // 如果是资源卡片拖拽，简单处理
+    if (draggedResource) {
+      return;
+    }
 
     if (!draggedActivity) return;
 
@@ -351,18 +346,26 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     const activityTopY = mouseY - dragOffsetRef.current.y;
 
     // 计算目标时间槽
-    const headerHeight = 35;
-    const slotHeight = 45;
+    const headerHeight = 30;
+    const slotHeight = 40;
     const adjustedY = activityTopY - headerHeight;
-    const targetSlotIndex = Math.round(adjustedY / slotHeight);
+
+    // 使用与handleDrop相同的逻辑
+    let targetSlotIndex;
+    if (adjustedY < 0) {
+      targetSlotIndex = 0;
+    } else {
+      targetSlotIndex = Math.round(adjustedY / slotHeight);
+    }
 
     // 计算持续时间
     const originalStart = timeToGridRow(draggedActivity.startTime);
     const originalEnd = timeToGridRow(draggedActivity.endTime);
     const duration = originalEnd - originalStart;
 
-    // 限制索引范围
-    const constrainedIndex = Math.max(0, Math.min(timeSlots.length - duration, targetSlotIndex));
+    // 限制索引范围（与handleDrop保持一致）
+    const maxStartIndex = Math.max(0, timeSlots.length - duration);
+    const constrainedIndex = Math.max(0, Math.min(maxStartIndex, targetSlotIndex));
 
     // 获取当前悬停的列（日期）
     const targetElement = e.target.closest('.time-slot');
@@ -377,6 +380,16 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
           slotIndex: constrainedIndex,
           duration,
           time: timeSlots[constrainedIndex]
+        });
+
+        // 调试：确保标尺线位置正确
+        console.log('📏 标尺线位置:', {
+          '活动上沿Y': activityTopY,
+          '调整后Y': adjustedY,
+          '目标索引': targetSlotIndex,
+          '约束后索引': constrainedIndex,
+          '对应时间': timeSlots[constrainedIndex],
+          'Grid行': constrainedIndex + 2
         });
       }
     }
@@ -400,8 +413,50 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
   // 拖拽放置
   const handleDrop = (e, targetDate, targetTime) => {
     e.preventDefault();
+    e.stopPropagation();
     console.log('拖拽放置到:', targetDate, targetTime);
+    console.log('draggedResource:', draggedResource);
+    console.log('draggedActivity:', draggedActivity);
 
+    // 处理资源卡片拖拽
+    if (draggedResource) {
+      console.log('处理资源卡片拖拽:', draggedResource.title);
+      // 创建新活动
+      const startHour = parseInt(targetTime.split(':')[0]);
+      const endHour = Math.min(20, startHour + Math.ceil(draggedResource.duration));
+      const newActivity = {
+        id: Date.now(),
+        groupId: groupData.id,
+        date: targetDate,
+        startTime: targetTime,
+        endTime: `${endHour.toString().padStart(2, '0')}:00`,
+        type: draggedResource.type,
+        title: draggedResource.title,
+        location: '',
+        description: draggedResource.description,
+        color: activityTypes[draggedResource.type].color,
+        resourceId: draggedResource.id,  // 记录资源ID
+        isFromResource: true  // 标记来自资源
+      };
+
+      const updatedActivities = [...activities, newActivity];
+      setActivities(updatedActivities);
+      onUpdate(updatedActivities);
+
+      // 如果是单一活动，从资源列表中移除
+      if (draggedResource.isUnique) {
+        setAvailableResources(prev => prev.filter(r => r.id !== draggedResource.id));
+      }
+
+      // 清除拖拽状态
+      setDraggedResource(null);
+      setIsDragging(false);
+
+      message.success(`已添加活动：${draggedResource.title}`, 1);
+      return;
+    }
+
+    // 处理已有活动的拖拽（考虑鼠标偏移）
     if (!draggedActivity) {
       console.log('没有被拖拽的活动');
       return;
@@ -442,13 +497,14 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     // 使用记录的拖拽偏移量计算活动卡片上沿的位置
     const activityTopY = mouseY - dragOffsetY;
 
-    console.log('放置计算:', {
-      mouseClientY: e.clientY,
-      wrapperTop: wrapperRect.top,
-      scrollTop,
-      mouseY,
-      dragOffsetY,
-      activityTopY
+    console.log('🎯 拖拽定位计算:', {
+      '鼠标客户端Y': e.clientY,
+      '容器顶部': wrapperRect.top,
+      '滚动偏移': scrollTop,
+      '鼠标相对Y': mouseY,
+      '拖拽偏移（鼠标在卡片内位置）': dragOffsetY,
+      '活动上沿Y': activityTopY,
+      '说明': '活动上沿Y = 鼠标Y - 拖拽偏移'
     });
 
     // 计算原始持续时间
@@ -456,9 +512,9 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     const originalEnd = timeToGridRow(draggedActivity.endTime);
     const duration = originalEnd - originalStart;
 
-    // 每个时间槽50px（1小时），头部35px
-    const headerHeight = 35;
-    const slotHeight = 45;
+    // 每个时间槽40px（1小时），头部30px
+    const headerHeight = 30;
+    const slotHeight = 40;
 
     // 计算活动上沿对应的时间槽索引
     const adjustedY = activityTopY - headerHeight;
@@ -469,7 +525,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
       // 如果在头部上方，设置为第一个时间槽
       targetSlotIndex = 0;
     } else {
-      // 使用四舍五入找到最接近的时间槽
+      // 使用四舍五入定位到最接近的时间槽（与标尺线保持一致）
       targetSlotIndex = Math.round(adjustedY / slotHeight);
     }
 
@@ -478,10 +534,14 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     const constrainedIndex = Math.max(0, Math.min(maxStartIndex, targetSlotIndex));
     const adjustedStartTime = timeSlots[constrainedIndex];
 
-    console.log('计算结果:', {
-      targetSlotIndex,
-      constrainedIndex,
-      adjustedStartTime
+    console.log('📍 最终放置位置:', {
+      '活动上沿相对网格Y': adjustedY,
+      '目标时间槽索引': targetSlotIndex,
+      '约束后索引': constrainedIndex,
+      '对应开始时间': adjustedStartTime,
+      '活动持续格数': duration,
+      'Grid行': constrainedIndex + 2,
+      '说明': '活动上沿对应的时间即为开始时间'
     });
 
     // 计算新的结束时间
@@ -564,9 +624,9 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
       // 使用滚动容器作为参考点，避免滚动问题
       const relativeY = moveEvent.clientY - wrapperRect.top + scrollTop;
 
-      // 每个时间槽的高度是50px（1小时），第一行是35px的日期头部
-      const headerHeight = 35;
-      const rowHeight = 45;
+      // 每个时间槽的高度是40px（1小时），第一行是30px的日期头部
+      const headerHeight = 30;
+      const rowHeight = 40;
 
       // 计算鼠标位置对应的时间槽行数
       const adjustedY = relativeY - headerHeight;
@@ -799,7 +859,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
                 style={{
                   gridColumn: dayIndex + 2,
                   gridRow: timeIndex + 2,
-                  height: '45px'
+                  height: '40px'
                 }}
               />
             ))}
@@ -902,7 +962,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
             className={`calendar-grid ${isDragging ? 'dragging-active' : ''}`}
             style={{
               gridTemplateColumns: `60px repeat(${days.length}, 1fr)`,
-              gridTemplateRows: `35px repeat(${timeSlots.length}, 45px)`  // 减小行高以适应屏幕
+              gridTemplateRows: `30px repeat(${timeSlots.length}, minmax(30px, 1fr))`  // 自适应高度，最小30px
             }}
           >
             {renderGridContent()}
@@ -910,12 +970,131 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
         </div>
       </div>
 
-      {/* 自定义拖拽影子 */}
-      <DragGhostOverlay
-        isDragging={isDragging}
-        dragGhost={dragGhost}
-        activityTypes={activityTypes}
-      />
+      {/* 行程资源卡片区域 */}
+      <div className="resource-cards-container"
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          // 处理从日历拖回的活动
+          if (draggedActivity && draggedActivity.isFromResource) {
+            // 如果是单一活动，恢复到资源列表
+            const resourceData = presetResourcesData.find(r => r.id === draggedActivity.resourceId);
+            if (resourceData && resourceData.isUnique) {
+              setAvailableResources(prev => {
+                if (!prev.find(r => r.id === resourceData.id)) {
+                  return [...prev, resourceData].sort((a, b) => {
+                    // 保持原有顺序
+                    const aIndex = presetResourcesData.findIndex(r => r.id === a.id);
+                    const bIndex = presetResourcesData.findIndex(r => r.id === b.id);
+                    return aIndex - bIndex;
+                  });
+                }
+                return prev;
+              });
+
+              // 从活动列表中移除
+              const updatedActivities = activities.filter(a => a.id !== draggedActivity.id);
+              setActivities(updatedActivities);
+              onUpdate(updatedActivities);
+
+              message.success(`已将 ${draggedActivity.title} 返回资源区`, 1);
+            }
+          }
+
+          // 清除所有拖拽状态
+          setDraggedActivity(null);
+          setDraggedResource(null);
+          // dragGhost已移除
+          setDropIndicator(null);
+          setIsDragging(false);
+          setReturningActivity(null);
+          // 清除拖拽偏移
+          dragOffsetRef.current = { x: 0, y: 0 };
+        }}
+      >
+        <div className="resource-header">
+          <span className="resource-title">行程资源</span>
+          <span className="resource-hint">拖拽卡片到日历中创建活动</span>
+        </div>
+
+        {/* 可重复活动区域 */}
+        <div className="resource-section">
+          <div className="section-label">可重复活动</div>
+          <div className="resource-cards">
+            {availableResources.filter(r => !r.isUnique).map(resource => (
+              <div
+                key={resource.id}
+                className={`resource-card ${resource.type} repeatable`}
+                draggable={true}
+                onDragStart={(e) => {
+                  setDraggedResource(resource);
+                  setIsDragging(true);
+                  e.dataTransfer.effectAllowed = 'copy';
+                  e.dataTransfer.setData('resource', JSON.stringify(resource));
+                }}
+                onDragEnd={() => {
+                  setDraggedResource(null);
+                  setIsDragging(false);
+                }}
+                style={{
+                  background: activityTypes[resource.type].color,
+                  cursor: 'grab'
+                }}
+                title={resource.description}
+              >
+                <div className="resource-icon">{resource.icon}</div>
+                <div className="resource-info">
+                  <div className="resource-name">{resource.title}</div>
+                  <div className="resource-duration">{resource.duration}小时</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 单一活动区域 */}
+        <div className="resource-section">
+          <div className="section-label">单一活动（仅使用一次）</div>
+          <div className="resource-cards">
+            {availableResources.filter(r => r.isUnique).map(resource => (
+              <div
+                key={resource.id}
+                className={`resource-card ${resource.type} unique`}
+                draggable={true}
+                onDragStart={(e) => {
+                  setDraggedResource(resource);
+                  setIsDragging(true);
+                  e.dataTransfer.effectAllowed = 'copy';
+                  e.dataTransfer.setData('resource', JSON.stringify(resource));
+                }}
+                onDragEnd={() => {
+                  setDraggedResource(null);
+                  setIsDragging(false);
+                }}
+                style={{
+                  background: activityTypes[resource.type].color,
+                  cursor: 'grab'
+                }}
+                title={resource.description}
+              >
+                <div className="resource-icon">{resource.icon}</div>
+                <div className="resource-info">
+                  <div className="resource-name">
+                    {resource.title}
+                    <span className="unique-badge">1</span>
+                  </div>
+                  <div className="resource-duration">{resource.duration}小时</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 拖拽影子已移除 - 使用简单虚线框 */}
 
       {/* 活动编辑模态框 */}
       <Modal

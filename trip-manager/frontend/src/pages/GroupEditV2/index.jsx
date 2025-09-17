@@ -251,7 +251,7 @@ const GroupEditV2 = () => {
               title={isNew ? '保存团组后可编辑' : '日程安排'}
             >
               <CalendarOutlined className="tab-icon" />
-              <span className="tab-text">日程安排</span>
+              <span className="tab-text">日历详情</span>
             </div>
           </div>
         </div>

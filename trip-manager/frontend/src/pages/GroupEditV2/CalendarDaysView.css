@@ -3,6 +3,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 /* 工具栏 */
@@ -40,24 +41,31 @@
   background: white;
   overflow: hidden;
   position: relative;
-  height: 100%; /* 使用全部高度 */
+  display: flex;
+  flex-direction: column;
   border-radius: 8px 0 0 0;
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.04);
+  min-height: 0; /* 确保可以收缩 */
 }
 
 /* 滚动包装器 */
 .calendar-scroll-wrapper {
   width: 100%;
   height: 100%;
-  overflow: auto;
+  flex: 1;
+  overflow: hidden; /* 禁用滚动条 */
   position: relative;
+  min-height: 0; /* 确保flex子元素可以收缩 */
+  display: flex;
 }
 
 /* 日历网格 */
 .calendar-grid {
   display: grid;
-  min-width: 1000px;
+  width: 100%;
   position: relative;
+  height: 100%;
+  flex: 1;
 }
 
 /* 角落单元格 */
@@ -186,10 +194,27 @@
   pointer-events: none;
 }
 
-/* 拖拽时的活动卡片样式 */
+/* 拖拽时的活动卡片样式 - 简单虚线框 */
 .calendar-activity.dragging {
-  opacity: 0.5;
   cursor: grabbing !important;
+  z-index: 1 !important;  /* 降低层级 */
+  opacity: 1 !important;  /* 保持不透明 */
+  background: rgba(255, 255, 255, 0.5) !important;  /* 半透明白色背景 */
+  border: 2px dashed #999 !important;
+  box-shadow: none !important;
+  transform: none !important;  /* 禁用任何变形 */
+  color: #999;
+}
+
+/* 拖拽时隐藏内容，只显示轮廓 */
+.calendar-activity.dragging .activity-content {
+  opacity: 0.3;
+}
+
+/* 拖拽时禁用hover效果 */
+.calendar-activity.dragging:hover {
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 /* 拖拽时整个网格的样式 */
@@ -228,11 +253,7 @@
   z-index: 30;
 }
 
-.calendar-activity.dragging {
-  opacity: 0.5;
-  cursor: grabbing;
-  z-index: 1;
-}
+/* 已在上面定义，删除重复样式 */
 
 /* 拖拽预览 */
 .drag-preview {
@@ -513,6 +534,8 @@
 /* 完全最大化日历容器 */
 .calendar-fully-maximized {
   height: 100%; /* 使用父容器的完整高度 */
+  display: flex;
+  flex-direction: column;
 }
 
 /* 日历容器优化全屏显示 */
@@ -521,7 +544,7 @@
 }
 
 .calendar-fully-maximized .calendar-scroll-wrapper {
-  overflow: auto; /* 始终允许滚动 */
+  overflow: hidden; /* 禁用滚动 */
 }
 
 /* 紧凑角落单元格 */
@@ -541,7 +564,7 @@
   left: 0;
   top: 0;
   z-index: 100;
-  height: 35px;
+  height: 30px;
 }
 
 /* 紧凑日期头部 - 压缩高度 */
@@ -557,8 +580,8 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 35px;
-  min-height: 35px;
+  height: 30px;
+  min-height: 30px;
   position: relative;
 }
 
@@ -607,4 +630,152 @@
 
 .date-header-compact.weekend .weekday-inline {
   color: #fa8c16;
+}
+
+/* \u884c\u7a0b\u8d44\u6e90\u5361\u7247\u533a\u57df */
+.resource-cards-container {
+  background: #f8f9fa;
+  border-top: 1px solid #e8e8e8;
+  padding: 12px 16px;
+  flex-shrink: 0;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.resource-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.resource-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.resource-hint {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+/* 资源分区 */
+.resource-section {
+  margin-bottom: 16px;
+}
+
+.resource-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #595959;
+  margin-bottom: 8px;
+  padding-left: 4px;
+  border-left: 3px solid #1890ff;
+}
+
+.resource-section:last-child .section-label {
+  border-left-color: #fa8c16;
+}
+
+.resource-cards {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.resource-card {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: white;
+  cursor: grab;
+  transition: all 0.2s;
+  min-width: 100px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.resource-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.resource-card:active {
+  cursor: grabbing;
+  transform: translateY(0);
+}
+
+.resource-icon {
+  font-size: 18px;
+  margin-right: 8px;
+}
+
+.resource-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.resource-name {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.resource-duration {
+  font-size: 10px;
+  opacity: 0.9;
+  margin-top: 2px;
+}
+
+/* \u5355\u4e00\u6d3b\u52a8\u5361\u7247\u6807\u8bb0 */
+.resource-card.unique {
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  position: relative;
+}
+
+.resource-card.unique::after {
+  content: '1';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #ff4d4f;
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.unique-badge {
+  background: #ff4d4f;
+  color: white;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* \u91cd\u590d\u6027\u6d3b\u52a8\u5361\u7247 */
+.resource-card.repeatable {
+  opacity: 0.95;
+}
+
+/* \u8d44\u6e90\u533a\u63a5\u6536\u62d6\u62fd */
+.resource-cards-container.drag-over {
+  background: #e6f7ff;
+  border-top: 2px solid #1890ff;
 }
