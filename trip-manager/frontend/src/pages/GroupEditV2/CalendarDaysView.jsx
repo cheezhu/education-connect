@@ -761,7 +761,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     const style = {
       gridColumn: dayIndex + 2, // +2 因为第一列是时间标签
       gridRow: `${startRow} / ${endRow}`,
-      zIndex: isDragged ? 1 : 20
+      zIndex: isDragged ? 1 : 10  // 降低正常活动的层级，让虚线框(15)能显示在上面
     };
 
     return (
@@ -769,12 +769,13 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
         key={activity.id}
         className={`calendar-activity ${activity.type} ${isDragged ? 'dragging' : ''}`}
         style={style}
-        draggable={true}
-        onDragStart={(e) => handleDragStart(e, activity)}
+        draggable={!isDragged}  // 拖拽中的活动禁用拖拽
+        onDragStart={(e) => !isDragged && handleDragStart(e, activity)}
         onDragEnd={handleDragEnd}
-        onClick={(e) => handleActivityClick(e, activity)}
-        onContextMenu={(e) => handleActivityContextMenu(e, activity)}
-        title="右键编辑活动"
+        // 移除拖拽事件阻止，让事件正常传播到下层时间槽
+        onClick={(e) => !isDragged && handleActivityClick(e, activity)}
+        onContextMenu={(e) => !isDragged && handleActivityContextMenu(e, activity)}
+        title={isDragged ? "" : "右键编辑活动"}
       >
         <div className="activity-content">
           <div className="activity-header">

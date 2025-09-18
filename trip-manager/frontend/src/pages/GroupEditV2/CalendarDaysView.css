@@ -194,21 +194,26 @@
   pointer-events: none;
 }
 
-/* 拖拽时的活动卡片样式 - 简单虚线框 */
+/* 拖拽时的活动卡片样式 - 极简占位 */
 .calendar-activity.dragging {
   cursor: grabbing !important;
-  z-index: 1 !important;  /* 降低层级 */
-  opacity: 1 !important;  /* 保持不透明 */
-  background: rgba(255, 255, 255, 0.5) !important;  /* 半透明白色背景 */
-  border: 2px dashed #999 !important;
+  z-index: 0 !important;  /* 最底层但不是负数 */
+  opacity: 0.05 !important;  /* 几乎不可见 */
+  background: transparent !important;
+  border: 1px dashed #f0f0f0 !important;  /* 极淡的虚线 */
   box-shadow: none !important;
-  transform: none !important;  /* 禁用任何变形 */
-  color: #999;
+  transform: none !important;
+  overflow: hidden !important;
 }
 
-/* 拖拽时隐藏内容，只显示轮廓 */
+/* 拖拽时完全隐藏内容 */
 .calendar-activity.dragging .activity-content {
-  opacity: 0.3;
+  visibility: hidden !important;  /* 完全隐藏但保留空间 */
+}
+
+/* 拖拽时隐藏调整手柄 */
+.calendar-activity.dragging .resize-handle {
+  display: none !important;
 }
 
 /* 拖拽时禁用hover效果 */
