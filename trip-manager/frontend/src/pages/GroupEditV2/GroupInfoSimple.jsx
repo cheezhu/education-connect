@@ -1,7 +1,26 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
 
 const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
+  const [themePackages, setThemePackages] = useState([]);
+
+  // 模拟获取主题包数据
+  useEffect(() => {
+    const mockPackages = [
+      { id: 'theme_001', name: '科技探索之旅', resourceCount: 3 },
+      { id: 'theme_002', name: '文化深度游', resourceCount: 2 },
+      { id: 'theme_003', name: '自然生态探索', resourceCount: 2 },
+      { id: 'theme_004', name: '学术交流体验', resourceCount: 1 }
+    ];
+    setThemePackages(mockPackages);
+  }, []);
+
+  // 获取当前选中主题包的资源数量
+  const getCurrentPackageResourceCount = () => {
+    if (!groupData.themePackageId) return 0;
+    const currentPackage = themePackages.find(pkg => pkg.id === groupData.themePackageId);
+    return currentPackage?.resourceCount || 0;
+  };
   return (
     <div className="unified-info-view">
       {/* 卡片容器 */}
@@ -164,7 +183,36 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
             </div>
           </div>
 
-          {/* 第三行：备注 */}
+          {/* 第五行：主题包选择 */}
+          <div className="info-row">
+            <div className="info-item flex-2">
+              <label>教育主题包</label>
+              <select
+                value={groupData.themePackageId || ''}
+                onChange={(e) => {
+                  onUpdate('themePackageId', e.target.value);
+                  handleAutoSave();
+                }}
+              >
+                <option value="">请选择主题包</option>
+                {themePackages.map(pkg => (
+                  <option key={pkg.id} value={pkg.id}>
+                    {pkg.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="info-item">
+              <label>包含资源</label>
+              <div className="duration-display">
+                <span className="duration-number">
+                  {getCurrentPackageResourceCount()}
+                </span> 个
+              </div>
+            </div>
+          </div>
+
+          {/* 第六行：备注 */}
           <div className="info-row">
             <div className="info-item full-width">
               <label>备注</label>

@@ -109,7 +109,8 @@ const GroupEditV2 = () => {
           emergency_contact: groupData.emergency_contact,
           emergency_phone: groupData.emergency_phone,
           tags: groupData.tags,
-          notes: groupData.notes
+          notes: groupData.notes,
+          themePackageId: groupData.themePackageId  // 添加主题包ID
         };
 
         await api.put(`/groups/${id}`, dataToSave);

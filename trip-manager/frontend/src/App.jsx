@@ -6,6 +6,7 @@ import GroupManagement from './pages/GroupManagement';
 import GroupManagementV2 from './pages/GroupManagementV2';
 import GroupEditV2 from './pages/GroupEditV2';
 import LocationManagement from './pages/LocationManagement';
+import EducationalResourceManagement from './pages/EducationalResourceManagement';
 import Statistics from './pages/Statistics';
 import ItineraryDesigner from './pages/ItineraryDesigner';
 import './App.css';
@@ -43,9 +44,9 @@ function App() {
               }
             />
             <Route
-              path="/locations"
+              path="/resources"
               element={
-                <LocationManagement
+                <EducationalResourceManagement
                   editMode={editMode}
                 />
               }
@@ -88,7 +89,7 @@ function CompactHeader() {
     { path: '/groups/v2', label: '团组管理V2' },
     { path: '/designer', label: '行程设计器' },
     { path: '/', label: '日历视图' },
-    { path: '/locations', label: '行程资源' },
+    { path: '/resources', label: '教育资源' },
     { path: '/statistics', label: '统计报表' }
   ];
 

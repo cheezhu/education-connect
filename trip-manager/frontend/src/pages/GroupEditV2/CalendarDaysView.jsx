@@ -35,9 +35,50 @@ const presetResourcesData = [
   { id: 'activity', type: 'activity', title: '团队活动', icon: '🎯', duration: 2, description: '互动游戏', isUnique: true }
 ];
 
+// 主题包资源映射
+const themePackageResources = {
+  'theme_001': [ // 科技探索之旅
+    { id: 'science', type: 'visit', title: '香港科学馆', icon: '🏛️', duration: 3, description: '互动科学体验', isUnique: true },
+    { id: 'space', type: 'visit', title: '香港太空馆', icon: '🌌', duration: 2, description: '天文知识学习', isUnique: true },
+    { id: 'digital', type: 'visit', title: '数码港', icon: '💻', duration: 2, description: '创新科技体验', isUnique: true }
+  ],
+  'theme_002': [ // 文化深度游
+    { id: 'culture', type: 'visit', title: '文化中心', icon: '🎭', duration: 2, description: '艺术文化欣赏', isUnique: true },
+    { id: 'history', type: 'visit', title: '历史博物馆', icon: '🏺', duration: 2, description: '历史文化了解', isUnique: true }
+  ],
+  'theme_003': [ // 自然生态探索
+    { id: 'ocean', type: 'visit', title: '海洋公园', icon: '🐬', duration: 6, description: '海洋生物观察', isUnique: true },
+    { id: 'wetland', type: 'visit', title: '湿地公园', icon: '🦜', duration: 3, description: '生态环境学习', isUnique: true }
+  ],
+  'theme_004': [ // 学术交流体验
+    { id: 'university', type: 'visit', title: '香港大学', icon: '🎓', duration: 2.5, description: '校园参观交流', isUnique: true }
+  ]
+};
+
+// 获取资源列表的函数
+const getResourcesForGroup = (groupData) => {
+  const baseResources = [
+    // 基础可重复活动
+    { id: 'meal', type: 'meal', title: '早餐', icon: '🍽️', duration: 1, description: '酒店自助早餐', isUnique: false },
+    { id: 'lunch', type: 'meal', title: '午餐', icon: '🍽️', duration: 1, description: '粤菜午餐', isUnique: false },
+    { id: 'dinner', type: 'meal', title: '晚餐', icon: '🍽️', duration: 1.5, description: '特色晚餐', isUnique: false },
+    { id: 'transport', type: 'transport', title: '大巴交通', icon: '🚌', duration: 1, description: '团组集体交通', isUnique: false },
+    { id: 'rest', type: 'rest', title: '休息', icon: '🏨', duration: 1, description: '酒店休息', isUnique: false },
+    { id: 'free', type: 'free', title: '自由活动', icon: '🚶', duration: 2, description: '自由安排', isUnique: false },
+  ];
+
+  // 如果团组有主题包ID，加载对应的教育资源
+  if (groupData?.themePackageId && themePackageResources[groupData.themePackageId]) {
+    return [...baseResources, ...themePackageResources[groupData.themePackageId]];
+  }
+
+  // 否则使用默认资源
+  return presetResourcesData;
+};
+
 const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
-  // 管理可用的资源卡片
-  const [availableResources, setAvailableResources] = useState(presetResourcesData);
+  // 管理可用的资源卡片 - 根据团组的主题包初始化
+  const [availableResources, setAvailableResources] = useState(() => getResourcesForGroup(groupData));
   const [activities, setActivities] = useState(schedules);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -76,6 +117,24 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     document.addEventListener('dragend', handleGlobalDragEnd);
     return () => document.removeEventListener('dragend', handleGlobalDragEnd);
   }, [isDragging, draggedActivity, draggedResource]);
+
+  // 监听主题包变化，更新可用资源
+  useEffect(() => {
+    const newResources = getResourcesForGroup(groupData);
+    // 过滤掉已经使用的单一资源
+    const usedUniqueResourceIds = activities
+      .filter(a => a.isFromResource && a.resourceId)
+      .map(a => a.resourceId);
+
+    const filteredResources = newResources.filter(resource => {
+      // 如果是非唯一资源，始终可用
+      if (!resource.isUnique) return true;
+      // 如果是唯一资源，检查是否已被使用
+      return !usedUniqueResourceIds.includes(resource.id);
+    });
+
+    setAvailableResources(filteredResources);
+  }, [groupData?.themePackageId, activities]);
 
   // 活动类型配置
   const activityTypes = {
@@ -982,14 +1041,16 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
           // 处理从日历拖回的活动
           if (draggedActivity && draggedActivity.isFromResource) {
             // 如果是单一活动，恢复到资源列表
-            const resourceData = presetResourcesData.find(r => r.id === draggedActivity.resourceId);
+            const allResources = getResourcesForGroup(groupData);
+            const resourceData = allResources.find(r => r.id === draggedActivity.resourceId);
             if (resourceData && resourceData.isUnique) {
               setAvailableResources(prev => {
                 if (!prev.find(r => r.id === resourceData.id)) {
                   return [...prev, resourceData].sort((a, b) => {
                     // 保持原有顺序
-                    const aIndex = presetResourcesData.findIndex(r => r.id === a.id);
-                    const bIndex = presetResourcesData.findIndex(r => r.id === b.id);
+                    const allResources = getResourcesForGroup(groupData);
+                    const aIndex = allResources.findIndex(r => r.id === a.id);
+                    const bIndex = allResources.findIndex(r => r.id === b.id);
                     return aIndex - bIndex;
                   });
                 }
