@@ -9,6 +9,7 @@ import {
   EnvironmentOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import api from '../../services/api';  // 添加API导入以支持未来扩展
 import './CalendarDaysView.css';
 
 const { TextArea } = Input;
@@ -55,30 +56,37 @@ const themePackageResources = {
   ]
 };
 
-// 获取资源列表的函数
-const getResourcesForGroup = (groupData) => {
-  const baseResources = [
-    // 基础可重复活动
-    { id: 'meal', type: 'meal', title: '早餐', icon: '🍽️', duration: 1, description: '酒店自助早餐', isUnique: false },
-    { id: 'lunch', type: 'meal', title: '午餐', icon: '🍽️', duration: 1, description: '粤菜午餐', isUnique: false },
-    { id: 'dinner', type: 'meal', title: '晚餐', icon: '🍽️', duration: 1.5, description: '特色晚餐', isUnique: false },
-    { id: 'transport', type: 'transport', title: '大巴交通', icon: '🚌', duration: 1, description: '团组集体交通', isUnique: false },
-    { id: 'rest', type: 'rest', title: '休息', icon: '🏨', duration: 1, description: '酒店休息', isUnique: false },
-    { id: 'free', type: 'free', title: '自由活动', icon: '🚶', duration: 2, description: '自由安排', isUnique: false },
-  ];
+// 获取基础可重复活动
+const getBaseResources = () => [
+  // 基础可重复活动（逻辑不变）
+  { id: 'meal', type: 'meal', title: '早餐', icon: '🍽️', duration: 1, description: '酒店自助早餐', isUnique: false },
+  { id: 'lunch', type: 'meal', title: '午餐', icon: '🍽️', duration: 1, description: '粤菜午餐', isUnique: false },
+  { id: 'dinner', type: 'meal', title: '晚餐', icon: '🍽️', duration: 1.5, description: '特色晚餐', isUnique: false },
+  { id: 'transport', type: 'transport', title: '大巴交通', icon: '🚌', duration: 1, description: '团组集体交通', isUnique: false },
+  { id: 'rest', type: 'rest', title: '休息', icon: '🏨', duration: 1, description: '酒店休息', isUnique: false },
+  { id: 'free', type: 'free', title: '自由活动', icon: '🚶', duration: 2, description: '自由安排', isUnique: false },
+];
 
-  // 如果团组有主题包ID，加载对应的教育资源
-  if (groupData?.themePackageId && themePackageResources[groupData.themePackageId]) {
-    return [...baseResources, ...themePackageResources[groupData.themePackageId]];
+// 从主题包的教育资源转换为资源卡片
+const convertEducationalResourcesToCards = (educationalResources) => {
+  if (!educationalResources || !Array.isArray(educationalResources)) {
+    return [];
   }
 
-  // 否则使用默认资源
-  return presetResourcesData;
+  return educationalResources.map(resource => ({
+    id: resource.id || resource.resourceId,  // 支持不同的ID字段名
+    type: 'visit',  // 教育资源统一为visit类型
+    title: resource.name || resource.title,
+    icon: resource.icon || '🏛️',  // 默认图标
+    duration: resource.duration || 2,
+    description: resource.description || '',
+    isUnique: true  // 教育资源都是单一资源
+  }));
 };
 
 const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
-  // 管理可用的资源卡片 - 根据团组的主题包初始化
-  const [availableResources, setAvailableResources] = useState(() => getResourcesForGroup(groupData));
+  // 管理可用的资源卡片 - 初始化为基础资源
+  const [availableResources, setAvailableResources] = useState(() => getBaseResources());
   const [activities, setActivities] = useState(schedules);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -118,22 +126,64 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     return () => document.removeEventListener('dragend', handleGlobalDragEnd);
   }, [isDragging, draggedActivity, draggedResource]);
 
-  // 监听主题包变化，更新可用资源
+  // 监听主题包变化，从API获取教育资源
   useEffect(() => {
-    const newResources = getResourcesForGroup(groupData);
-    // 过滤掉已经使用的单一资源
-    const usedUniqueResourceIds = activities
-      .filter(a => a.isFromResource && a.resourceId)
-      .map(a => a.resourceId);
+    const loadThemePackageResources = async () => {
+      // 基础可重复活动始终可用
+      const baseResources = getBaseResources();
 
-    const filteredResources = newResources.filter(resource => {
-      // 如果是非唯一资源，始终可用
-      if (!resource.isUnique) return true;
-      // 如果是唯一资源，检查是否已被使用
-      return !usedUniqueResourceIds.includes(resource.id);
-    });
+      // 如果团组有主题包，获取其教育资源
+      if (groupData?.themePackageId) {
+        try {
+          console.log('🎯 加载主题包教育资源:', groupData.themePackageId);
 
-    setAvailableResources(filteredResources);
+          // 方法1: 如果团组数据中已包含主题包资源
+          if (groupData.themePackage?.resources) {
+            const educationalResources = groupData.themePackage.resources.map(r => r.resource || r);
+            const uniqueResourceCards = convertEducationalResourcesToCards(educationalResources);
+            console.log('✅ 从团组数据获取教育资源:', uniqueResourceCards.length, '个');
+
+            // 过滤掉已使用的单一资源
+            const usedUniqueResourceIds = activities
+              .filter(a => a.isFromResource && a.resourceId)
+              .map(a => a.resourceId);
+
+            const filteredUniqueResources = uniqueResourceCards.filter(resource =>
+              !usedUniqueResourceIds.includes(resource.id)
+            );
+
+            setAvailableResources([...baseResources, ...filteredUniqueResources]);
+            return;
+          }
+
+          // 方法2: 如果需要从API获取（为未来扩展准备）
+          // const response = await api.get(`/theme-packages/${groupData.themePackageId}`);
+          // const themePackage = response.data;
+          // const educationalResources = themePackage.resources?.map(r => r.resource || r) || [];
+          // const uniqueResourceCards = convertEducationalResourcesToCards(educationalResources);
+
+        } catch (error) {
+          console.error('❌ 加载主题包资源失败:', error);
+          // 发生错误时，使用硬编码的备用资源
+          const fallbackResources = themePackageResources[groupData.themePackageId] || [];
+          const usedUniqueResourceIds = activities
+            .filter(a => a.isFromResource && a.resourceId)
+            .map(a => a.resourceId);
+
+          const filteredFallbackResources = fallbackResources.filter(resource =>
+            !usedUniqueResourceIds.includes(resource.id)
+          );
+
+          setAvailableResources([...baseResources, ...filteredFallbackResources]);
+        }
+      } else {
+        // 没有主题包时，只显示基础资源
+        console.log('📝 团组无主题包，仅显示基础资源');
+        setAvailableResources(baseResources);
+      }
+    };
+
+    loadThemePackageResources();
   }, [groupData?.themePackageId, activities]);
 
   // 活动类型配置
@@ -1041,18 +1091,48 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
           // 处理从日历拖回的活动
           if (draggedActivity && draggedActivity.isFromResource) {
             // 如果是单一活动，恢复到资源列表
-            const allResources = getResourcesForGroup(groupData);
-            const resourceData = allResources.find(r => r.id === draggedActivity.resourceId);
-            if (resourceData && resourceData.isUnique) {
+            console.log('🔄 尝试恢复资源:', draggedActivity.title, draggedActivity.resourceId);
+
+            // 获取教育资源信息用于恢复
+            let resourceToRestore = null;
+
+            // 方法1: 从团组的主题包资源中查找
+            if (groupData?.themePackage?.resources) {
+              const educationalResource = groupData.themePackage.resources
+                .map(r => r.resource || r)
+                .find(r => r.id === draggedActivity.resourceId);
+
+              if (educationalResource) {
+                resourceToRestore = {
+                  id: educationalResource.id,
+                  type: 'visit',
+                  title: educationalResource.name || educationalResource.title,
+                  icon: educationalResource.icon || '🏛️',
+                  duration: educationalResource.duration || 2,
+                  description: educationalResource.description || '',
+                  isUnique: true
+                };
+              }
+            }
+
+            // 方法2: 从硬编码备用资源中查找（兼容旧数据）
+            if (!resourceToRestore && groupData?.themePackageId) {
+              const fallbackResources = themePackageResources[groupData.themePackageId] || [];
+              resourceToRestore = fallbackResources.find(r => r.id === draggedActivity.resourceId);
+            }
+
+            if (resourceToRestore) {
               setAvailableResources(prev => {
-                if (!prev.find(r => r.id === resourceData.id)) {
-                  return [...prev, resourceData].sort((a, b) => {
-                    // 保持原有顺序
-                    const allResources = getResourcesForGroup(groupData);
-                    const aIndex = allResources.findIndex(r => r.id === a.id);
-                    const bIndex = allResources.findIndex(r => r.id === b.id);
-                    return aIndex - bIndex;
-                  });
+                // 检查资源是否已存在于列表中
+                if (!prev.find(r => r.id === resourceToRestore.id)) {
+                  console.log('✅ 恢复资源到列表:', resourceToRestore.title);
+
+                  // 将资源按类型分类并添加
+                  const baseResources = prev.filter(r => !r.isUnique);
+                  const uniqueResources = prev.filter(r => r.isUnique);
+                  uniqueResources.push(resourceToRestore);
+
+                  return [...baseResources, ...uniqueResources];
                 }
                 return prev;
               });
@@ -1063,6 +1143,8 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
               onUpdate(updatedActivities);
 
               message.success(`已将 ${draggedActivity.title} 返回资源区`, 1);
+            } else {
+              console.warn('⚠️ 未找到要恢复的资源:', draggedActivity.resourceId);
             }
           }
 

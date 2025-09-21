@@ -396,3 +396,149 @@
 .event-item.capacity-danger {
   border-left: 4px solid #ff4d4f;
 }
+
+/* 主题包资源显示样式 */
+.event-resources {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  line-height: 1.1;
+}
+
+.resource-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 500;
+  display: inline-block;
+  margin-right: 2px;
+  margin-bottom: 1px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* 资源标题显示 */
+.resource-title {
+  font-weight: bold;
+  font-size: 12px;
+  line-height: 1.2;
+  margin-bottom: 3px;
+  color: white;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* 资源详情容器 */
+.resource-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 2px;
+}
+
+/* 资源地点 */
+.resource-location {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* 资源时长 */
+.resource-duration {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* 资源类别 */
+.resource-category {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.more-resources {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 9px;
+  font-style: italic;
+  margin-top: 2px;
+}
+
+/* 当没有主题包时的提示 */
+.event-location {
+  font-size: 11px;
+  opacity: 0.9;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* 响应式优化 - 主题包资源 */
+@media (max-width: 1200px) {
+  .resource-badge {
+    font-size: 8px;
+    padding: 1px 3px;
+  }
+
+  .resource-title {
+    font-size: 11px;
+  }
+
+  .resource-location,
+  .resource-duration,
+  .resource-category {
+    font-size: 9px;
+  }
+
+  .more-resources {
+    font-size: 8px;
+  }
+}
+
+@media (max-width: 768px) {
+  .event-resources {
+    gap: 1px;
+  }
+
+  .resource-badge {
+    font-size: 7px;
+    padding: 1px 2px;
+  }
+
+  .resource-title {
+    font-size: 10px;
+    margin-bottom: 2px;
+  }
+
+  .resource-details {
+    gap: 0px;
+    margin-bottom: 1px;
+  }
+
+  .resource-location,
+  .resource-duration,
+  .resource-category {
+    font-size: 8px;
+  }
+
+  .more-resources {
+    font-size: 7px;
+  }
+}

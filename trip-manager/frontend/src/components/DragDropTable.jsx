@@ -17,6 +17,11 @@ function DragDropTable({ editMode, onRefresh }) {
   const [currentDayOffset, setCurrentDayOffset] = useState(0); // 当前天的偏移量
   const [form] = Form.useForm();
 
+  // 主题包相关状态
+  const [currentThemePackage, setCurrentThemePackage] = useState(null);
+  const [themePackageResources, setThemePackageResources] = useState([]);
+  const [loadingThemePackage, setLoadingThemePackage] = useState(false);
+
   // 时间段定义
   const timeSlots = [
     { key: 'MORNING', label: '上午 (9:00-12:00)', color: '#e6f7ff', borderColor: '#1890ff' },
@@ -55,9 +60,30 @@ function DragDropTable({ editMode, onRefresh }) {
         api.get('/groups'),
         api.get('/locations')
       ]);
-      
+
+      // 为有主题包的团组加载资源信息
+      const groupsWithResources = await Promise.all(
+        groupsRes.data.map(async (group) => {
+          if (group.themePackageId) {
+            try {
+              const themePackageRes = await api.get(`/theme-packages/${group.themePackageId}`);
+              // 映射嵌套的资源结构
+              const resources = themePackageRes.data.resources?.map(r => r.resource) || [];
+              return {
+                ...group,
+                themePackageResources: resources
+              };
+            } catch (error) {
+              console.warn(`Failed to load theme package ${group.themePackageId}:`, error);
+              return { ...group, themePackageResources: [] };
+            }
+          }
+          return { ...group, themePackageResources: [] };
+        })
+      );
+
       setEvents(eventsRes.data);
-      setGroups(groupsRes.data);
+      setGroups(groupsWithResources);
       setLocations(locationsRes.data);
     } catch (error) {
       message.error('加载数据失败');
@@ -67,6 +93,48 @@ function DragDropTable({ editMode, onRefresh }) {
   useEffect(() => {
     loadData();
   }, []);
+
+  // 当收到外部刷新信号时重新加载数据
+  useEffect(() => {
+    if (onRefresh) {
+      loadData();
+    }
+  }, [onRefresh]);
+
+  // 1. 页面刷新时读取主题包数据
+  const loadThemePackageDataForActivity = async (groupId) => {
+    if (!groupId) {
+      setCurrentThemePackage(null);
+      setThemePackageResources([]);
+      return;
+    }
+
+    setLoadingThemePackage(true);
+    try {
+      // 获取团组信息
+      const groupResponse = await api.get(`/groups/${groupId}`);
+      const group = groupResponse.data;
+
+      if (group.themePackageId) {
+        // 获取主题包详细信息
+        const themePackageResponse = await api.get(`/theme-packages/${group.themePackageId}`);
+        const themePackage = themePackageResponse.data;
+
+        setCurrentThemePackage(themePackage);
+        setThemePackageResources(themePackage.resources || []);
+      } else {
+        setCurrentThemePackage(null);
+        setThemePackageResources([]);
+      }
+    } catch (error) {
+      console.error('加载主题包数据失败:', error);
+      message.error('加载主题包数据失败');
+      setCurrentThemePackage(null);
+      setThemePackageResources([]);
+    } finally {
+      setLoadingThemePackage(false);
+    }
+  };
 
   // 获取指定日期和时间段的活动
   const getEventsForSlot = (date, timeSlot) => {
@@ -138,8 +206,8 @@ function DragDropTable({ editMode, onRefresh }) {
         timeSlot: targetTimeSlot
       });
       
-      message.success('活动已更新');
-      loadData();
+      message.success('教育资源已更新');
+      await loadData(); // 确保数据同步更新
     } catch (error) {
       if (error.response?.data?.conflicts) {
         const conflicts = error.response.data.conflicts;
@@ -171,6 +239,9 @@ function DragDropTable({ editMode, onRefresh }) {
   // 创建或更新活动
   const handleCreateActivity = async (values) => {
     try {
+      // 2. 保存更改时再次读取主题包数据
+      await loadThemePackageDataForActivity(values.groupId);
+
       const activityData = {
         groupId: values.groupId,
         locationId: values.locationId || null,
@@ -182,16 +253,19 @@ function DragDropTable({ editMode, onRefresh }) {
       if (currentSlot.isEditing && currentSlot.eventId) {
         // 更新现有活动
         await api.put(`/activities/${currentSlot.eventId}`, activityData);
-        message.success('活动更新成功');
+        message.success('教育资源更新成功');
       } else {
         // 创建新活动
         await api.post('/activities', activityData);
-        message.success('活动创建成功');
+        message.success('教育资源创建成功');
       }
 
       setModalVisible(false);
       form.resetFields();
-      loadData();
+      // 清空主题包数据
+      setCurrentThemePackage(null);
+      setThemePackageResources([]);
+      await loadData(); // 确保数据同步更新
     } catch (error) {
       console.error('保存活动失败:', error);
       if (error.response?.data?.conflicts) {
@@ -213,7 +287,7 @@ function DragDropTable({ editMode, onRefresh }) {
   };
 
   // 处理活动点击
-  const handleEventClick = (event) => {
+  const handleEventClick = async (event) => {
     const props = event.extendedProps;
 
     // 设置编辑模式的当前活动
@@ -223,6 +297,9 @@ function DragDropTable({ editMode, onRefresh }) {
       timeSlot: props.timeSlot,
       isEditing: true
     });
+
+    // 1. 页面刷新时读取主题包数据
+    await loadThemePackageDataForActivity(props.groupId);
 
     // 预填表单数据
     form.setFieldsValue({
@@ -301,13 +378,13 @@ function DragDropTable({ editMode, onRefresh }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <span>行程安排表格</span>
             {/* 添加活动按钮 */}
-            <Button 
-              type="primary" 
+            <Button
+              type="primary"
               icon={<PlusOutlined />}
               onClick={handleQuickAddActivity}
               size="small"
             >
-              添加活动卡片
+              添加教育资源
             </Button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               {/* 单天导航 */}
@@ -422,23 +499,32 @@ function DragDropTable({ editMode, onRefresh }) {
                             {(() => {
                               const props = event.extendedProps;
                               const group = groups.find(g => g.id === props.groupId);
-                              const location = locations.find(l => l.id === props.locationId);
                               const groupName = group?.name || '未知团组';
 
-                              if (location) {
-                                // 已安排地点：显示团组名称 + 地点名称
+                              // 显示主题包资源信息（简化版：名称+时长）
+                              if (group?.themePackageId && group?.themePackageResources && group.themePackageResources.length > 0) {
+                                // 有主题包资源：显示资源名称和时长
+                                const primaryResource = group.themePackageResources[0]; // 主要显示第一个资源
                                 return (
                                   <>
                                     <div className="event-group">{groupName}</div>
-                                    <div className="event-location">📍 {location.name}</div>
+                                    <div className="resource-title">📚 {primaryResource.name}</div>
+                                    {primaryResource.duration && (
+                                      <div className="resource-duration">⏰ {primaryResource.duration}小时</div>
+                                    )}
+                                    {group.themePackageResources.length > 1 && (
+                                      <div className="more-resources">
+                                        +{group.themePackageResources.length - 1}个资源
+                                      </div>
+                                    )}
                                   </>
                                 );
                               } else {
-                                // 未安排地点：显示团组名称 + "尚无活动"
+                                // 无主题包资源：显示团组名称 + "暂无主题包"
                                 return (
                                   <>
                                     <div className="event-group">{groupName}</div>
-                                    <div className="event-location">尚无活动</div>
+                                    <div className="event-location">暂无主题包资源</div>
                                   </>
                                 );
                               }
@@ -451,7 +537,7 @@ function DragDropTable({ editMode, onRefresh }) {
                       <div
                         className="add-event-btn"
                         onClick={() => handleAddActivity(date, timeSlot.key)}
-                        title={slotEvents.length === 0 ? '添加活动卡片' : '添加更多活动'}
+                        title={slotEvents.length === 0 ? '添加教育资源' : '添加更多教育资源'}
                       >
                         <PlusOutlined />
                       </div>
@@ -463,15 +549,19 @@ function DragDropTable({ editMode, onRefresh }) {
           </div>
         </div>
 
-        {/* 创建/编辑活动弹窗 */}
+        {/* 创建/编辑教育资源弹窗 */}
         <Modal
-          title={currentSlot?.isEditing ? "编辑活动" : "创建活动"}
+          title={currentSlot?.isEditing ? "编辑教育资源" : "创建教育资源"}
           open={modalVisible}
           onCancel={() => {
             setModalVisible(false);
             form.resetFields();
+            // 清空主题包数据
+            setCurrentThemePackage(null);
+            setThemePackageResources([]);
           }}
           onOk={() => form.submit()}
+          width={600}
         >
           <Form
             form={form}
@@ -486,7 +576,13 @@ function DragDropTable({ editMode, onRefresh }) {
               label="选择团组"
               rules={[{ required: true, message: '请选择团组' }]}
             >
-              <Select placeholder="请选择团组">
+              <Select
+                placeholder="请选择团组"
+                onChange={(groupId) => {
+                  // 当团组选择发生变化时，重新加载主题包数据
+                  loadThemePackageDataForActivity(groupId);
+                }}
+              >
                 {groups.map(g => (
                   <Option key={g.id} value={g.id}>
                     {g.name} ({g.type === 'primary' ? '小学' : '中学'})
@@ -494,6 +590,62 @@ function DragDropTable({ editMode, onRefresh }) {
                 ))}
               </Select>
             </Form.Item>
+
+            {/* 显示主题包资源信息（与卡片显示保持一致）*/}
+            {currentThemePackage && (
+              <div style={{
+                background: '#f5f5f5',
+                padding: '12px',
+                borderRadius: '6px',
+                marginBottom: '16px'
+              }}>
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  marginBottom: '8px',
+                  color: '#1890ff'
+                }}>
+                  📦 主题包: {currentThemePackage.name}
+                </div>
+                {loadingThemePackage ? (
+                  <div style={{ color: '#666', fontSize: '12px' }}>加载中...</div>
+                ) : themePackageResources.length > 0 ? (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}>
+                    {themePackageResources.map((resource, index) => (
+                      <div key={index} style={{
+                        background: '#e6f7ff',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #d6f2ff'
+                      }}>
+                        <div style={{
+                          fontSize: '13px',
+                          fontWeight: '500',
+                          color: '#1890ff',
+                          marginBottom: '4px'
+                        }}>
+                          📚 {resource.name}
+                        </div>
+                        {resource.duration && (
+                          <div style={{
+                            fontSize: '12px',
+                            color: '#666'
+                          }}>
+                            ⏰ {resource.duration}小时
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ color: '#999', fontSize: '12px' }}>暂无资源信息</div>
+                )}
+              </div>
+            )}
 
             <Form.Item
               name="locationId"
