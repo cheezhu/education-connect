@@ -52,7 +52,7 @@ const MemberManagement = ({ groupId, groupData, members, onUpdate }) => {
       role: '学生',
       room_number: '301',
       special_needs: '花生过敏',
-      emergency_contact: '张妈妈'
+      emergencyContact: '张妈妈'
     },
     {
       id: 2,
@@ -65,7 +65,7 @@ const MemberManagement = ({ groupId, groupData, members, onUpdate }) => {
       role: '老师',
       room_number: '501',
       special_needs: '',
-      emergency_contact: '李先生'
+      emergencyContact: '李先生'
     }
   ]);
 
@@ -141,8 +141,8 @@ const MemberManagement = ({ groupId, groupData, members, onUpdate }) => {
     },
     {
       title: '紧急联系人',
-      dataIndex: 'emergency_contact',
-      key: 'emergency_contact',
+      dataIndex: 'emergencyContact',
+      key: 'emergencyContact',
       width: 100
     },
     {
@@ -504,7 +504,7 @@ const MemberManagement = ({ groupId, groupData, members, onUpdate }) => {
             <Col span={16}>
               <Form.Item
                 label="紧急联系人"
-                name="emergency_contact"
+                name="emergencyContact"
                 rules={[{ required: true, message: '请输入紧急联系人' }]}
               >
                 <Input placeholder="请输入紧急联系人姓名" />

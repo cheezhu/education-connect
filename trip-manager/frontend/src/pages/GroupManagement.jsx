@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Button, Modal, Form, Input, Select, DatePicker, ColorPicker, message, Space, Collapse, Tag, Row, Col, Avatar, Divider, Tooltip, Badge } from 'antd';
+import { Card, Table, Button, Modal, Form, Input, Select, DatePicker, ColorPicker, message, Space, Collapse, Tag, Row, Col, Avatar, Divider, Tooltip, Badge, Drawer } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, MinusCircleOutlined, UserOutlined, CalendarOutlined, TeamOutlined, EnvironmentOutlined } from '@ant-design/icons';
 import api from '../services/api';
 import dayjs from 'dayjs';
 import useDataSync from '../hooks/useDataSync';
+import MemberList from '../components/MemberList';
 import './GroupManagement.css';
 
 const { Option } = Select;
@@ -19,6 +20,8 @@ function GroupManagement({ editMode }) {
   const [form] = Form.useForm();
   const { registerRefreshCallback, triggerGlobalRefresh } = useDataSync();
   const [draggedActivity, setDraggedActivity] = useState(null);
+  const [memberDrawerVisible, setMemberDrawerVisible] = useState(false);
+  const [selectedGroupForMembers, setSelectedGroupForMembers] = useState(null);
 
   // 加载所有数据
   const loadData = async () => {
@@ -519,14 +522,14 @@ function GroupManagement({ editMode }) {
     },
     {
       title: '开始日期',
-      dataIndex: 'start_date',
-      key: 'start_date',
+      dataIndex: 'startDate',
+      key: 'startDate',
       render: (date) => dayjs(date).format('YYYY-MM-DD')
     },
     {
       title: '结束日期',
-      dataIndex: 'end_date',
-      key: 'end_date',
+      dataIndex: 'endDate',
+      key: 'endDate',
       render: (date) => dayjs(date).format('YYYY-MM-DD')
     },
     {
@@ -537,13 +540,29 @@ function GroupManagement({ editMode }) {
     },
     {
       title: '联系人',
-      dataIndex: 'contact_person',
-      key: 'contact_person'
+      dataIndex: 'contactPerson',
+      key: 'contactPerson'
     },
     {
       title: '联系电话',
-      dataIndex: 'contact_phone',
-      key: 'contact_phone'
+      dataIndex: 'contactPhone',
+      key: 'contactPhone'
+    },
+    {
+      title: '团员',
+      key: 'members',
+      width: 100,
+      render: (_, record) => (
+        <Button
+          type="link"
+          onClick={() => {
+            setSelectedGroupForMembers(record);
+            setMemberDrawerVisible(true);
+          }}
+        >
+          <TeamOutlined /> {record.members?.length || 0}人
+        </Button>
+      )
     },
     {
       title: '操作',
@@ -747,6 +766,26 @@ function GroupManagement({ editMode }) {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Drawer
+        title={`团员管理 - ${selectedGroupForMembers?.name || ''}`}
+        placement="right"
+        width="90%"
+        onClose={() => {
+          setMemberDrawerVisible(false);
+          setSelectedGroupForMembers(null);
+          loadData(); // 刷新数据以更新团员数量
+        }}
+        open={memberDrawerVisible}
+      >
+        {selectedGroupForMembers && (
+          <MemberList
+            groupId={selectedGroupForMembers.id}
+            groupName={selectedGroupForMembers.name}
+            editMode={editMode}
+          />
+        )}
+      </Drawer>
     </Card>
   );
 }

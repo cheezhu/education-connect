@@ -41,8 +41,8 @@ const GroupEditV2 = () => {
         status: '准备中',
         contact_person: '',
         contact_phone: '',
-        emergency_contact: '',
-        emergency_phone: '',
+        emergencyContact: '',
+        emergencyPhone: '',
         tags: [],
         notes: '',
         members: [],
@@ -63,8 +63,8 @@ const GroupEditV2 = () => {
         status: group.status || '准备中',
         contact_person: group.contact_person || '',
         contact_phone: group.contact_phone || '',
-        emergency_contact: group.emergency_contact || '',
-        emergency_phone: group.emergency_phone || '',
+        emergencyContact: group.emergencyContact || '',
+        emergencyPhone: group.emergencyPhone || '',
         tags: group.tags || [],
         notes: group.notes || '',
         members: [], // TODO: 加载团员数据
@@ -106,8 +106,8 @@ const GroupEditV2 = () => {
           status: groupData.status,
           contact_person: groupData.contact_person,
           contact_phone: groupData.contact_phone,
-          emergency_contact: groupData.emergency_contact,
-          emergency_phone: groupData.emergency_phone,
+          emergencyContact: groupData.emergencyContact,
+          emergencyPhone: groupData.emergencyPhone,
           tags: groupData.tags,
           notes: groupData.notes
         };
@@ -141,8 +141,8 @@ const GroupEditV2 = () => {
         status: groupData.status,
         contact_person: groupData.contact_person,
         contact_phone: groupData.contact_phone,
-        emergency_contact: groupData.emergency_contact,
-        emergency_phone: groupData.emergency_phone,
+        emergencyContact: groupData.emergencyContact,
+        emergencyPhone: groupData.emergencyPhone,
         tags: groupData.tags,
         notes: groupData.notes
       };

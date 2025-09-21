@@ -1,18 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
+import api from '../../services/api';
 
 const GroupInfoSimple = ({ groupData, onUpdate, handleSave, isNew, saving }) => {
   const [themePackages, setThemePackages] = useState([]);
+  const [loadingPackages, setLoadingPackages] = useState(true);
+  const [selectedPackageResources, setSelectedPackageResources] = useState([]);
+  const [loadingResources, setLoadingResources] = useState(false);
 
-  // 模拟获取主题包数据
+  // 从数据库获取主题包数据
   useEffect(() => {
-    const mockPackages = [
-      { id: 'theme_001', name: '科技探索之旅', resourceCount: 3 },
-      { id: 'theme_002', name: '文化深度游', resourceCount: 2 },
-      { id: 'theme_003', name: '自然生态探索', resourceCount: 2 },
-      { id: 'theme_004', name: '学术交流体验', resourceCount: 1 }
-    ];
-    setThemePackages(mockPackages);
+    const fetchThemePackages = async () => {
+      try {
+        setLoadingPackages(true);
+        const response = await api.get('/theme-packages');
+        // 计算每个主题包的资源数量
+        const packagesWithCount = response.data.map(pkg => ({
+          id: pkg.id,
+          name: pkg.name,
+          description: pkg.description,
+          resourceCount: pkg.resources ? pkg.resources.length : 0
+        }));
+        setThemePackages(packagesWithCount);
+      } catch (error) {
+        console.error('Error fetching theme packages:', error);
+        // 如果获取失败，使用默认数据
+        const mockPackages = [
+          { id: 'theme_001', name: '科技探索之旅', resourceCount: 3 },
+          { id: 'theme_002', name: '文化深度游', resourceCount: 2 },
+          { id: 'theme_003', name: '自然生态探索', resourceCount: 2 },
+          { id: 'theme_004', name: '学术交流体验', resourceCount: 1 }
+        ];
+        setThemePackages(mockPackages);
+      } finally {
+        setLoadingPackages(false);
+      }
+    };
+
+    fetchThemePackages();
   }, []);
 
   // 获取当前选中主题包的资源数量
@@ -21,6 +46,38 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleSave, isNew, saving }) => 
     const currentPackage = themePackages.find(pkg => pkg.id === groupData.themePackageId);
     return currentPackage?.resourceCount || 0;
   };
+
+  // 获取选中主题包的详细资源信息
+  const fetchPackageResources = async (themePackageId) => {
+    if (!themePackageId) {
+      setSelectedPackageResources([]);
+      return;
+    }
+
+    setLoadingResources(true);
+    try {
+      const response = await api.get(`/theme-packages/${themePackageId}`);
+      if (response.data && response.data.resources) {
+        setSelectedPackageResources(response.data.resources);
+      } else {
+        setSelectedPackageResources([]);
+      }
+    } catch (error) {
+      console.error('Error fetching package resources:', error);
+      setSelectedPackageResources([]);
+    } finally {
+      setLoadingResources(false);
+    }
+  };
+
+  // 监听主题包选择变化
+  useEffect(() => {
+    if (groupData.themePackageId) {
+      fetchPackageResources(groupData.themePackageId);
+    } else {
+      setSelectedPackageResources([]);
+    }
+  }, [groupData.themePackageId]);
   return (
     <div className="unified-info-view">
       {/* 卡片容器 */}
@@ -182,11 +239,14 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleSave, isNew, saving }) => 
                 onChange={(e) => {
                   onUpdate('themePackageId', e.target.value);
                 }}
+                disabled={loadingPackages}
               >
-                <option value="">请选择主题包</option>
+                <option value="">
+                  {loadingPackages ? '加载中...' : '请选择主题包'}
+                </option>
                 {themePackages.map(pkg => (
                   <option key={pkg.id} value={pkg.id}>
-                    {pkg.name}
+                    {pkg.name} {pkg.description ? `- ${pkg.description}` : ''}
                   </option>
                 ))}
               </select>
@@ -200,6 +260,26 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleSave, isNew, saving }) => 
               </div>
             </div>
           </div>
+
+          {/* 主题包资源简要显示 */}
+          {groupData.themePackageId && selectedPackageResources.length > 0 && (
+            <div className="info-row">
+              <div className="info-item full-width">
+                <label>主题包资源</label>
+                <div className="theme-resources-summary">
+                  {loadingResources ? (
+                    <span className="loading-text">加载中...</span>
+                  ) : (
+                    selectedPackageResources.map((item, index) => (
+                      <span key={item.resourceId} className="resource-tag">
+                        {item.resource.name}
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 第六行：备注 */}
           <div className="info-row">
@@ -240,6 +320,7 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleSave, isNew, saving }) => 
           </div>
         </div>
       </div>
+
 
       {/* 团员信息卡片 - 只在非新建模式下显示 */}
       {!isNew && (

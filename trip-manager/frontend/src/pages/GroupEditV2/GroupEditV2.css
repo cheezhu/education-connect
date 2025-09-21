@@ -248,6 +248,37 @@
   letter-spacing: 1px;
 }
 
+/* 主题包资源简要显示样式 */
+.group-edit-v2 .theme-resources-summary {
+  padding: 4px 8px;
+  background: #f9f9f9;
+  border-radius: 3px;
+  font-size: 12px;
+  color: #262626;
+  min-height: 26px;
+  line-height: 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.group-edit-v2 .theme-resources-summary .loading-text {
+  color: #8c8c8c;
+  font-style: italic;
+}
+
+.group-edit-v2 .theme-resources-summary .resource-tag {
+  background: #e6f7ff;
+  color: #1890ff;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  display: inline-block;
+}
+
 /* 统一信息视图 */
 .group-edit-v2 .unified-info-view {
   padding: 16px;

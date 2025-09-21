@@ -24,8 +24,8 @@ const GroupOverviewCompact = ({ data, onUpdate, onMultipleUpdate, isNew }) => {
         color: data.color,
         contactPerson: data.contactPerson,
         contactPhone: data.contactPhone,
-        emergency_contact: data.emergency_contact,
-        emergency_phone: data.emergency_phone,
+        emergencyContact: data.emergencyContact,
+        emergencyPhone: data.emergencyPhone,
         notes: data.notes
       });
     }
@@ -38,8 +38,8 @@ const GroupOverviewCompact = ({ data, onUpdate, onMultipleUpdate, isNew }) => {
       onUpdate(field, dateStr);
 
       // 自动计算天数
-      const startDate = field === 'start_date' ? dateStr : data.startDate;
-      const endDate = field === 'end_date' ? dateStr : data.endDate;
+      const startDate = field === 'startDate' ? dateStr : data.startDate;
+      const endDate = field === 'endDate' ? dateStr : data.endDate;
 
       if (startDate && endDate) {
         const duration = dayjs(endDate).diff(dayjs(startDate), 'day') + 1;
@@ -79,7 +79,7 @@ const GroupOverviewCompact = ({ data, onUpdate, onMultipleUpdate, isNew }) => {
           const key = Object.keys(changedValues)[0];
           const value = changedValues[key];
 
-          if (key === 'start_date' || key === 'end_date') {
+          if (key === 'startDate' || key === 'endDate') {
             handleDateChange(key, value);
           } else if (key === 'color') {
             handleFieldChange(key, typeof value === 'string' ? value : value.toHexString());
@@ -152,11 +152,11 @@ const GroupOverviewCompact = ({ data, onUpdate, onMultipleUpdate, isNew }) => {
             <Input placeholder="手机号" />
           </Form.Item>
 
-          <Form.Item label="紧急" name="emergency_contact" className="form-item-contact">
+          <Form.Item label="紧急" name="emergencyContact" className="form-item-contact">
             <Input placeholder="紧急联系人" />
           </Form.Item>
 
-          <Form.Item label="" name="emergency_phone" className="form-item-contact">
+          <Form.Item label="" name="emergencyPhone" className="form-item-contact">
             <Input placeholder="紧急电话" />
           </Form.Item>
         </div>

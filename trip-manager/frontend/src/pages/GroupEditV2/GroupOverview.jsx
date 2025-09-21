@@ -26,8 +26,8 @@ const GroupOverview = ({ data, onUpdate, onMultipleUpdate, isNew }) => {
         color: data.color,
         contactPerson: data.contactPerson,
         contactPhone: data.contactPhone,
-        emergency_contact: data.emergency_contact,
-        emergency_phone: data.emergency_phone,
+        emergencyContact: data.emergencyContact,
+        emergencyPhone: data.emergencyPhone,
         tags: data.tags,
         notes: data.notes
       });
@@ -193,12 +193,12 @@ const GroupOverview = ({ data, onUpdate, onMultipleUpdate, isNew }) => {
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item label="紧急联系人" name="emergency_contact">
+              <Form.Item label="紧急联系人" name="emergencyContact">
                 <Input placeholder="姓名" />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item label="紧急电话" name="emergency_phone">
+              <Form.Item label="紧急电话" name="emergencyPhone">
                 <Input placeholder="手机号码" />
               </Form.Item>
             </Col>
