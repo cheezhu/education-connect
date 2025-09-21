@@ -49,8 +49,31 @@ model Group {
   themePackage     ThemePackage? @relation(fields: [themePackageId], references: [id])
   schedules        Schedule[]
   activities       Activity[]
+  members          Member[]
 
   @@map("groups")
+}
+
+// 团员表
+model Member {
+  id                 Int      @id @default(autoincrement())
+  groupId            Int      @map("group_id")
+  name               String   // 姓名
+  school             String?  // 学校
+  role               String   // student, teacher (身份)
+  idCard             String?  @map("id_card") // 身份证号码
+  permitNumber       String?  @map("permit_number") // 港澳通行证号码
+  permitExpiry       String?  @map("permit_expiry") // 港澳签注有效期
+  englishName        String?  @map("english_name") // 英文姓名
+  roomNumber         String?  @map("room_number") // 房间号码
+  notes              String?  // 备注
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  group              Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@map("members")
 }
 
 // 教育资源表

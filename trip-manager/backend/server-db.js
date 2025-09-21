@@ -93,7 +93,8 @@ app.get('/api/groups', authenticateToken, async (req, res) => {
     const groups = await prisma.group.findMany({
       include: {
         themePackage: true,
-        activities: true
+        activities: true,
+        members: true
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -121,7 +122,13 @@ app.get('/api/groups/:id', authenticateToken, async (req, res) => {
           }
         },
         activities: true,
-        schedules: true
+        schedules: true,
+        members: {
+          orderBy: [
+            { role: 'desc' },
+            { name: 'asc' }
+          ]
+        }
       }
     });
 
@@ -176,8 +183,12 @@ app.put('/api/groups/:id', authenticateToken, async (req, res) => {
     delete updateData.createdBy;
     delete updateData.members;  // members字段在数据库中不存在
     delete updateData.schedules;  // schedules字段需要通过关联而非直接字段
+    delete updateData.tags;  // tags字段在Group模型中不存在
+    delete updateData.activities;  // activities字段需要通过关联而非直接字段
+    delete updateData.themePackage;  // themePackage是关联字段，不是数据字段
 
-    console.log('Updating group with data:', updateData);
+    console.log('🔄 Updating group with ID:', id);
+    console.log('📤 Update data:', JSON.stringify(updateData, null, 2));
 
     const group = await prisma.group.update({
       where: { id: parseInt(id) },
@@ -187,10 +198,21 @@ app.put('/api/groups/:id', authenticateToken, async (req, res) => {
       }
     });
 
+    console.log('✅ Group updated successfully:', {
+      id: group.id,
+      name: group.name,
+      updatedAt: group.updatedAt
+    });
+
     res.json({ success: true, group });
   } catch (error) {
-    console.error('Update group error:', error);
-    res.status(500).json({ error: '更新团组失败' });
+    console.error('❌ Update group error:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: error.stack
+    });
+    res.status(500).json({ error: '更新团组失败', details: error.message });
   }
 });
 
@@ -489,6 +511,92 @@ app.delete('/api/theme-packages/:id', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Delete package error:', error);
     res.status(500).json({ error: '删除主题包失败' });
+  }
+});
+
+// ==================== 团员相关 API ====================
+
+// 获取团组的团员列表
+app.get('/api/groups/:groupId/members', authenticateToken, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const members = await prisma.member.findMany({
+      where: { groupId: parseInt(groupId) },
+      orderBy: [
+        { role: 'desc' }, // teacher first
+        { name: 'asc' }
+      ]
+    });
+    res.json(members);
+  } catch (error) {
+    console.error('Get members error:', error);
+    res.status(500).json({ error: '获取团员列表失败' });
+  }
+});
+
+// 创建团员
+app.post('/api/groups/:groupId/members', authenticateToken, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const member = await prisma.member.create({
+      data: {
+        ...req.body,
+        groupId: parseInt(groupId)
+      }
+    });
+    res.json({ success: true, member });
+  } catch (error) {
+    console.error('Create member error:', error);
+    res.status(500).json({ error: '创建团员失败' });
+  }
+});
+
+// 批量创建团员
+app.post('/api/groups/:groupId/members/batch', authenticateToken, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { members } = req.body;
+
+    const createdMembers = await prisma.member.createMany({
+      data: members.map(member => ({
+        ...member,
+        groupId: parseInt(groupId)
+      }))
+    });
+
+    res.json({ success: true, count: createdMembers.count });
+  } catch (error) {
+    console.error('Batch create members error:', error);
+    res.status(500).json({ error: '批量创建团员失败' });
+  }
+});
+
+// 更新团员
+app.put('/api/members/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const member = await prisma.member.update({
+      where: { id: parseInt(id) },
+      data: req.body
+    });
+    res.json({ success: true, member });
+  } catch (error) {
+    console.error('Update member error:', error);
+    res.status(500).json({ error: '更新团员失败' });
+  }
+});
+
+// 删除团员
+app.delete('/api/members/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.member.delete({
+      where: { id: parseInt(id) }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete member error:', error);
+    res.status(500).json({ error: '删除团员失败' });
   }
 });
 
