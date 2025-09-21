@@ -344,9 +344,10 @@ app.get('/api/theme-packages', authenticateToken, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    // 格式化响应
+    // 格式化响应并解析JSON字段
     const formattedPackages = packages.map(pkg => ({
       ...pkg,
+      tags: typeof pkg.tags === 'string' ? JSON.parse(pkg.tags) : pkg.tags,
       resourceCount: pkg.resources.length,
       totalDuration: pkg.resources.reduce((sum, r) => sum + r.resource.duration, 0),
       usageCount: pkg._count.groups,

@@ -283,6 +283,7 @@ const ThemePackageManagement = () => {
   const [editingPackage, setEditingPackage] = useState(null);
   const [viewingPackage, setViewingPackage] = useState(null);
   const [selectedResourceIds, setSelectedResourceIds] = useState([]);
+  const [error, setError] = useState(null);
   const [form] = Form.useForm();
 
   // 资源类型配置
@@ -300,6 +301,7 @@ const ThemePackageManagement = () => {
   // 从后端加载数据
   const fetchPackages = async () => {
     setLoading(true);
+    setError(null);
     try {
       const response = await api.get('/theme-packages');
       const packagesData = response.data.map(pkg => ({
@@ -307,11 +309,23 @@ const ThemePackageManagement = () => {
         resourceCount: pkg.resources?.length || 0,
         totalDuration: pkg.resources?.reduce((sum, r) => sum + (r.duration || 0), 0) || 0,
         usageCount: pkg.usageCount || 0,
-        tags: pkg.tags || []
+        tags: (() => {
+          try {
+            // tags可能是JSON字符串，需要解析
+            if (typeof pkg.tags === 'string') {
+              return JSON.parse(pkg.tags);
+            }
+            return pkg.tags || [];
+          } catch (e) {
+            console.warn('Failed to parse tags:', pkg.tags);
+            return [];
+          }
+        })()
       }));
       setPackages(packagesData);
     } catch (error) {
       console.error('加载主题包失败:', error);
+      setError(error.message || '加载主题包失败');
       message.error('加载主题包失败');
     } finally {
       setLoading(false);
@@ -331,6 +345,104 @@ const ThemePackageManagement = () => {
     fetchPackages();
     fetchResources();
   }, []);
+
+  const handleViewDetail = (packageItem) => {
+    setViewingPackage(packageItem);
+    setDetailModalVisible(true);
+  };
+
+  const handleEdit = (packageItem) => {
+    setEditingPackage(packageItem);
+    form.setFieldsValue({
+      ...packageItem,
+      resources: packageItem.resources || []
+    });
+    setSelectedResourceIds(packageItem.resources || []);
+    setModalVisible(true);
+  };
+
+  const handleCopy = async (packageItem) => {
+    try {
+      const newPackage = {
+        ...packageItem,
+        name: `${packageItem.name} (副本)`,
+        usageCount: 0
+      };
+      delete newPackage.id; // 移除ID，让后端生成新的
+
+      const response = await api.post('/theme-packages', newPackage);
+      await fetchPackages(); // 刷新列表
+      message.success('复制成功');
+    } catch (error) {
+      console.error('复制失败:', error);
+      message.error('复制失败');
+    }
+  };
+
+  const handleDelete = (id) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: '确定要删除这个主题包吗？',
+      onOk: async () => {
+        try {
+          await api.delete(`/theme-packages/${id}`);
+          setPackages(packages.filter(p => p.id !== id));
+          message.success('删除成功');
+        } catch (error) {
+          console.error('删除失败:', error);
+          message.error('删除失败');
+        }
+      }
+    });
+  };
+
+  const showCreateModal = () => {
+    setEditingPackage(null);
+    form.resetFields();
+    setSelectedResourceIds([]);
+    setModalVisible(true);
+  };
+
+  const handleSave = async () => {
+    try {
+      const values = await form.validateFields();
+      const packageData = {
+        ...values,
+        resources: selectedResourceIds, // 发送资源ID数组
+        usageCount: editingPackage?.usageCount || 0
+      };
+
+      let savedPackage;
+      if (editingPackage) {
+        const response = await api.put(`/theme-packages/${editingPackage.id}`, packageData);
+        savedPackage = response.data;
+        message.success('主题包更新成功');
+      } else {
+        const response = await api.post('/theme-packages', packageData);
+        savedPackage = response.data;
+        message.success('主题包创建成功');
+      }
+
+      // 刷新列表
+      await fetchPackages();
+
+      setModalVisible(false);
+      form.resetFields();
+      setSelectedResourceIds([]);
+    } catch (error) {
+      console.error('保存失败:', error);
+      message.error('保存失败');
+    }
+  };
+
+  const handleResourceSelect = (resourceId) => {
+    setSelectedResourceIds(prev => {
+      if (prev.includes(resourceId)) {
+        return prev.filter(id => id !== resourceId);
+      }
+      return [...prev, resourceId];
+    });
+  };
 
   const columns = [
     {
@@ -432,103 +544,15 @@ const ThemePackageManagement = () => {
     }
   ];
 
-  const handleViewDetail = (packageItem) => {
-    setViewingPackage(packageItem);
-    setDetailModalVisible(true);
-  };
-
-  const handleEdit = (packageItem) => {
-    setEditingPackage(packageItem);
-    form.setFieldsValue({
-      ...packageItem,
-      resources: packageItem.resources || []
-    });
-    setSelectedResourceIds(packageItem.resources || []);
-    setModalVisible(true);
-  };
-
-  const handleCopy = async (packageItem) => {
-    try {
-      const newPackage = {
-        ...packageItem,
-        name: `${packageItem.name} (副本)`,
-        usageCount: 0
-      };
-      delete newPackage.id; // 移除ID，让后端生成新的
-
-      const response = await api.post('/theme-packages', newPackage);
-      await fetchPackages(); // 刷新列表
-      message.success('复制成功');
-    } catch (error) {
-      console.error('复制失败:', error);
-      message.error('复制失败');
-    }
-  };
-
-  const handleDelete = (id) => {
-    Modal.confirm({
-      title: '确认删除',
-      content: '确定要删除这个主题包吗？',
-      onOk: async () => {
-        try {
-          await api.delete(`/theme-packages/${id}`);
-          setPackages(packages.filter(p => p.id !== id));
-          message.success('删除成功');
-        } catch (error) {
-          console.error('删除失败:', error);
-          message.error('删除失败');
-        }
-      }
-    });
-  };
-
-  const showCreateModal = () => {
-    setEditingPackage(null);
-    form.resetFields();
-    setSelectedResourceIds([]);
-    setModalVisible(true);
-  };
-
-  const handleSave = async () => {
-    try {
-      const values = await form.validateFields();
-      const packageData = {
-        ...values,
-        resources: selectedResourceIds, // 发送资源ID数组
-        usageCount: editingPackage?.usageCount || 0
-      };
-
-      let savedPackage;
-      if (editingPackage) {
-        const response = await api.put(`/theme-packages/${editingPackage.id}`, packageData);
-        savedPackage = response.data;
-        message.success('主题包更新成功');
-      } else {
-        const response = await api.post('/theme-packages', packageData);
-        savedPackage = response.data;
-        message.success('主题包创建成功');
-      }
-
-      // 刷新列表
-      await fetchPackages();
-
-      setModalVisible(false);
-      form.resetFields();
-      setSelectedResourceIds([]);
-    } catch (error) {
-      console.error('保存失败:', error);
-      message.error('保存失败');
-    }
-  };
-
-  const handleResourceSelect = (resourceId) => {
-    setSelectedResourceIds(prev => {
-      if (prev.includes(resourceId)) {
-        return prev.filter(id => id !== resourceId);
-      }
-      return [...prev, resourceId];
-    });
-  };
+  // 如果有错误，显示错误信息
+  if (error) {
+    return (
+      <div style={{ padding: 20, textAlign: 'center' }}>
+        <h3>Error: {error}</h3>
+        <Button onClick={() => { setError(null); fetchPackages(); }}>重试</Button>
+      </div>
+    );
+  }
 
   return (
     <>
