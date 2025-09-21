@@ -180,10 +180,10 @@ function ItineraryDesigner() {
                     {group.name}
                   </div>
                   <div style={{ fontSize: '10px', color: '#666' }}>
-                    📅 {dayjs(group.start_date).format('MM-DD')} ~ {dayjs(group.end_date).format('MM-DD')}
+                    📅 {dayjs(group.startDate).format('MM-DD')} ~ {dayjs(group.endDate).format('MM-DD')}
                   </div>
                   <div style={{ fontSize: '10px', color: '#666' }}>
-                    👥 {group.student_count + group.teacher_count}人 🏫 {group.type === 'primary' ? '小学' : '中学'}
+                    👥 {group.studentCount + group.teacherCount}人 🏫 {group.type === 'primary' ? '小学' : '中学'}
                   </div>
                 </div>
               </div>
@@ -241,7 +241,7 @@ function ItineraryDesigner() {
         <div style={{ fontSize: '12px', lineHeight: '1.6', background: '#f8f9fa', padding: '8px', borderRadius: '4px' }}>
           <div>选中团组: {selectedGroups.length}个</div>
           <div>总人数: {groups.filter(g => selectedGroups.includes(g.id))
-            .reduce((sum, g) => sum + g.student_count + g.teacher_count, 0)}人</div>
+            .reduce((sum, g) => sum + g.studentCount + g.teacherCount, 0)}人</div>
           <div>活动总数: {weekStats.totalActivities}个</div>
           <div>使用地点: {weekStats.locationsUsed}个</div>
           <div style={{ color: weekStats.unassignedActivities > 0 ? '#fa8c16' : '#52c41a' }}>
@@ -648,7 +648,7 @@ function ItineraryDesigner() {
   // 添加新活动
   const handleAddActivity = async (groupId, locationId, participantCount) => {
     const group = groups.find(g => g.id === groupId);
-    const finalParticipantCount = participantCount || group?.student_count || 0;
+    const finalParticipantCount = participantCount || group?.studentCount || 0;
 
     // 检查冲突
     const conflicts = checkConflicts(
@@ -781,8 +781,8 @@ function ItineraryDesigner() {
           类型: group?.type === 'primary' ? '小学' : '中学',
           人数: activity.participantCount,
           地点: location?.name || '未安排',
-          联系人: group?.contact_person || '',
-          联系电话: group?.contact_phone || ''
+          联系人: group?.contactPerson || '',
+          联系电话: group?.contactPhone || ''
         };
       });
 

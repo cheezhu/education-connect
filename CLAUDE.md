@@ -5,15 +5,71 @@
 Education Connect 是一个专为香港研学团组设计的行程管理系统，支持多团组并发管理、可视化日历、拖拽操作、当日时间线显示和冲突检测。
 
 ## 最新更新 (2025年1月)
-  V2版本采用渐进式开发，不影响V1功能正常使用。
+
+### 数据库架构升级
+- **全面迁移到数据库**: 从内存存储迁移到 SQLite + Prisma ORM
+- **统一命名规范**: 全栈采用 camelCase 命名规则
+- **主题包功能**: 新增教育资源管理和主题包系统
+
 ### UI/UX 重大升级
 - **导航布局改版**: 从左侧边栏改为顶部紧凑导航栏（仅42px高度）
 - **品牌更新**: 系统更名为 "Education Connect" (简称 EC)
 - **空间优化**: 内容区域占比提升至 95.8%
 - **导航菜单优化**:
-  - 调整为: 团组管理 → 行程设计器 → 日历视图 → 行程资源 → 统计报表
+  - 调整为: 团组管理 → 行程设计器 → 日历视图 → 教育资源 → 统计报表
   - 纯文字设计，移除图标
   - 简化右侧操作区，仅保留设置和用户信息
+
+## 命名规范
+
+### 统一命名规则
+项目全栈采用 **camelCase** 命名规范，确保前后端数据一致性。
+
+| 类型 | 规范 | 示例 |
+|------|------|------|
+| **变量/字段** | camelCase | `studentCount`, `startDate`, `contactPerson` |
+| **布尔值** | is/has前缀 | `isActive`, `hasCompleted`, `isBaseActivity` |
+| **常量/枚举值** | UPPER_CASE | `MORNING`, `AFTERNOON`, `PENDING` |
+| **数据库表名** | snake_case复数 | `groups`, `theme_packages`, `educational_resources` |
+| **数据库字段** | snake_case (通过@map映射) | `student_count`, `start_date` |
+| **API路径** | kebab-case | `/api/theme-packages`, `/api/educational-resources` |
+| **文件名** | kebab-case | `theme-package-service.js`, `group-edit-v2.jsx` |
+
+### Prisma 映射示例
+```prisma
+model Group {
+  id            Int      @id @default(autoincrement())
+  name          String
+  type          String
+  studentCount  Int      @map("student_count")
+  teacherCount  Int      @map("teacher_count")
+  startDate     DateTime @map("start_date")
+  endDate       DateTime @map("end_date")
+  contactPerson String?  @map("contact_person")
+  contactPhone  String?  @map("contact_phone")
+  themePackageId Int?    @map("theme_package_id")
+
+  @@map("groups")  // 表名映射
+}
+```
+
+### API 数据格式
+```javascript
+// ✅ 统一的 camelCase 格式
+{
+  id: 1,
+  name: "深圳实验学校小学部",
+  type: "primary",
+  studentCount: 40,        // 不再使用 student_count
+  teacherCount: 4,         // 不再使用 teacher_count
+  startDate: "2025-09-12", // 不再使用 start_date
+  endDate: "2025-09-16",   // 不再使用 end_date
+  contactPerson: "张老师",  // 不再使用 contact_person
+  contactPhone: "13800138000",
+  themePackageId: 1,       // 新增：关联主题包
+  notes: ""
+}
+```
 
 ## 技术栈
 

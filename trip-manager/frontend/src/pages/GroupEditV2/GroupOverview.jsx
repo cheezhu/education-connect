@@ -17,15 +17,15 @@ const GroupOverview = ({ data, onUpdate, onMultipleUpdate, isNew }) => {
         name: data.name,
         type: data.type,
         status: data.status,
-        dateRange: data.start_date && data.end_date ? [
-          dayjs(data.start_date),
-          dayjs(data.end_date)
+        dateRange: data.startDate && data.endDate ? [
+          dayjs(data.startDate),
+          dayjs(data.endDate)
         ] : null,
-        student_count: data.student_count,
-        teacher_count: data.teacher_count,
+        studentCount: data.studentCount,
+        teacherCount: data.teacherCount,
         color: data.color,
-        contact_person: data.contact_person,
-        contact_phone: data.contact_phone,
+        contactPerson: data.contactPerson,
+        contactPhone: data.contactPhone,
         emergency_contact: data.emergency_contact,
         emergency_phone: data.emergency_phone,
         tags: data.tags,
@@ -42,8 +42,8 @@ const GroupOverview = ({ data, onUpdate, onMultipleUpdate, isNew }) => {
       const duration = dates[1].diff(dates[0], 'day') + 1;
 
       onMultipleUpdate({
-        start_date: startDate,
-        end_date: endDate,
+        startDate: startDate,
+        endDate: endDate,
         duration: duration
       });
     }
@@ -171,10 +171,10 @@ const GroupOverview = ({ data, onUpdate, onMultipleUpdate, isNew }) => {
           </Row>
 
           {/* 行程信息显示 */}
-          {data.start_date && data.end_date && (
+          {data.startDate && data.endDate && (
             <div className="duration-info">
               <Tag color="blue">行程天数：{data.duration}天</Tag>
-              <Tag color="green">总人数：{data.student_count + data.teacher_count}人</Tag>
+              <Tag color="green">总人数：{data.studentCount + data.teacherCount}人</Tag>
             </div>
           )}
         </Card>
@@ -260,7 +260,7 @@ const GroupOverview = ({ data, onUpdate, onMultipleUpdate, isNew }) => {
               <Col span={6}>
                 <div className="stat-item">
                   <div className="stat-label">创建时间</div>
-                  <div className="stat-value">{data.created_at || '2025-01-01'}</div>
+                  <div className="stat-value">{data.createdAt || '2025-01-01'}</div>
                 </div>
               </Col>
               <Col span={6}>

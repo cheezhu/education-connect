@@ -50,19 +50,22 @@ const ResourceLibrary = () => {
     enterprise: { label: '企业参观', icon: '🏢', color: '#595959' }
   };
 
-  // 模拟数据
+  // 从后端加载数据
+  const fetchResources = async () => {
+    setLoading(true);
+    try {
+      const response = await api.get('/educational-resources');
+      setResources(response.data);
+    } catch (error) {
+      console.error('加载教育资源失败:', error);
+      message.error('加载教育资源失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const mockData = [
-      { id: '001', name: '香港科学馆', type: 'museum', duration: 3, location: '尖沙咀东部', description: '常设展览参观，科学体验' },
-      { id: '002', name: '香港太空馆', type: 'museum', duration: 2, location: '尖沙咀', description: '天文知识学习' },
-      { id: '003', name: '海洋公园', type: 'park', duration: 6, location: '南区黄竹坑', description: '海洋生物观察' },
-      { id: '004', name: '香港大学', type: 'university', duration: 2.5, location: '薄扶林', description: '校园参观交流' },
-      { id: '005', name: '数码港', type: 'enterprise', duration: 2, location: '薄扶林', description: '创新科技体验' },
-      { id: '006', name: '文化中心', type: 'cultural', duration: 2, location: '尖沙咀', description: '艺术文化欣赏' },
-      { id: '007', name: '湿地公园', type: 'nature', duration: 3, location: '天水围', description: '生态环境学习' },
-      { id: '008', name: '历史博物馆', type: 'museum', duration: 2, location: '尖沙咀', description: '历史文化了解' }
-    ];
-    setResources(mockData);
+    fetchResources();
   }, []);
 
   const columns = [
@@ -151,23 +154,21 @@ const ResourceLibrary = () => {
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
-      const newResource = {
-        ...values,
-        id: editingResource?.id || `R${Date.now()}`
-      };
 
       if (editingResource) {
-        setResources(resources.map(r => r.id === editingResource.id ? newResource : r));
+        await api.put(`/educational-resources/${editingResource.id}`, values);
         message.success('资源更新成功');
       } else {
-        setResources([...resources, newResource]);
+        await api.post('/educational-resources', values);
         message.success('资源创建成功');
       }
 
       setModalVisible(false);
       form.resetFields();
+      await fetchResources(); // 刷新列表
     } catch (error) {
       console.error('保存失败:', error);
+      message.error('保存失败');
     }
   };
 
@@ -175,9 +176,15 @@ const ResourceLibrary = () => {
     Modal.confirm({
       title: '确认删除',
       content: '确定要删除这个教育资源吗？',
-      onOk: () => {
-        setResources(resources.filter(r => r.id !== id));
-        message.success('删除成功');
+      onOk: async () => {
+        try {
+          await api.delete(`/educational-resources/${id}`);
+          message.success('删除成功');
+          await fetchResources(); // 刷新列表
+        } catch (error) {
+          console.error('删除失败:', error);
+          message.error('删除失败');
+        }
       }
     });
   };
@@ -207,7 +214,7 @@ const ResourceLibrary = () => {
 
       <Modal
         title={editingResource ? '编辑教育资源' : '新增教育资源'}
-        visible={modalVisible}
+        open={modalVisible}
         onOk={handleSave}
         onCancel={() => {
           setModalVisible(false);
@@ -278,68 +285,51 @@ const ThemePackageManagement = () => {
   const [selectedResourceIds, setSelectedResourceIds] = useState([]);
   const [form] = Form.useForm();
 
-  // 模拟资源数据
-  const allResources = [
-    { id: '001', name: '香港科学馆', type: 'museum', duration: 3, location: '尖沙咀东部', icon: '🏛️' },
-    { id: '002', name: '香港太空馆', type: 'museum', duration: 2, location: '尖沙咀', icon: '🌌' },
-    { id: '003', name: '海洋公园', type: 'park', duration: 6, location: '南区黄竹坑', icon: '🐬' },
-    { id: '004', name: '香港大学', type: 'university', duration: 2.5, location: '薄扶林', icon: '🎓' },
-    { id: '005', name: '数码港', type: 'enterprise', duration: 2, location: '薄扶林', icon: '💻' },
-    { id: '006', name: '文化中心', type: 'cultural', duration: 2, location: '尖沙咀', icon: '🎭' },
-    { id: '007', name: '湿地公园', type: 'nature', duration: 3, location: '天水围', icon: '🦜' },
-    { id: '008', name: '历史博物馆', type: 'museum', duration: 2, location: '尖沙咀', icon: '🏺' }
-  ];
+  // 资源类型配置
+  const resourceTypes = {
+    museum: { label: '博物馆', icon: '🏛️', color: '#1890ff' },
+    park: { label: '主题公园', icon: '🎢', color: '#52c41a' },
+    university: { label: '大学', icon: '🏫', color: '#722ed1' },
+    cultural: { label: '文化场所', icon: '🎭', color: '#fa8c16' },
+    nature: { label: '自然景点', icon: '🏞️', color: '#13c2c2' },
+    enterprise: { label: '企业参观', icon: '🏢', color: '#595959' },
+    science: { label: '科学', icon: '🏛️', color: '#1890ff' },
+    history: { label: '历史', icon: '🏺', color: '#722ed1' }
+  };
 
-  // 模拟数据
+  // 从后端加载数据
+  const fetchPackages = async () => {
+    setLoading(true);
+    try {
+      const response = await api.get('/theme-packages');
+      const packagesData = response.data.map(pkg => ({
+        ...pkg,
+        resourceCount: pkg.resources?.length || 0,
+        totalDuration: pkg.resources?.reduce((sum, r) => sum + (r.duration || 0), 0) || 0,
+        usageCount: pkg.usageCount || 0,
+        tags: pkg.tags || []
+      }));
+      setPackages(packagesData);
+    } catch (error) {
+      console.error('加载主题包失败:', error);
+      message.error('加载主题包失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchResources = async () => {
+    try {
+      const response = await api.get('/educational-resources');
+      setResources(response.data);
+    } catch (error) {
+      console.error('加载资源失败:', error);
+    }
+  };
+
   useEffect(() => {
-    const mockData = [
-      {
-        id: 'theme_001',
-        name: '科技探索之旅',
-        description: '专注科技创新教育',
-        resources: ['001', '002', '005'],
-        resourceCount: 3,
-        totalDuration: 7,
-        usageCount: 5,
-        createdAt: '2024-01-15',
-        tags: ['科技', 'STEM', '互动体验']
-      },
-      {
-        id: 'theme_002',
-        name: '文化深度游',
-        description: '传统与现代文化体验',
-        resources: ['006', '008'],
-        resourceCount: 2,
-        totalDuration: 4,
-        usageCount: 3,
-        createdAt: '2024-01-20',
-        tags: ['文化', '艺术', '历史']
-      },
-      {
-        id: 'theme_003',
-        name: '自然生态探索',
-        description: '环保与生态教育',
-        resources: ['003', '007'],
-        resourceCount: 2,
-        totalDuration: 9,
-        usageCount: 2,
-        createdAt: '2024-02-01',
-        tags: ['自然', '生态', '环保']
-      },
-      {
-        id: 'theme_004',
-        name: '学术交流体验',
-        description: '高校参观与学术体验',
-        resources: ['004'],
-        resourceCount: 1,
-        totalDuration: 2.5,
-        usageCount: 1,
-        createdAt: '2024-02-10',
-        tags: ['学术', '高校', '交流']
-      }
-    ];
-    setPackages(mockData);
-    setResources(allResources);
+    fetchPackages();
+    fetchResources();
   }, []);
 
   const columns = [
@@ -457,25 +447,37 @@ const ThemePackageManagement = () => {
     setModalVisible(true);
   };
 
-  const handleCopy = (packageItem) => {
-    const newPackage = {
-      ...packageItem,
-      id: `theme_${Date.now()}`,
-      name: `${packageItem.name} (副本)`,
-      usageCount: 0,
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-    setPackages([...packages, newPackage]);
-    message.success('复制成功');
+  const handleCopy = async (packageItem) => {
+    try {
+      const newPackage = {
+        ...packageItem,
+        name: `${packageItem.name} (副本)`,
+        usageCount: 0
+      };
+      delete newPackage.id; // 移除ID，让后端生成新的
+
+      const response = await api.post('/theme-packages', newPackage);
+      await fetchPackages(); // 刷新列表
+      message.success('复制成功');
+    } catch (error) {
+      console.error('复制失败:', error);
+      message.error('复制失败');
+    }
   };
 
   const handleDelete = (id) => {
     Modal.confirm({
       title: '确认删除',
       content: '确定要删除这个主题包吗？',
-      onOk: () => {
-        setPackages(packages.filter(p => p.id !== id));
-        message.success('删除成功');
+      onOk: async () => {
+        try {
+          await api.delete(`/theme-packages/${id}`);
+          setPackages(packages.filter(p => p.id !== id));
+          message.success('删除成功');
+        } catch (error) {
+          console.error('删除失败:', error);
+          message.error('删除失败');
+        }
       }
     });
   };
@@ -490,32 +492,32 @@ const ThemePackageManagement = () => {
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
-      const selectedResources = resources.filter(r => selectedResourceIds.includes(r.id));
-      const totalDuration = selectedResources.reduce((sum, r) => sum + r.duration, 0);
-
-      const newPackage = {
+      const packageData = {
         ...values,
-        id: editingPackage?.id || `theme_${Date.now()}`,
-        resources: selectedResourceIds,
-        resourceCount: selectedResourceIds.length,
-        totalDuration,
-        usageCount: editingPackage?.usageCount || 0,
-        createdAt: editingPackage?.createdAt || new Date().toISOString().split('T')[0]
+        resources: selectedResourceIds, // 发送资源ID数组
+        usageCount: editingPackage?.usageCount || 0
       };
 
+      let savedPackage;
       if (editingPackage) {
-        setPackages(packages.map(p => p.id === editingPackage.id ? newPackage : p));
+        const response = await api.put(`/theme-packages/${editingPackage.id}`, packageData);
+        savedPackage = response.data;
         message.success('主题包更新成功');
       } else {
-        setPackages([...packages, newPackage]);
+        const response = await api.post('/theme-packages', packageData);
+        savedPackage = response.data;
         message.success('主题包创建成功');
       }
+
+      // 刷新列表
+      await fetchPackages();
 
       setModalVisible(false);
       form.resetFields();
       setSelectedResourceIds([]);
     } catch (error) {
       console.error('保存失败:', error);
+      message.error('保存失败');
     }
   };
 
@@ -559,7 +561,7 @@ const ThemePackageManagement = () => {
             主题包详情
           </span>
         }
-        visible={detailModalVisible}
+        open={detailModalVisible}
         onCancel={() => setDetailModalVisible(false)}
         footer={[
           <Button key="close" onClick={() => setDetailModalVisible(false)}>
@@ -639,7 +641,7 @@ const ThemePackageManagement = () => {
                     >
                       <div style={{ display: 'flex', alignItems: 'center' }}>
                         <span style={{ fontSize: 20, marginRight: 8 }}>
-                          {resource.icon}
+                          {resource.icon || resourceTypes[resource.type]?.icon || '🏛️'}
                         </span>
                         <div style={{ flex: 1 }}>
                           <strong>{resource.name}</strong>
@@ -660,7 +662,7 @@ const ThemePackageManagement = () => {
       {/* 编辑/创建弹窗 */}
       <Modal
         title={editingPackage ? '编辑主题包' : '创建主题包'}
-        visible={modalVisible}
+        open={modalVisible}
         onOk={handleSave}
         onCancel={() => {
           setModalVisible(false);
@@ -668,7 +670,7 @@ const ThemePackageManagement = () => {
           setSelectedResourceIds([]);
         }}
         width={900}
-        bodyStyle={{ maxHeight: '70vh', overflowY: 'auto' }}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       >
         <Form form={form} layout="vertical">
           <Form.Item
@@ -720,7 +722,7 @@ const ThemePackageManagement = () => {
                   .reduce((sum, r) => sum + r.duration, 0)} 小时
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                {allResources.map(resource => (
+                {resources.map(resource => (
                   <Card
                     key={resource.id}
                     size="small"
@@ -737,7 +739,7 @@ const ThemePackageManagement = () => {
                   >
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       <span style={{ fontSize: 18, marginRight: 8 }}>
-                        {resource.icon}
+                        {resource.icon || resourceTypes[resource.type]?.icon || '🏛️'}
                       </span>
                       <div style={{ flex: 1 }}>
                         <strong>{resource.name}</strong>

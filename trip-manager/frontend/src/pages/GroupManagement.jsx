@@ -60,10 +60,10 @@ function GroupManagement({ editMode }) {
     if (group) {
       form.setFieldsValue({
         ...group,
-        startDate: dayjs(group.start_date),
-        endDate: group.end_date ? dayjs(group.end_date) : null,
-        studentCount: group.student_count,
-        teacherCount: group.teacher_count,
+        startDate: dayjs(group.startDate),
+        endDate: group.endDate ? dayjs(group.endDate) : null,
+        studentCount: group.studentCount,
+        teacherCount: group.teacherCount,
         duration: group.duration,
         color: group.color || '#1890ff'
       });
@@ -85,14 +85,14 @@ function GroupManagement({ editMode }) {
       const data = {
         name: values.name,
         type: values.type,
-        student_count: parseInt(values.studentCount),
-        teacher_count: parseInt(values.teacherCount),
-        start_date: values.startDate.format('YYYY-MM-DD'),
-        end_date: values.endDate.format('YYYY-MM-DD'),
+        studentCount: parseInt(values.studentCount),
+        teacherCount: parseInt(values.teacherCount),
+        startDate: values.startDate.format('YYYY-MM-DD'),
+        endDate: values.endDate.format('YYYY-MM-DD'),
         duration: values.duration,
         color: typeof values.color === 'string' ? values.color : values.color.toHexString(),
-        contact_person: values.contactPerson || '',
-        contact_phone: values.contactPhone || '',
+        contactPerson: values.contactPerson || '',
+        contactPhone: values.contactPhone || '',
         notes: values.notes || ''
       };
 
@@ -136,10 +136,10 @@ function GroupManagement({ editMode }) {
 
   // 获取团组每日行程状态
   const getGroupDailyStatus = (group) => {
-    if (!group.start_date || !group.end_date || !activities.length) return [];
+    if (!group.startDate || !group.endDate || !activities.length) return [];
 
-    const startDate = new Date(group.start_date);
-    const endDate = new Date(group.end_date);
+    const startDate = new Date(group.startDate);
+    const endDate = new Date(group.endDate);
     const dailyStatus = [];
 
     const currentDate = new Date(startDate);
@@ -236,7 +236,7 @@ function GroupManagement({ editMode }) {
         locationId: null, // 默认未安排地点
         date,
         timeSlot,
-        participantCount: group.student_count + group.teacher_count
+        participantCount: group.studentCount + group.teacherCount
       });
 
       message.success('行程已添加');
@@ -515,7 +515,7 @@ function GroupManagement({ editMode }) {
     {
       title: '人数',
       key: 'participants',
-      render: (_, record) => `${record.student_count + record.teacher_count}人`
+      render: (_, record) => `${record.studentCount + record.teacherCount}人`
     },
     {
       title: '开始日期',

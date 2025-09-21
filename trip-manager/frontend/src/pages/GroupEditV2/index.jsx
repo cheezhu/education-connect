@@ -32,15 +32,15 @@ const GroupEditV2 = () => {
       setGroupData({
         name: '',
         type: 'primary',
-        student_count: 40,
-        teacher_count: 4,
-        start_date: dayjs().format('YYYY-MM-DD'),
-        end_date: dayjs().add(4, 'day').format('YYYY-MM-DD'),
+        studentCount: 40,
+        teacherCount: 4,
+        startDate: dayjs().format('YYYY-MM-DD'),
+        endDate: dayjs().add(4, 'day').format('YYYY-MM-DD'),
         duration: 5,
         color: '#1890ff',
         status: '准备中',
-        contact_person: '',
-        contact_phone: '',
+        contactPerson: '',
+        contactPhone: '',
         emergency_contact: '',
         emergency_phone: '',
         tags: [],
@@ -61,8 +61,8 @@ const GroupEditV2 = () => {
       const enhancedData = {
         ...group,
         status: group.status || '准备中',
-        contact_person: group.contact_person || '',
-        contact_phone: group.contact_phone || '',
+        contactPerson: group.contactPerson || '',
+        contactPhone: group.contactPhone || '',
         emergency_contact: group.emergency_contact || '',
         emergency_phone: group.emergency_phone || '',
         tags: group.tags || [],
@@ -97,15 +97,15 @@ const GroupEditV2 = () => {
         const dataToSave = {
           name: groupData.name,
           type: groupData.type,
-          student_count: groupData.student_count,
-          teacher_count: groupData.teacher_count,
-          start_date: groupData.start_date,
-          end_date: groupData.end_date,
+          studentCount: groupData.studentCount,
+          teacherCount: groupData.teacherCount,
+          startDate: groupData.startDate,
+          endDate: groupData.endDate,
           duration: groupData.duration,
           color: groupData.color,
           status: groupData.status,
-          contact_person: groupData.contact_person,
-          contact_phone: groupData.contact_phone,
+          contactPerson: groupData.contactPerson,
+          contactPhone: groupData.contactPhone,
           emergency_contact: groupData.emergency_contact,
           emergency_phone: groupData.emergency_phone,
           tags: groupData.tags,
@@ -133,15 +133,15 @@ const GroupEditV2 = () => {
       const dataToSave = {
         name: groupData.name,
         type: groupData.type,
-        student_count: groupData.student_count,
-        teacher_count: groupData.teacher_count,
-        start_date: groupData.start_date,
-        end_date: groupData.end_date,
+        studentCount: groupData.studentCount,
+        teacherCount: groupData.teacherCount,
+        startDate: groupData.startDate,
+        endDate: groupData.endDate,
         duration: groupData.duration,
         color: groupData.color,
         status: groupData.status,
-        contact_person: groupData.contact_person,
-        contact_phone: groupData.contact_phone,
+        contactPerson: groupData.contactPerson,
+        contactPhone: groupData.contactPhone,
         emergency_contact: groupData.emergency_contact,
         emergency_phone: groupData.emergency_phone,
         tags: groupData.tags,
@@ -176,8 +176,8 @@ const GroupEditV2 = () => {
 
       // 自动计算天数
       if (field === 'start_date' || field === 'end_date') {
-        if (updated.start_date && updated.end_date) {
-          updated.duration = dayjs(updated.end_date).diff(dayjs(updated.start_date), 'day') + 1;
+        if (updated.startDate && updated.endDate) {
+          updated.duration = dayjs(updated.endDate).diff(dayjs(updated.startDate), 'day') + 1;
         }
       }
 

@@ -16,7 +16,7 @@ const ScheduleManagement = ({ groupId, groupData, schedules, onUpdate }) => {
         {
           id: 1,
           groupId: groupId,
-          date: groupData.start_date,
+          date: groupData.startDate,
           startTime: '07:00',
           endTime: '08:00',
           type: 'meal',
@@ -27,7 +27,7 @@ const ScheduleManagement = ({ groupId, groupData, schedules, onUpdate }) => {
         {
           id: 2,
           groupId: groupId,
-          date: groupData.start_date,
+          date: groupData.startDate,
           startTime: '09:00',
           endTime: '11:30',
           type: 'visit',
@@ -38,7 +38,7 @@ const ScheduleManagement = ({ groupId, groupData, schedules, onUpdate }) => {
         {
           id: 3,
           groupId: groupId,
-          date: groupData.start_date,
+          date: groupData.startDate,
           startTime: '12:00',
           endTime: '13:00',
           type: 'meal',

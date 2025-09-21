@@ -157,10 +157,10 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
 
   // 计算天数
   const calculateDays = () => {
-    if (!groupData?.start_date || !groupData?.end_date) return [];
+    if (!groupData?.startDate || !groupData?.endDate) return [];
 
-    const start = new Date(groupData.start_date);
-    const end = new Date(groupData.end_date);
+    const start = new Date(groupData.startDate);
+    const end = new Date(groupData.endDate);
     const days = [];
     const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
     const dayNamesFull = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];

@@ -1,0 +1,169 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  role      String   @default("user") // admin, user
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  groups    Group[]  // 用户创建的团组
+}
+
+// 团组表
+model Group {
+  id               Int      @id @default(autoincrement())
+  name             String
+  type             String   // primary, secondary
+  studentCount     Int      @map("student_count")
+  teacherCount     Int      @map("teacher_count")
+  startDate        String   @map("start_date")
+  endDate          String   @map("end_date")
+  duration         Int
+  color            String
+  status           String   @default("准备中")
+  contactPerson    String?  @map("contact_person")
+  contactPhone     String?  @map("contact_phone")
+  emergencyContact String?  @map("emergency_contact")
+  emergencyPhone   String?  @map("emergency_phone")
+  notes            String?
+  themePackageId   String?  @map("theme_package_id")
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdBy        Int?     @map("created_by")
+
+  creator          User?    @relation(fields: [createdBy], references: [id])
+  themePackage     ThemePackage? @relation(fields: [themePackageId], references: [id])
+  schedules        Schedule[]
+  activities       Activity[]
+
+  @@map("groups")
+}
+
+// 教育资源表
+model EducationalResource {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // museum, park, university, cultural, nature, enterprise
+  category    String?  // science, history, culture, nature
+  description String?
+  location    String?
+  duration    Float    // 建议时长(小时)
+  ageGroups   String?  // JSON array: ["primary", "secondary"]
+  highlights  String?  // JSON array of highlights
+  imageUrl    String?  @map("image_url")
+  icon        String?
+  status      String   @default("active")
+  isUnique    Boolean  @default(true) // 是否为单一活动
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  themePackages ThemePackageResource[]
+
+  @@map("educational_resources")
+}
+
+// 主题包表
+model ThemePackage {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  tags        String?  // JSON array of tags
+  status      String   @default("active")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  resources   ThemePackageResource[]
+  groups      Group[]
+
+  @@map("theme_packages")
+}
+
+// 主题包-资源关联表
+model ThemePackageResource {
+  id             Int      @id @default(autoincrement())
+  themePackageId String   @map("theme_package_id")
+  resourceId     String   @map("resource_id")
+  sortOrder      Int      @default(0) @map("sort_order")
+
+  themePackage   ThemePackage @relation(fields: [themePackageId], references: [id], onDelete: Cascade)
+  resource       EducationalResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@unique([themePackageId, resourceId])
+  @@map("theme_package_resources")
+}
+
+// 日程表
+model Schedule {
+  id          Int      @id @default(autoincrement())
+  groupId     Int      @map("group_id")
+  date        String
+  dayNumber   Int      @map("day_number")
+  title       String?
+  description String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  activities  Activity[]
+
+  @@map("schedules")
+}
+
+// 活动表
+model Activity {
+  id           Int      @id @default(autoincrement())
+  groupId      Int      @map("group_id")
+  scheduleId   Int?     @map("schedule_id")
+  resourceId   String?  @map("resource_id")
+  date         String
+  startTime    String   @map("start_time")
+  endTime      String   @map("end_time")
+  title        String
+  type         String   // meal, visit, transport, rest, activity, free
+  description  String?
+  location     String?
+  duration     Float?   // 时长(小时)
+  isBaseActivity Boolean @default(false) @map("is_base_activity")
+  isFromResource Boolean @default(false) @map("is_from_resource")
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  group        Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  schedule     Schedule? @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@map("activities")
+}
+
+// 审计日志表
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int?     @map("user_id")
+  action      String   // CREATE, UPDATE, DELETE
+  entity      String   // groups, activities, etc.
+  entityId    String   @map("entity_id")
+  changes     String?  // JSON string of changes
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+
+  createdAt   DateTime @default(now())
+
+  @@map("audit_logs")
+}

@@ -81,7 +81,7 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
               <label>开始日期</label>
               <input
                 type="date"
-                value={groupData.start_date || ''}
+                value={groupData.startDate || ''}
                 onChange={(e) => {
                   onUpdate('start_date', e.target.value);
                   handleAutoSave();
@@ -92,7 +92,7 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
               <label>结束日期</label>
               <input
                 type="date"
-                value={groupData.end_date || ''}
+                value={groupData.endDate || ''}
                 onChange={(e) => {
                   onUpdate('end_date', e.target.value);
                   handleAutoSave();
@@ -113,7 +113,7 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
               <label>学生人数</label>
               <input
                 type="number"
-                value={groupData.student_count || 0}
+                value={groupData.studentCount || 0}
                 onChange={(e) => {
                   onUpdate('student_count', parseInt(e.target.value) || 0);
                   handleAutoSave();
@@ -126,7 +126,7 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
               <label>老师人数</label>
               <input
                 type="number"
-                value={groupData.teacher_count || 0}
+                value={groupData.teacherCount || 0}
                 onChange={(e) => {
                   onUpdate('teacher_count', parseInt(e.target.value) || 0);
                   handleAutoSave();
@@ -138,7 +138,7 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
             <div className="info-item">
               <label>总人数</label>
               <div className="duration-display">
-                <span className="duration-number">{(groupData.student_count || 0) + (groupData.teacher_count || 0)}</span> 人
+                <span className="duration-number">{(groupData.studentCount || 0) + (groupData.teacherCount || 0)}</span> 人
               </div>
             </div>
           </div>
@@ -149,7 +149,7 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
               <label>联系人</label>
               <input
                 type="text"
-                value={groupData.contact_person || ''}
+                value={groupData.contactPerson || ''}
                 onChange={(e) => {
                   onUpdate('contact_person', e.target.value);
                   handleAutoSave();
@@ -161,7 +161,7 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
               <label>联系电话</label>
               <input
                 type="tel"
-                value={groupData.contact_phone || ''}
+                value={groupData.contactPhone || ''}
                 onChange={(e) => {
                   onUpdate('contact_phone', e.target.value);
                   handleAutoSave();
@@ -237,12 +237,12 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
             <span className="card-title">团员信息</span>
             <div className="member-stats">
               <span className="stat-item">
-                学生 {groupData.student_count || 0}
+                学生 {groupData.studentCount || 0}
               </span>
               <span className="stat-divider">|</span>
-              <span className="stat-item">老师 {groupData.teacher_count || 0}</span>
+              <span className="stat-item">老师 {groupData.teacherCount || 0}</span>
               <span className="stat-divider">|</span>
-              <span className="stat-item total">总计 {(groupData.student_count || 0) + (groupData.teacher_count || 0)}</span>
+              <span className="stat-item total">总计 {(groupData.studentCount || 0) + (groupData.teacherCount || 0)}</span>
             </div>
           </div>
 

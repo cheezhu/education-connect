@@ -729,6 +729,333 @@ app.post('/api/schedules/conflicts', (req, res) => {
   res.json({ hasConflicts: conflicts.length > 0, conflicts });
 });
 
+// 主题包管理
+let themePackages = [
+  {
+    id: 1,
+    name: '科技探索之旅',
+    description: '专注科技创新的学习体验，包含科学馆、太空馆等科技教育资源',
+    resources: [
+      {
+        id: 'resource_001',
+        name: '香港科学馆',
+        type: 'museum',
+        category: 'science',
+        description: '展示各种科学原理的互动博物馆',
+        location: '尖沙咀东部科学馆道2号',
+        duration: 3,
+        ageGroups: ['primary', 'secondary'],
+        highlights: ['互动物理实验', '科学原理展示', '团队探索活动']
+      },
+      {
+        id: 'resource_002',
+        name: '香港太空馆',
+        type: 'museum',
+        category: 'science',
+        description: '探索宇宙奥秘的天文博物馆',
+        location: '尖沙咀梳士巴利道10号',
+        duration: 2,
+        ageGroups: ['primary', 'secondary'],
+        highlights: ['天象厅', '宇宙展览', '互动体验']
+      }
+    ],
+    createdAt: '2024-09-21',
+    status: 'active'
+  },
+  {
+    id: 2,
+    name: '历史文化之旅',
+    description: '深入了解香港历史文化，参观博物馆和文化景点',
+    resources: [
+      {
+        id: 'resource_003',
+        name: '香港历史博物馆',
+        type: 'museum',
+        category: 'history',
+        description: '展示香港历史发展的综合博物馆',
+        location: '尖沙咀漆咸道南100号',
+        duration: 2.5,
+        ageGroups: ['primary', 'secondary'],
+        highlights: ['香港故事展览', '民俗文化展示', '历史场景重现']
+      },
+      {
+        id: 'resource_004',
+        name: '香港文化博物馆',
+        type: 'museum',
+        category: 'culture',
+        description: '展示香港文化艺术的博物馆',
+        location: '沙田文林路1号',
+        duration: 2.5,
+        ageGroups: ['primary', 'secondary'],
+        highlights: ['粤剧文化', '香港电影', '艺术展览']
+      }
+    ],
+    createdAt: '2024-09-21',
+    status: 'active'
+  },
+  {
+    id: 3,
+    name: '自然生态之旅',
+    description: '亲近自然，了解生态保育和环境保护',
+    resources: [
+      {
+        id: 'resource_005',
+        name: '香港海洋公园',
+        type: 'park',
+        category: 'nature',
+        description: '集娱乐和教育于一体的海洋主题公园',
+        location: '香港仔黄竹坑道180号',
+        duration: 6,
+        ageGroups: ['primary', 'secondary'],
+        highlights: ['海洋生物展览', '保育教育', '动物表演']
+      },
+      {
+        id: 'resource_006',
+        name: '诺亚方舟',
+        type: 'park',
+        category: 'nature',
+        description: '结合自然教育和历史文化的主题公园',
+        location: '新界马湾珀欣路33号',
+        duration: 4,
+        ageGroups: ['primary', 'secondary'],
+        highlights: ['生命教育', '环保体验', '团队活动']
+      }
+    ],
+    createdAt: '2024-09-21',
+    status: 'active'
+  }
+];
+
+let educationalResources = [
+  {
+    id: 'resource_001',
+    name: '香港科学馆',
+    type: 'museum',
+    category: 'science',
+    description: '展示各种科学原理的互动博物馆',
+    location: '尖沙咀东部科学馆道2号',
+    duration: 3,
+    ageGroups: ['primary', 'secondary'],
+    highlights: ['互动物理实验', '科学原理展示', '团队探索活动'],
+    image: '/images/science_museum.jpg',
+    status: 'active'
+  },
+  {
+    id: 'resource_002',
+    name: '香港太空馆',
+    type: 'museum',
+    category: 'science',
+    description: '探索宇宙奥秘的天文博物馆',
+    location: '尖沙咀梳士巴利道10号',
+    duration: 2,
+    ageGroups: ['primary', 'secondary'],
+    highlights: ['天象厅', '宇宙展览', '互动体验'],
+    image: '/images/space_museum.jpg',
+    status: 'active'
+  },
+  {
+    id: 'resource_003',
+    name: '香港历史博物馆',
+    type: 'museum',
+    category: 'history',
+    description: '展示香港历史发展的综合博物馆',
+    location: '尖沙咀漆咸道南100号',
+    duration: 2.5,
+    ageGroups: ['primary', 'secondary'],
+    highlights: ['香港故事展览', '民俗文化展示', '历史场景重现'],
+    image: '/images/history_museum.jpg',
+    status: 'active'
+  },
+  {
+    id: 'resource_004',
+    name: '香港文化博物馆',
+    type: 'museum',
+    category: 'culture',
+    description: '展示香港文化艺术的博物馆',
+    location: '沙田文林路1号',
+    duration: 2.5,
+    ageGroups: ['primary', 'secondary'],
+    highlights: ['粤剧文化', '香港电影', '艺术展览'],
+    image: '/images/culture_museum.jpg',
+    status: 'active'
+  },
+  {
+    id: 'resource_005',
+    name: '香港海洋公园',
+    type: 'park',
+    category: 'nature',
+    description: '集娱乐和教育于一体的海洋主题公园',
+    location: '香港仔黄竹坑道180号',
+    duration: 6,
+    ageGroups: ['primary', 'secondary'],
+    highlights: ['海洋生物展览', '保育教育', '动物表演'],
+    image: '/images/ocean_park.jpg',
+    status: 'active'
+  },
+  {
+    id: 'resource_006',
+    name: '诺亚方舟',
+    type: 'park',
+    category: 'nature',
+    description: '结合自然教育和历史文化的主题公园',
+    location: '新界马湾珀欣路33号',
+    duration: 4,
+    ageGroups: ['primary', 'secondary'],
+    highlights: ['生命教育', '环保体验', '团队活动'],
+    image: '/images/noahs_ark.jpg',
+    status: 'active'
+  },
+  {
+    id: 'resource_007',
+    name: '香港大学',
+    type: 'university',
+    category: 'education',
+    description: '香港历史最悠久的高等教育机构',
+    location: '薄扶林道',
+    duration: 2,
+    ageGroups: ['secondary'],
+    highlights: ['校园参观', '学术交流', '历史建筑'],
+    image: '/images/hku.jpg',
+    status: 'active'
+  },
+  {
+    id: 'resource_008',
+    name: '西九文化区',
+    type: 'cultural',
+    category: 'culture',
+    description: '香港的艺术文化枢纽',
+    location: '西九龙文化区',
+    duration: 3,
+    ageGroups: ['primary', 'secondary'],
+    highlights: ['M+博物馆', '艺术公园', '文化表演'],
+    image: '/images/west_kowloon.jpg',
+    status: 'active'
+  }
+];
+
+// 教育资源API
+app.get('/api/educational-resources', (req, res) => {
+  res.json(educationalResources);
+});
+
+app.get('/api/educational-resources/:id', (req, res) => {
+  const resource = educationalResources.find(r => r.id === req.params.id);
+  if (resource) {
+    res.json(resource);
+  } else {
+    res.status(404).json({ error: '资源不存在' });
+  }
+});
+
+app.post('/api/educational-resources', (req, res) => {
+  const newResource = {
+    id: `resource_${Date.now()}`,
+    ...req.body,
+    status: 'active'
+  };
+  educationalResources.push(newResource);
+  res.json(newResource);
+});
+
+app.put('/api/educational-resources/:id', (req, res) => {
+  const index = educationalResources.findIndex(r => r.id === req.params.id);
+  if (index === -1) {
+    return res.status(404).json({ error: '资源不存在' });
+  }
+  educationalResources[index] = { ...educationalResources[index], ...req.body };
+  res.json(educationalResources[index]);
+});
+
+app.delete('/api/educational-resources/:id', (req, res) => {
+  const index = educationalResources.findIndex(r => r.id === req.params.id);
+  if (index === -1) {
+    return res.status(404).json({ error: '资源不存在' });
+  }
+  educationalResources.splice(index, 1);
+  res.json({ success: true, message: '资源已删除' });
+});
+
+// 主题包API
+app.get('/api/theme-packages', (req, res) => {
+  res.json(themePackages);
+});
+
+app.get('/api/theme-packages/:id', (req, res) => {
+  const packageId = parseInt(req.params.id);
+  const themePackage = themePackages.find(p => p.id === packageId);
+  if (themePackage) {
+    res.json(themePackage);
+  } else {
+    res.status(404).json({ error: '主题包不存在' });
+  }
+});
+
+app.post('/api/theme-packages', (req, res) => {
+  const newPackage = {
+    id: Math.max(...themePackages.map(p => p.id), 0) + 1,
+    ...req.body,
+    createdAt: new Date().toISOString(),
+    status: 'active'
+  };
+  themePackages.push(newPackage);
+  res.json(newPackage);
+});
+
+app.put('/api/theme-packages/:id', (req, res) => {
+  const packageId = parseInt(req.params.id);
+  const index = themePackages.findIndex(p => p.id === packageId);
+  if (index === -1) {
+    return res.status(404).json({ error: '主题包不存在' });
+  }
+  themePackages[index] = { ...themePackages[index], ...req.body };
+  res.json(themePackages[index]);
+});
+
+app.delete('/api/theme-packages/:id', (req, res) => {
+  const packageId = parseInt(req.params.id);
+  const index = themePackages.findIndex(p => p.id === packageId);
+  if (index === -1) {
+    return res.status(404).json({ error: '主题包不存在' });
+  }
+  themePackages.splice(index, 1);
+  res.json({ success: true, message: '主题包已删除' });
+});
+
+// 为主题包添加资源
+app.post('/api/theme-packages/:id/resources', (req, res) => {
+  const packageId = parseInt(req.params.id);
+  const themePackage = themePackages.find(p => p.id === packageId);
+  if (!themePackage) {
+    return res.status(404).json({ error: '主题包不存在' });
+  }
+
+  const { resourceId } = req.body;
+  const resource = educationalResources.find(r => r.id === resourceId);
+  if (!resource) {
+    return res.status(404).json({ error: '资源不存在' });
+  }
+
+  if (!themePackage.resources.find(r => r.id === resourceId)) {
+    themePackage.resources.push(resource);
+  }
+
+  res.json(themePackage);
+});
+
+// 从主题包移除资源
+app.delete('/api/theme-packages/:id/resources/:resourceId', (req, res) => {
+  const packageId = parseInt(req.params.id);
+  const { resourceId } = req.params;
+
+  const themePackage = themePackages.find(p => p.id === packageId);
+  if (!themePackage) {
+    return res.status(404).json({ error: '主题包不存在' });
+  }
+
+  themePackage.resources = themePackage.resources.filter(r => r.id !== resourceId);
+  res.json(themePackage);
+});
+
 // 统计路由
 app.get('/api/statistics', (req, res) => {
   const summary = {

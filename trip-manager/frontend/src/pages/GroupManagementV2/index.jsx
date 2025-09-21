@@ -59,8 +59,8 @@ const GroupManagementV2 = () => {
         status: calculateStatus(group),
         completed_activities: Math.floor(Math.random() * 15) + 1,
         activity_count: 15,
-        contact_person: group.contact_person || '张老师',
-        contact_phone: group.contact_phone || '13800138000',
+        contactPerson: group.contactPerson || '张老师',
+        contactPhone: group.contactPhone || '13800138000',
         tags: generateTags(group),
         completion_rate: calculateCompletionRate(group)
       }));
@@ -78,8 +78,8 @@ const GroupManagementV2 = () => {
   // 计算团组状态
   const calculateStatus = (group) => {
     const today = dayjs();
-    const startDate = dayjs(group.start_date);
-    const endDate = dayjs(group.end_date);
+    const startDate = dayjs(group.startDate);
+    const endDate = dayjs(group.endDate);
 
     if (today.isBefore(startDate)) return '准备中';
     if (today.isAfter(endDate)) return '已完成';
@@ -89,18 +89,18 @@ const GroupManagementV2 = () => {
   // 生成标签
   const generateTags = (group) => {
     const tags = [];
-    if (group.student_count > 45) tags.push('大型团组');
+    if (group.studentCount > 45) tags.push('大型团组');
     if (group.type === 'primary') tags.push('小学');
     else tags.push('中学');
-    if (dayjs(group.start_date).month() === 8) tags.push('9月出行');
+    if (dayjs(group.startDate).month() === 8) tags.push('9月出行');
     return tags;
   };
 
   // 计算完成率
   const calculateCompletionRate = (group) => {
     const today = dayjs();
-    const startDate = dayjs(group.start_date);
-    const endDate = dayjs(group.end_date);
+    const startDate = dayjs(group.startDate);
+    const endDate = dayjs(group.endDate);
 
     if (today.isBefore(startDate)) return 0;
     if (today.isAfter(endDate)) return 100;
@@ -129,7 +129,7 @@ const GroupManagementV2 = () => {
       const searchLower = filters.searchText.toLowerCase();
       filtered = filtered.filter(g =>
         g.name.toLowerCase().includes(searchLower) ||
-        g.contact_person?.toLowerCase().includes(searchLower) ||
+        g.contactPerson?.toLowerCase().includes(searchLower) ||
         g.tags?.some(tag => tag.toLowerCase().includes(searchLower))
       );
     }
@@ -143,8 +143,8 @@ const GroupManagementV2 = () => {
 
   // 渲染团组卡片
   const renderGroupCard = (group) => {
-    const startDate = dayjs(group.start_date);
-    const endDate = dayjs(group.end_date);
+    const startDate = dayjs(group.startDate);
+    const endDate = dayjs(group.endDate);
 
     return (
       <Card
@@ -198,7 +198,7 @@ const GroupManagementV2 = () => {
 
             <div className="info-row">
               <TeamOutlined />
-              <span>学生: {group.student_count}人 | 老师: {group.teacher_count}人</span>
+              <span>学生: {group.studentCount}人 | 老师: {group.teacherCount}人</span>
             </div>
 
             <div className="info-row">
@@ -222,7 +222,7 @@ const GroupManagementV2 = () => {
 
             <div className="info-row">
               <PhoneOutlined />
-              <span>联系人: {group.contact_person} {group.contact_phone}</span>
+              <span>联系人: {group.contactPerson} {group.contactPhone}</span>
             </div>
 
             {group.tags && group.tags.length > 0 && (

@@ -17,13 +17,13 @@ const GroupOverviewCompact = ({ data, onUpdate, onMultipleUpdate, isNew }) => {
         name: data.name,
         type: data.type,
         status: data.status,
-        start_date: data.start_date ? dayjs(data.start_date) : null,
-        end_date: data.end_date ? dayjs(data.end_date) : null,
-        student_count: data.student_count,
-        teacher_count: data.teacher_count,
+        startDate: data.startDate ? dayjs(data.startDate) : null,
+        endDate: data.endDate ? dayjs(data.endDate) : null,
+        studentCount: data.studentCount,
+        teacherCount: data.teacherCount,
         color: data.color,
-        contact_person: data.contact_person,
-        contact_phone: data.contact_phone,
+        contactPerson: data.contactPerson,
+        contactPhone: data.contactPhone,
         emergency_contact: data.emergency_contact,
         emergency_phone: data.emergency_phone,
         notes: data.notes
@@ -38,8 +38,8 @@ const GroupOverviewCompact = ({ data, onUpdate, onMultipleUpdate, isNew }) => {
       onUpdate(field, dateStr);
 
       // 自动计算天数
-      const startDate = field === 'start_date' ? dateStr : data.start_date;
-      const endDate = field === 'end_date' ? dateStr : data.end_date;
+      const startDate = field === 'start_date' ? dateStr : data.startDate;
+      const endDate = field === 'end_date' ? dateStr : data.endDate;
 
       if (startDate && endDate) {
         const duration = dayjs(endDate).diff(dayjs(startDate), 'day') + 1;
@@ -231,7 +231,7 @@ const GroupOverviewCompact = ({ data, onUpdate, onMultipleUpdate, isNew }) => {
             <div className="stat-divider">|</div>
             <div className="stat-item">
               <span className="stat-label">创建:</span>
-              <span className="stat-value">{data.created_at || '2025-01-01'}</span>
+              <span className="stat-value">{data.createdAt || '2025-01-01'}</span>
             </div>
             <div className="stat-item">
               <span className="stat-label">更新:</span>
