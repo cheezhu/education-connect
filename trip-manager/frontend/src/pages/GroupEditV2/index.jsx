@@ -20,7 +20,7 @@ const GroupEditV2 = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  const autoSaveTimeoutRef = useRef(null);
+  // Removed auto-save logic
 
   // 是否为新建模式
   const isNew = id === 'new';
@@ -41,8 +41,8 @@ const GroupEditV2 = () => {
         status: '准备中',
         contactPerson: '',
         contactPhone: '',
-        emergency_contact: '',
-        emergency_phone: '',
+        emergencyContact: '',
+        emergencyPhone: '',
         tags: [],
         notes: '',
         members: [],
@@ -63,8 +63,8 @@ const GroupEditV2 = () => {
         status: group.status || '准备中',
         contactPerson: group.contactPerson || '',
         contactPhone: group.contactPhone || '',
-        emergency_contact: group.emergency_contact || '',
-        emergency_phone: group.emergency_phone || '',
+        emergencyContact: group.emergencyContact || '',
+        emergencyPhone: group.emergencyPhone || '',
         tags: group.tags || [],
         notes: group.notes || '',
         members: [], // TODO: 加载团员数据
@@ -84,42 +84,7 @@ const GroupEditV2 = () => {
     fetchGroupData();
   }, [id]);
 
-  // 自动保存
-  const handleAutoSave = async () => {
-    // 清除之前的定时器
-    clearTimeout(autoSaveTimeoutRef.current);
-
-    // 延迟800ms后执行保存
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      if (!groupData.name || isNew) return;
-
-      try {
-        const dataToSave = {
-          name: groupData.name,
-          type: groupData.type,
-          studentCount: groupData.studentCount,
-          teacherCount: groupData.teacherCount,
-          startDate: groupData.startDate,
-          endDate: groupData.endDate,
-          duration: groupData.duration,
-          color: groupData.color,
-          status: groupData.status,
-          contactPerson: groupData.contactPerson,
-          contactPhone: groupData.contactPhone,
-          emergency_contact: groupData.emergency_contact,
-          emergency_phone: groupData.emergency_phone,
-          tags: groupData.tags,
-          notes: groupData.notes,
-          themePackageId: groupData.themePackageId  // 添加主题包ID
-        };
-
-        await api.put(`/groups/${id}`, dataToSave);
-        setHasChanges(false);
-      } catch (error) {
-        console.error('自动保存失败:', error);
-      }
-    }, 800);
-  };
+  // Removed auto-save function - now using manual save only
 
   // 保存团组数据
   const handleSave = async () => {
@@ -142,10 +107,11 @@ const GroupEditV2 = () => {
         status: groupData.status,
         contactPerson: groupData.contactPerson,
         contactPhone: groupData.contactPhone,
-        emergency_contact: groupData.emergency_contact,
-        emergency_phone: groupData.emergency_phone,
+        emergencyContact: groupData.emergencyContact,
+        emergencyPhone: groupData.emergencyPhone,
         tags: groupData.tags,
-        notes: groupData.notes
+        notes: groupData.notes,
+        themePackageId: groupData.themePackageId  // 添加主题包ID
       };
 
       if (isNew) {
@@ -175,7 +141,7 @@ const GroupEditV2 = () => {
       };
 
       // 自动计算天数
-      if (field === 'start_date' || field === 'end_date') {
+      if (field === 'startDate' || field === 'endDate') {
         if (updated.startDate && updated.endDate) {
           updated.duration = dayjs(updated.endDate).diff(dayjs(updated.startDate), 'day') + 1;
         }
@@ -195,12 +161,7 @@ const GroupEditV2 = () => {
     setHasChanges(true);
   };
 
-  // 清理定时器
-  useEffect(() => {
-    return () => {
-      clearTimeout(autoSaveTimeoutRef.current);
-    };
-  }, []);
+  // Removed auto-save cleanup
 
   if (loading) {
     return (
@@ -263,8 +224,9 @@ const GroupEditV2 = () => {
             <GroupInfoSimple
               groupData={groupData}
               onUpdate={updateGroupData}
-              handleAutoSave={handleAutoSave}
+              handleSave={handleSave}
               isNew={isNew}
+              saving={saving}
             />
           )}
 

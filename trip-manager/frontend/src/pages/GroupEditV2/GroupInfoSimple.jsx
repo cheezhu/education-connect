@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
 
-const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
+const GroupInfoSimple = ({ groupData, onUpdate, handleSave, isNew, saving }) => {
   const [themePackages, setThemePackages] = useState([]);
 
   // 模拟获取主题包数据
@@ -44,7 +44,6 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
                 value={groupData.name || ''}
                 onChange={(e) => {
                   onUpdate('name', e.target.value);
-                  handleAutoSave();
                 }}
                 placeholder="输入团组名称"
               />
@@ -55,7 +54,6 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
                 value={groupData.type || 'primary'}
                 onChange={(e) => {
                   onUpdate('type', e.target.value);
-                  handleAutoSave();
                 }}
               >
                 <option value="primary">小学</option>
@@ -69,7 +67,6 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
                 value={groupData.color || '#1890ff'}
                 onChange={(e) => {
                   onUpdate('color', e.target.value);
-                  handleAutoSave();
                 }}
               />
             </div>
@@ -83,8 +80,7 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
                 type="date"
                 value={groupData.startDate || ''}
                 onChange={(e) => {
-                  onUpdate('start_date', e.target.value);
-                  handleAutoSave();
+                  onUpdate('startDate', e.target.value);
                 }}
               />
             </div>
@@ -94,8 +90,7 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
                 type="date"
                 value={groupData.endDate || ''}
                 onChange={(e) => {
-                  onUpdate('end_date', e.target.value);
-                  handleAutoSave();
+                  onUpdate('endDate', e.target.value);
                 }}
               />
             </div>
@@ -115,8 +110,7 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
                 type="number"
                 value={groupData.studentCount || 0}
                 onChange={(e) => {
-                  onUpdate('student_count', parseInt(e.target.value) || 0);
-                  handleAutoSave();
+                  onUpdate('studentCount', parseInt(e.target.value) || 0);
                 }}
                 min="0"
                 placeholder="0"
@@ -128,8 +122,7 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
                 type="number"
                 value={groupData.teacherCount || 0}
                 onChange={(e) => {
-                  onUpdate('teacher_count', parseInt(e.target.value) || 0);
-                  handleAutoSave();
+                  onUpdate('teacherCount', parseInt(e.target.value) || 0);
                 }}
                 min="0"
                 placeholder="0"
@@ -151,8 +144,7 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
                 type="text"
                 value={groupData.contactPerson || ''}
                 onChange={(e) => {
-                  onUpdate('contact_person', e.target.value);
-                  handleAutoSave();
+                  onUpdate('contactPerson', e.target.value);
                 }}
                 placeholder="联系人姓名"
               />
@@ -163,8 +155,7 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
                 type="tel"
                 value={groupData.contactPhone || ''}
                 onChange={(e) => {
-                  onUpdate('contact_phone', e.target.value);
-                  handleAutoSave();
+                  onUpdate('contactPhone', e.target.value);
                 }}
                 placeholder="联系电话"
               />
@@ -173,10 +164,9 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
               <label>紧急联系人</label>
               <input
                 type="text"
-                value={groupData.emergency_contact || ''}
+                value={groupData.emergencyContact || ''}
                 onChange={(e) => {
-                  onUpdate('emergency_contact', e.target.value);
-                  handleAutoSave();
+                  onUpdate('emergencyContact', e.target.value);
                 }}
                 placeholder="紧急联系人"
               />
@@ -191,7 +181,6 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
                 value={groupData.themePackageId || ''}
                 onChange={(e) => {
                   onUpdate('themePackageId', e.target.value);
-                  handleAutoSave();
                 }}
               >
                 <option value="">请选择主题包</option>
@@ -220,11 +209,33 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
                 value={groupData.notes || ''}
                 onChange={(e) => {
                   onUpdate('notes', e.target.value);
-                  handleAutoSave();
                 }}
                 placeholder="特殊要求、注意事项等"
                 rows={2}
               />
+            </div>
+          </div>
+
+          {/* 保存按钮行 */}
+          <div className="info-row" style={{ marginTop: '20px', borderTop: '1px solid #e8e8e8', paddingTop: '20px' }}>
+            <div className="info-item full-width" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                onClick={handleSave}
+                disabled={saving || !groupData.name}
+                style={{
+                  padding: '8px 24px',
+                  backgroundColor: '#1890ff',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: saving || !groupData.name ? 'not-allowed' : 'pointer',
+                  opacity: saving || !groupData.name ? 0.6 : 1,
+                  fontSize: '14px',
+                  fontWeight: 500
+                }}
+              >
+                {saving ? '保存中...' : (isNew ? '创建团组' : '保存更改')}
+              </button>
             </div>
           </div>
         </div>
