@@ -1,0 +1,223 @@
+.group-management-v2 {
+  padding: 24px;
+  background: #f5f5f5;
+  min-height: calc(100vh - 42px);
+}
+
+/* 页面标题栏 */
+.group-management-v2 .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 20px 24px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.group-management-v2 .header-content h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.group-management-v2 .header-content .subtitle {
+  color: #8c8c8c;
+  font-size: 14px;
+  margin-left: 12px;
+}
+
+/* 筛选卡片 */
+.group-management-v2 .filter-card {
+  margin-bottom: 24px;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+/* 团组卡片 */
+.group-card-v2 {
+  height: 100%;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.group-card-v2:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.group-card-v2 .ant-card-body {
+  padding: 20px;
+}
+
+.group-card-v2 .card-header {
+  margin-bottom: 16px;
+}
+
+.group-card-v2 .group-name {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.group-card-v2 .group-name h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.group-card-v2 .ant-badge {
+  margin-left: 8px;
+}
+
+/* 信息行 */
+.group-card-v2 .info-row {
+  display: flex;
+  align-items: center;
+  color: #595959;
+  font-size: 14px;
+  line-height: 22px;
+  padding: 4px 0;
+}
+
+.group-card-v2 .info-row .anticon {
+  margin-right: 8px;
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+/* 进度条样式 */
+.group-card-v2 .ant-progress {
+  margin-left: 8px;
+}
+
+.group-card-v2 .ant-progress-text {
+  font-size: 12px;
+}
+
+/* 标签行 */
+.group-card-v2 .tags-row {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.group-card-v2 .tags-row .ant-tag {
+  margin-bottom: 4px;
+}
+
+/* 卡片操作按钮 */
+.group-card-v2 .ant-card-actions {
+  background: #fafafa;
+  border-top: 1px solid #f0f0f0;
+}
+
+.group-card-v2 .ant-card-actions > li {
+  margin: 8px 0;
+}
+
+.group-card-v2 .ant-card-actions .ant-btn {
+  border: none;
+  height: auto;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.group-card-v2 .ant-card-actions .ant-btn:hover {
+  background: rgba(24, 144, 255, 0.05);
+  color: #1890ff;
+}
+
+/* 空状态 */
+.group-management-v2 .ant-empty {
+  padding: 60px 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .group-management-v2 {
+    padding: 16px;
+  }
+
+  .group-management-v2 .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .group-management-v2 .filter-card .ant-space {
+    width: 100%;
+  }
+
+  .group-management-v2 .filter-card .ant-input-search {
+    width: 100% !important;
+  }
+}
+
+/* 加载状态 */
+.group-management-v2 .ant-spin-nested-loading {
+  min-height: 400px;
+}
+
+/* 状态标签特殊样式 */
+.group-card-v2 .ant-tag-blue {
+  background: #e6f7ff;
+  border-color: #91d5ff;
+  color: #1890ff;
+}
+
+.group-card-v2 .ant-tag-green {
+  background: #f6ffed;
+  border-color: #b7eb8f;
+  color: #52c41a;
+}
+
+.group-card-v2 .ant-tag-red {
+  background: #fff1f0;
+  border-color: #ffa39e;
+  color: #f5222d;
+}
+
+/* 添加卡片左侧颜色条动画 */
+.group-card-v2::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: inherit;
+  transition: width 0.3s ease;
+}
+
+.group-card-v2:hover::before {
+  width: 6px;
+}
+
+/* 优化滚动条样式 */
+.group-management-v2::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.group-management-v2::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 4px;
+}
+
+.group-management-v2::-webkit-scrollbar-thumb {
+  background: #bfbfbf;
+  border-radius: 4px;
+}
+
+.group-management-v2::-webkit-scrollbar-thumb:hover {
+  background: #8c8c8c;
+}

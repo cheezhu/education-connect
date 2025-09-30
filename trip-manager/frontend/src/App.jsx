@@ -3,6 +3,8 @@ import { Layout, Dropdown, Badge, Avatar } from 'antd';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import DragDropTable from './components/DragDropTable';
 import GroupManagement from './pages/GroupManagement';
+import GroupManagementV2 from './pages/GroupManagementV2';
+import GroupEditV2 from './pages/GroupEditV2';
 import LocationManagement from './pages/LocationManagement';
 import Statistics from './pages/Statistics';
 import ItineraryDesigner from './pages/ItineraryDesigner';
@@ -56,6 +58,18 @@ function App() {
               path="/designer"
               element={<ItineraryDesigner />}
             />
+            <Route
+              path="/groups/v2/edit/:id"
+              element={<GroupEditV2 />}
+            />
+            <Route
+              path="/groups/v2/new"
+              element={<GroupEditV2 />}
+            />
+            <Route
+              path="/groups/v2"
+              element={<GroupManagementV2 />}
+            />
           </Routes>
         </Content>
       </Layout>
@@ -71,6 +85,7 @@ function CompactHeader() {
   // 导航菜单项
   const menuItems = [
     { path: '/groups', label: '团组管理V1' },
+    { path: '/groups/v2', label: '团组管理V2' },
     { path: '/designer', label: '行程设计器' },
     { path: '/', label: '日历视图' },
     { path: '/locations', label: '行程资源' },
@@ -145,22 +160,22 @@ function CompactHeader() {
               padding: '0 12px',
               height: '32px',
               lineHeight: '32px',
-              color: currentPath === item.path ? '#667eea' : 'rgba(255,255,255,0.65)',
+              color: currentPath.startsWith(item.path) ? '#667eea' : 'rgba(255,255,255,0.65)',
               fontSize: '13px',
               borderRadius: '4px',
-              background: currentPath === item.path ? 'rgba(102,126,234,0.12)' : 'transparent',
+              background: currentPath.startsWith(item.path) ? 'rgba(102,126,234,0.12)' : 'transparent',
               textDecoration: 'none',
               transition: 'all 0.2s',
               display: 'inline-block'
             }}
             onMouseEnter={(e) => {
-              if (currentPath !== item.path) {
+              if (!currentPath.startsWith(item.path)) {
                 e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
                 e.currentTarget.style.color = 'rgba(255,255,255,0.9)';
               }
             }}
             onMouseLeave={(e) => {
-              if (currentPath !== item.path) {
+              if (!currentPath.startsWith(item.path)) {
                 e.currentTarget.style.background = 'transparent';
                 e.currentTarget.style.color = 'rgba(255,255,255,0.65)';
               }
