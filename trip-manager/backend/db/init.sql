@@ -47,6 +47,7 @@ CREATE TABLE locations (
 -- 4. 活动安排表
 CREATE TABLE activities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    schedule_id INTEGER,
     group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     location_id INTEGER REFERENCES locations(id),
     activity_date DATE NOT NULL,
@@ -97,6 +98,7 @@ CREATE TABLE system_config (
 CREATE INDEX idx_activities_date ON activities(activity_date);
 CREATE INDEX idx_activities_group ON activities(group_id);
 CREATE INDEX idx_activities_location ON activities(location_id);
+CREATE INDEX idx_activities_schedule ON activities(schedule_id);
 CREATE INDEX idx_schedules_group_date ON schedules(group_id, activity_date);
 CREATE INDEX idx_groups_date_range ON groups(start_date, end_date);
 

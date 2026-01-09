@@ -2,6 +2,178 @@ const express = require('express');
 const router = express.Router();
 const requireEditLock = require('../middleware/editLock');
 
+const mapActivityRow = (row) => ({
+  id: row.id,
+  groupId: row.group_id,
+  locationId: row.location_id,
+  date: row.activity_date,
+  timeSlot: row.time_slot,
+  participantCount: row.participant_count,
+  scheduleId: row.schedule_id
+});
+
+const toMinutes = (timeValue) => {
+  if (!timeValue) return null;
+  const [hourStr, minuteStr] = timeValue.split(':');
+  const hour = Number(hourStr);
+  const minute = Number(minuteStr);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+};
+
+const toTimeString = (totalMinutes) => {
+  if (!Number.isFinite(totalMinutes)) return '09:00';
+  const hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+};
+
+const getDefaultTimeRange = (timeSlot) => {
+  if (timeSlot === 'AFTERNOON') {
+    return { startTime: '14:00', endTime: '17:00' };
+  }
+  if (timeSlot === 'EVENING') {
+    return { startTime: '19:00', endTime: '21:00' };
+  }
+  return { startTime: '09:00', endTime: '11:30' };
+};
+
+const getSchedulePlacement = (db, groupId, date, timeSlot, excludeScheduleId) => {
+  const params = [groupId, date];
+  let query = `
+    SELECT end_time
+    FROM schedules
+    WHERE group_id = ?
+      AND activity_date = ?
+  `;
+  if (excludeScheduleId) {
+    query += ' AND id != ?';
+    params.push(excludeScheduleId);
+  }
+
+  const rows = db.prepare(query).all(...params);
+  if (rows.length === 0) {
+    return getDefaultTimeRange(timeSlot);
+  }
+
+  const endTimes = rows
+    .map(row => toMinutes(row.end_time))
+    .filter(value => Number.isFinite(value));
+
+  if (endTimes.length === 0) {
+    return getDefaultTimeRange(timeSlot);
+  }
+
+  const lastEnd = Math.max(...endTimes);
+  return {
+    startTime: toTimeString(lastEnd),
+    endTime: toTimeString(lastEnd + 60)
+  };
+};
+
+const syncActivityToSchedule = (db, activity, options = {}) => {
+  const shouldReposition = Boolean(options.reposition);
+  const existingSchedule = activity.schedule_id
+    ? db.prepare(`
+        SELECT id, type, title, location, description, color, resource_id, is_from_resource, start_time, end_time, location_id
+        FROM schedules
+        WHERE id = ?
+      `).get(activity.schedule_id)
+    : null;
+
+  const group = db.prepare('SELECT name, color FROM groups WHERE id = ?').get(activity.group_id);
+  const location = activity.location_id
+    ? db.prepare('SELECT name, address FROM locations WHERE id = ?').get(activity.location_id)
+    : null;
+
+  const defaultTitle = location?.name || group?.name || '行程活动';
+  const resolvedTitle = existingSchedule?.title?.trim() ? existingSchedule.title : defaultTitle;
+  const resolvedLocation = location?.name || existingSchedule?.location || '';
+  const resolvedType = existingSchedule?.type || 'visit';
+  const resolvedColor = existingSchedule?.color || group?.color || '#1890ff';
+  const resolvedDescription = existingSchedule?.description || '';
+  const resolvedResourceId = existingSchedule?.resource_id || null;
+  const resolvedIsFromResource = existingSchedule?.is_from_resource ? 1 : 0;
+
+  let startTime = existingSchedule?.start_time;
+  let endTime = existingSchedule?.end_time;
+  if (!existingSchedule || shouldReposition) {
+    const placement = getSchedulePlacement(
+      db,
+      activity.group_id,
+      activity.activity_date,
+      activity.time_slot,
+      existingSchedule?.id
+    );
+    startTime = placement.startTime;
+    endTime = placement.endTime;
+  }
+
+  if (existingSchedule) {
+    db.prepare(`
+      UPDATE schedules
+      SET activity_date = ?,
+          start_time = ?,
+          end_time = ?,
+          type = ?,
+          title = ?,
+          location = ?,
+          description = ?,
+          color = ?,
+          resource_id = ?,
+          is_from_resource = ?,
+          location_id = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(
+      activity.activity_date,
+      startTime,
+      endTime,
+      resolvedType,
+      resolvedTitle,
+      resolvedLocation,
+      resolvedDescription,
+      resolvedColor,
+      resolvedResourceId,
+      resolvedIsFromResource,
+      activity.location_id ?? null,
+      existingSchedule.id
+    );
+
+    return existingSchedule.id;
+  }
+
+  const result = db.prepare(`
+    INSERT INTO schedules (
+      group_id, activity_date, start_time, end_time, type,
+      title, location, description, color, resource_id, is_from_resource, location_id,
+      created_at, updated_at
+    ) VALUES (
+      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?,
+      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    )
+  `).run(
+    activity.group_id,
+    activity.activity_date,
+    startTime,
+    endTime,
+    resolvedType,
+    resolvedTitle,
+    resolvedLocation,
+    resolvedDescription,
+    resolvedColor,
+    resolvedResourceId,
+    resolvedIsFromResource,
+    activity.location_id ?? null
+  );
+
+  db.prepare('UPDATE activities SET schedule_id = ? WHERE id = ?')
+    .run(result.lastInsertRowid, activity.id);
+
+  return result.lastInsertRowid;
+};
+
 // 获取活动列表
 router.get('/', (req, res) => {
   const { startDate, endDate, groupId, locationId } = req.query;
@@ -61,21 +233,12 @@ router.get('/', (req, res) => {
 // 获取原始活动数据（用于团组管理页面）
 router.get('/raw', (req, res) => {
   const activities = req.db.prepare(`
-    SELECT id, group_id, location_id, activity_date, time_slot, participant_count
+    SELECT id, schedule_id, group_id, location_id, activity_date, time_slot, participant_count
     FROM activities
     ORDER BY activity_date, time_slot
   `).all();
 
-  const result = activities.map(a => ({
-    id: a.id,
-    groupId: a.group_id,
-    locationId: a.location_id,
-    date: a.activity_date,
-    timeSlot: a.time_slot,
-    participantCount: a.participant_count
-  }));
-
-  res.json(result);
+  res.json(activities.map(mapActivityRow));
 });
 
 // 创建活动（需要编辑锁）
@@ -106,11 +269,12 @@ router.post('/', requireEditLock, (req, res) => {
       INSERT INTO activities (group_id, location_id, activity_date, time_slot, participant_count)
       VALUES (?, ?, ?, ?, ?)
     `).run(groupId, locationId ?? null, date, timeSlot, participantCount);
-    
-    res.json({ 
-      success: true, 
-      id: result.lastInsertRowid 
-    });
+
+    const activity = req.db.prepare('SELECT * FROM activities WHERE id = ?').get(result.lastInsertRowid);
+    syncActivityToSchedule(req.db, activity, { reposition: true });
+
+    const updated = req.db.prepare('SELECT * FROM activities WHERE id = ?').get(result.lastInsertRowid);
+    res.json(mapActivityRow(updated));
   } catch (error) {
     console.error('创建活动失败:', error);
     res.status(500).json({ error: '创建活动失败' });
@@ -179,8 +343,13 @@ router.put('/:id', requireEditLock, (req, res) => {
       SET ${updates.join(', ')}
       WHERE id = ?
     `).run(...values);
-    
-    res.json({ success: true });
+
+    const updatedActivity = req.db.prepare('SELECT * FROM activities WHERE id = ?').get(id);
+    const shouldReposition = date !== undefined || timeSlot !== undefined;
+    syncActivityToSchedule(req.db, updatedActivity, { reposition: shouldReposition || !updatedActivity.schedule_id });
+
+    const syncedActivity = req.db.prepare('SELECT * FROM activities WHERE id = ?').get(id);
+    res.json(mapActivityRow(syncedActivity));
   } catch (error) {
     console.error('更新活动失败:', error);
     res.status(500).json({ error: '更新活动失败' });
@@ -190,8 +359,13 @@ router.put('/:id', requireEditLock, (req, res) => {
 // 删除活动（需要编辑锁）
 router.delete('/:id', requireEditLock, (req, res) => {
   try {
+    const activity = req.db.prepare('SELECT schedule_id FROM activities WHERE id = ?').get(req.params.id);
     const result = req.db.prepare('DELETE FROM activities WHERE id = ?').run(req.params.id);
-    
+
+    if (activity?.schedule_id) {
+      req.db.prepare('DELETE FROM schedules WHERE id = ?').run(activity.schedule_id);
+    }
+
     res.json({ 
       success: result.changes > 0,
       message: result.changes > 0 ? '活动已删除' : '活动不存在'

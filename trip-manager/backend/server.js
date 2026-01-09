@@ -32,6 +32,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_schedules_group_date ON schedules(group_id, activity_date);
 `);
 
+const activityColumns = db.prepare("PRAGMA table_info(activities)").all().map(col => col.name);
+if (!activityColumns.includes('schedule_id')) {
+  db.exec('ALTER TABLE activities ADD COLUMN schedule_id INTEGER');
+}
+db.exec('CREATE INDEX IF NOT EXISTS idx_activities_schedule ON activities(schedule_id)');
+
 // 中间件
 app.use(cors());
 app.use(express.json());

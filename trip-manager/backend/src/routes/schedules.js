@@ -2,6 +2,97 @@ const express = require('express');
 const router = express.Router();
 const requireEditLock = require('../middleware/editLock');
 
+const toMinutes = (timeValue) => {
+  if (!timeValue) return null;
+  const [hourStr, minuteStr] = timeValue.split(':');
+  const hour = Number(hourStr);
+  const minute = Number(minuteStr);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+};
+
+const getTimeSlotFromStart = (startTime) => {
+  const minutes = toMinutes(startTime);
+  if (minutes === null) return 'MORNING';
+  if (minutes < 12 * 60) return 'MORNING';
+  if (minutes < 18 * 60) return 'AFTERNOON';
+  return 'EVENING';
+};
+
+const syncSchedulesToActivities = (db, groupId) => {
+  const schedules = db.prepare(`
+    SELECT id, group_id, activity_date, start_time, location_id
+    FROM schedules
+    WHERE group_id = ?
+  `).all(groupId);
+
+  const group = db.prepare(`
+    SELECT student_count, teacher_count
+    FROM groups
+    WHERE id = ?
+  `).get(groupId);
+
+  const participantCount = group
+    ? (group.student_count || 0) + (group.teacher_count || 0)
+    : 0;
+
+  const insertActivity = db.prepare(`
+    INSERT INTO activities (
+      schedule_id, group_id, location_id, activity_date, time_slot, participant_count
+    ) VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
+  const updateActivity = db.prepare(`
+    UPDATE activities
+    SET group_id = ?, location_id = ?, activity_date = ?, time_slot = ?, participant_count = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+
+  const findActivityBySchedule = db.prepare(`
+    SELECT id
+    FROM activities
+    WHERE schedule_id = ?
+  `);
+
+  schedules.forEach((schedule) => {
+    const timeSlot = getTimeSlotFromStart(schedule.start_time);
+    const existing = findActivityBySchedule.get(schedule.id);
+    if (existing) {
+      updateActivity.run(
+        groupId,
+        schedule.location_id ?? null,
+        schedule.activity_date,
+        timeSlot,
+        participantCount,
+        existing.id
+      );
+    } else {
+      insertActivity.run(
+        schedule.id,
+        groupId,
+        schedule.location_id ?? null,
+        schedule.activity_date,
+        timeSlot,
+        participantCount
+      );
+    }
+  });
+
+  if (schedules.length === 0) {
+    db.prepare('DELETE FROM activities WHERE group_id = ? AND schedule_id IS NOT NULL').run(groupId);
+    return;
+  }
+
+  const scheduleIds = schedules.map((item) => item.id);
+  const placeholders = scheduleIds.map(() => '?').join(', ');
+  db.prepare(`
+    DELETE FROM activities
+    WHERE group_id = ?
+      AND schedule_id IS NOT NULL
+      AND schedule_id NOT IN (${placeholders})
+  `).run(groupId, ...scheduleIds);
+};
+
 const mapScheduleRow = (row) => ({
   id: row.id,
   groupId: row.group_id,
@@ -98,6 +189,8 @@ router.post('/groups/:groupId/schedules/batch', requireEditLock, (req, res) => {
 
   try {
     replaceAll(scheduleList);
+
+    syncSchedulesToActivities(req.db, groupId);
 
     const rows = req.db.prepare(`
       SELECT id, group_id, activity_date, start_time, end_time, type,
