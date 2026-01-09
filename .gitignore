@@ -67,3 +67,6 @@ temp/
 
 # Local development files
 *.local
+
+# Local SQLite database
+trip-manager/backend/db/trip.db
