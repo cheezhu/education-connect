@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const basicAuth = require('express-basic-auth');
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 const path = require('path');
 const bcrypt = require('bcrypt');
 
@@ -9,8 +9,28 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // 初始化数据库
-const db = new sqlite3.Database(path.join(__dirname, 'db/trip.db'));
-db.run('PRAGMA foreign_keys = ON');
+const db = new Database(path.join(__dirname, 'db/trip.db'));
+db.pragma('foreign_keys = ON');
+db.exec(`
+  CREATE TABLE IF NOT EXISTS schedules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    activity_date DATE NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    type VARCHAR(20) NOT NULL,
+    title VARCHAR(200),
+    location VARCHAR(200),
+    description TEXT,
+    color VARCHAR(20),
+    resource_id VARCHAR(100),
+    is_from_resource BOOLEAN DEFAULT 0,
+    location_id INTEGER REFERENCES locations(id),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_schedules_group_date ON schedules(group_id, activity_date);
+`);
 
 // 中间件
 app.use(cors());
@@ -19,13 +39,16 @@ app.use(express.static('public'));
 
 // 基础认证
 const authenticator = (username, password, cb) => {
-  db.get('SELECT * FROM users WHERE username = ?', [username], (err, user) => {
-    if (err) return cb(null, false);
+  try {
+    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
     if (user && bcrypt.compareSync(password, user.password)) {
       return cb(null, true);
     }
     return cb(null, false);
-  });
+  } catch (error) {
+    console.error('认证查询失败:', error);
+    return cb(null, false);
+  }
 };
 
 app.use(basicAuth({
@@ -44,6 +67,7 @@ app.use((req, res, next) => {
 
 // 路由
 app.use('/api/lock', require('./src/routes/lock'));
+app.use('/api', require('./src/routes/schedules'));
 app.use('/api/groups', require('./src/routes/groups'));
 app.use('/api/locations', require('./src/routes/locations'));
 app.use('/api/activities', require('./src/routes/activities'));

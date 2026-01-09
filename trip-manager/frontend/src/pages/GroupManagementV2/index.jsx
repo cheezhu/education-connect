@@ -155,7 +155,7 @@ const GroupManagementV2 = () => {
           <Button
             type="link"
             icon={<FileTextOutlined />}
-            onClick={() => navigate(`/groups/v2/${group.id}`)}
+            onClick={() => navigate(`/groups/v2/edit/${group.id}`)}
           >
             查看详情
           </Button>,

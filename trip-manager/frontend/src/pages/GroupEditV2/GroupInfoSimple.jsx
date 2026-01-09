@@ -1,5 +1,4 @@
 import React from 'react';
-import dayjs from 'dayjs';
 
 const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
   return (

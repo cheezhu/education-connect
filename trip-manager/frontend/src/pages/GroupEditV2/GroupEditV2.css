@@ -668,6 +668,60 @@
   color: #d9d9d9;
 }
 
+/* \u8be6\u7ec6\u65e5\u7a0b */
+.group-edit-v2 .schedule-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.group-edit-v2 .schedule-detail-day {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.group-edit-v2 .schedule-detail-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 6px;
+}
+
+.group-edit-v2 .schedule-detail-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.group-edit-v2 .schedule-detail-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: #595959;
+}
+
+.group-edit-v2 .schedule-detail-time {
+  font-weight: 600;
+  color: #262626;
+}
+
+.group-edit-v2 .schedule-detail-name {
+  color: #262626;
+}
+
+.group-edit-v2 .schedule-detail-location,
+.group-edit-v2 .schedule-detail-desc {
+  color: #8c8c8c;
+}
+
+.group-edit-v2 .schedule-detail-empty {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
 /* \u6eda\u52a8\u6761\u7f8e\u5316 */
 .group-edit-v2 .unified-info-view::-webkit-scrollbar {
   width: 6px;

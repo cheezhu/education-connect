@@ -1,60 +1,48 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Alert, Button, Space, message, Segmented } from 'antd';
-import { CalendarOutlined, InfoCircleOutlined, AppstoreOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { Alert, Space, message } from 'antd';
+import { InfoCircleOutlined } from '@ant-design/icons';
 import CalendarDaysView from './CalendarDaysView';
+import api from '../../services/api';
 import './ScheduleManagement.css';
 
 const ScheduleManagement = ({ groupId, groupData, schedules, onUpdate }) => {
   const [viewMode, setViewMode] = useState('calendar');
   const [localSchedules, setLocalSchedules] = useState(schedules || []);
+  const saveTimeoutRef = useRef(null);
+  const onUpdateRef = useRef(onUpdate);
 
-  // 示例数据 - 实际应从API加载
   useEffect(() => {
-    if (!schedules || schedules.length === 0) {
-      // 加载示例数据
-      const sampleSchedules = [
-        {
-          id: 1,
-          groupId: groupId,
-          date: groupData.start_date,
-          startTime: '07:00',
-          endTime: '08:00',
-          type: 'meal',
-          title: '早餐',
-          location: '酒店餐厅',
-          description: '自助早餐'
-        },
-        {
-          id: 2,
-          groupId: groupId,
-          date: groupData.start_date,
-          startTime: '09:00',
-          endTime: '11:30',
-          type: 'visit',
-          title: '香港科学馆参观',
-          location: '尖沙咀',
-          description: '常设展览参观，科学体验'
-        },
-        {
-          id: 3,
-          groupId: groupId,
-          date: groupData.start_date,
-          startTime: '12:00',
-          endTime: '13:00',
-          type: 'meal',
-          title: '午餐',
-          location: '尖沙咀餐厅',
-          description: '粤菜套餐'
-        }
-      ];
-      setLocalSchedules(sampleSchedules);
-    }
-  }, [groupId, groupData, schedules]);
+    onUpdateRef.current = onUpdate;
+  }, [onUpdate]);
+
+  useEffect(() => {
+    setLocalSchedules(schedules || []);
+  }, [schedules]);
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(saveTimeoutRef.current);
+    };
+  }, []);
 
   // 处理日程更新
   const handleScheduleUpdate = (updatedSchedules) => {
     setLocalSchedules(updatedSchedules);
-    onUpdate(updatedSchedules);
+    onUpdateRef.current?.(updatedSchedules);
+
+    clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const response = await api.post(`/groups/${groupId}/schedules/batch`, {
+          scheduleList: updatedSchedules
+        });
+        const saved = Array.isArray(response.data) ? response.data : updatedSchedules;
+        setLocalSchedules(saved);
+        onUpdateRef.current?.(saved);
+      } catch (error) {
+        message.error('保存日程失败');
+      }
+    }, 500);
   };
 
   return (

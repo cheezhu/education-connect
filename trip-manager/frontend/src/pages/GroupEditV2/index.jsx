@@ -3,11 +3,13 @@ import { Button, Spin, message } from 'antd';
 import {
   ArrowLeftOutlined,
   TeamOutlined,
-  CalendarOutlined
+  CalendarOutlined,
+  UnorderedListOutlined
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import GroupInfoSimple from './GroupInfoSimple';
 import ScheduleManagement from './ScheduleManagement';
+import ScheduleDetail from './ScheduleDetail';
 import api from '../../services/api';
 import dayjs from 'dayjs';
 import './GroupEditV2.css';
@@ -17,6 +19,7 @@ const GroupEditV2 = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('info');
   const [groupData, setGroupData] = useState(null);
+  const [groupSchedules, setGroupSchedules] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -48,6 +51,7 @@ const GroupEditV2 = () => {
         members: [],
         schedules: []
       });
+      setGroupSchedules([]);
       return;
     }
 
@@ -83,6 +87,25 @@ const GroupEditV2 = () => {
   useEffect(() => {
     fetchGroupData();
   }, [id]);
+
+  const fetchSchedules = async () => {
+    if (isNew) {
+      setGroupSchedules([]);
+      return;
+    }
+    try {
+      const response = await api.get(`/groups/${id}/schedules`);
+      const loaded = Array.isArray(response.data) ? response.data : [];
+      setGroupSchedules(loaded);
+    } catch (error) {
+      message.error('加载日程失败');
+      setGroupSchedules([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchSchedules();
+  }, [id, isNew]);
 
   // 自动保存
   const handleAutoSave = async () => {
@@ -150,7 +173,12 @@ const GroupEditV2 = () => {
       if (isNew) {
         const response = await api.post('/groups', dataToSave);
         message.success('团组创建成功');
-        navigate(`/groups/v2/edit/${response.data.id}`);
+        const createdId = response.data?.group?.id ?? response.data?.id;
+        if (createdId) {
+          navigate(`/groups/v2/edit/${createdId}`);
+        } else {
+          navigate('/groups/v2');
+        }
       } else {
         await api.put(`/groups/${id}`, dataToSave);
         message.success('保存成功');
@@ -253,6 +281,14 @@ const GroupEditV2 = () => {
               <CalendarOutlined className="tab-icon" />
               <span className="tab-text">日历详情</span>
             </div>
+            <div
+              className={`tab-item ${activeTab === 'schedule-detail' ? 'active' : ''} ${isNew ? 'disabled' : ''}`}
+              onClick={() => !isNew && setActiveTab('schedule-detail')}
+              title={isNew ? '保存团组后可查看' : '详细日程'}
+            >
+              <UnorderedListOutlined className="tab-icon" />
+              <span className="tab-text">详细日程</span>
+            </div>
           </div>
         </div>
 
@@ -261,6 +297,7 @@ const GroupEditV2 = () => {
           {activeTab === 'info' && (
             <GroupInfoSimple
               groupData={groupData}
+              schedules={groupSchedules}
               onUpdate={updateGroupData}
               handleAutoSave={handleAutoSave}
               isNew={isNew}
@@ -271,11 +308,17 @@ const GroupEditV2 = () => {
             <ScheduleManagement
               groupId={id}
               groupData={groupData}
-              schedules={groupData.schedules}
+              schedules={groupSchedules}
               onUpdate={(schedules) => {
-                updateGroupData('schedules', schedules);
-                // 日程已经在组件内部处理自动保存
+                setGroupSchedules(schedules);
               }}
+            />
+          )}
+
+          {activeTab === 'schedule-detail' && !isNew && (
+            <ScheduleDetail
+              groupData={groupData}
+              schedules={groupSchedules}
             />
           )}
         </div>

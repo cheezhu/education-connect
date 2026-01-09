@@ -19,7 +19,8 @@ CREATE TABLE groups (
     student_count INTEGER DEFAULT 40,
     teacher_count INTEGER DEFAULT 4,
     start_date DATE NOT NULL,
-    duration INTEGER CHECK(duration IN (4, 5, 6)) DEFAULT 5,
+    end_date DATE NOT NULL,
+    duration INTEGER CHECK(duration > 0) DEFAULT 5,
     color VARCHAR(7) DEFAULT '#1890ff',
     contact_person VARCHAR(100),
     contact_phone VARCHAR(20),
@@ -47,14 +48,32 @@ CREATE TABLE locations (
 CREATE TABLE activities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    location_id INTEGER NOT NULL REFERENCES locations(id),
+    location_id INTEGER REFERENCES locations(id),
     activity_date DATE NOT NULL,
-    time_slot VARCHAR(10) CHECK(time_slot IN ('AM', 'PM1', 'PM2')) NOT NULL,
+    time_slot VARCHAR(10) CHECK(time_slot IN ('MORNING', 'AFTERNOON', 'EVENING')) NOT NULL,
     participant_count INTEGER,
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(group_id, activity_date, time_slot)
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4.5 日程详情表（团组日历详情）
+CREATE TABLE schedules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    activity_date DATE NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    type VARCHAR(20) NOT NULL,
+    title VARCHAR(200),
+    location VARCHAR(200),
+    description TEXT,
+    color VARCHAR(20),
+    resource_id VARCHAR(100),
+    is_from_resource BOOLEAN DEFAULT 0,
+    location_id INTEGER REFERENCES locations(id),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 5. 编辑锁表
@@ -78,7 +97,8 @@ CREATE TABLE system_config (
 CREATE INDEX idx_activities_date ON activities(activity_date);
 CREATE INDEX idx_activities_group ON activities(group_id);
 CREATE INDEX idx_activities_location ON activities(location_id);
-CREATE INDEX idx_groups_date_range ON groups(start_date, duration);
+CREATE INDEX idx_schedules_group_date ON schedules(group_id, activity_date);
+CREATE INDEX idx_groups_date_range ON groups(start_date, end_date);
 
 -- 创建视图简化查询
 CREATE VIEW calendar_view AS
@@ -92,17 +112,17 @@ SELECT
     g.type as group_type,
     g.color as group_color,
     l.id as location_id,
-    l.name as location_name,
-    l.capacity as location_capacity
+    COALESCE(l.name, '') as location_name,
+    COALESCE(l.capacity, 0) as location_capacity
 FROM activities a
 JOIN groups g ON a.group_id = g.id
-JOIN locations l ON a.location_id = l.id
+LEFT JOIN locations l ON a.location_id = l.id
 ORDER BY a.activity_date, a.time_slot;
 
 -- 插入默认用户
 INSERT INTO users (username, password, display_name, role) VALUES
-('admin', '$2b$10$7FJjJ2vXZxOKr7HhkXB.uO5I9t6CppFjJgDqpU6wkJrYq5YJjpJme', '系统管理员', 'admin'),
-('viewer1', '$2b$10$7FJjJ2vXZxOKr7HhkXB.uO5I9t6CppFjJgDqpU6wkJrYq5YJjpJme', '查看用户1', 'viewer');
+('admin', '$2b$10$7RRAOCIs.j63Y7g/i6wnpu6xQeJ1d8qjgISCI1TYkGYf8l2PfbzSq', '系统管理员', 'admin'),
+('viewer1', '$2b$10$7RRAOCIs.j63Y7g/i6wnpu6xQeJ1d8qjgISCI1TYkGYf8l2PfbzSq', '查看用户1', 'viewer');
 
 -- 插入默认地点
 INSERT INTO locations (name, capacity, blocked_weekdays, target_groups, address) VALUES

@@ -17,24 +17,47 @@ router.get('/:id', (req, res) => {
   res.json(group);
 });
 
+const calculateDuration = (startDate, endDate) => {
+  if (!startDate || !endDate) return 5;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const diffTime = end.getTime() - start.getTime();
+  return Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+};
+
 // 创建团组（需要编辑锁）
 router.post('/', requireEditLock, (req, res) => {
   const { 
     name, 
     type, 
-    studentCount = 40, 
-    teacherCount = 4, 
-    startDate, 
-    duration = 5, 
+    studentCount, 
+    teacherCount, 
+    startDate,
+    endDate,
+    duration, 
     color = '#1890ff',
     contactPerson,
     contactPhone,
-    notes
+    notes,
+    student_count,
+    teacher_count,
+    start_date,
+    end_date,
+    contact_person,
+    contact_phone
   } = req.body;
 
-  if (!name || !type || !startDate) {
+  const resolvedStartDate = startDate ?? start_date;
+  const resolvedEndDate = endDate ?? end_date;
+  const resolvedStudentCount = studentCount ?? student_count ?? 40;
+  const resolvedTeacherCount = teacherCount ?? teacher_count ?? 4;
+  const resolvedDuration = duration ?? calculateDuration(resolvedStartDate, resolvedEndDate);
+  const resolvedContactPerson = contactPerson ?? contact_person;
+  const resolvedContactPhone = contactPhone ?? contact_phone;
+
+  if (!name || !type || !resolvedStartDate || !resolvedEndDate) {
     return res.status(400).json({ 
-      error: '缺少必需字段: name, type, startDate' 
+      error: '缺少必需字段: name, type, start_date, end_date' 
     });
   }
 
@@ -42,13 +65,13 @@ router.post('/', requireEditLock, (req, res) => {
     const result = req.db.prepare(`
       INSERT INTO groups (
         name, type, student_count, teacher_count, 
-        start_date, duration, color, contact_person, 
+        start_date, end_date, duration, color, contact_person, 
         contact_phone, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      name, type, studentCount, teacherCount,
-      startDate, duration, color, contactPerson,
-      contactPhone, notes
+      name, type, resolvedStudentCount, resolvedTeacherCount,
+      resolvedStartDate, resolvedEndDate, resolvedDuration, color, resolvedContactPerson,
+      resolvedContactPhone, notes
     );
 
     const newGroup = req.db.prepare('SELECT * FROM groups WHERE id = ?').get(result.lastInsertRowid);
@@ -68,7 +91,7 @@ router.put('/:id', requireEditLock, (req, res) => {
   // 构建更新字段
   const allowedFields = [
     'name', 'type', 'student_count', 'teacher_count',
-    'start_date', 'duration', 'color', 'contact_person',
+    'start_date', 'end_date', 'duration', 'color', 'contact_person',
     'contact_phone', 'notes'
   ];
 

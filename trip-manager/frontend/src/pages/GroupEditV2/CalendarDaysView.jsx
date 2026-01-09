@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Modal, Form, Input, Select, TimePicker, ColorPicker, message, Tooltip, Dropdown, Button } from 'antd';
 import {
   PlusOutlined,
@@ -9,6 +9,7 @@ import {
   EnvironmentOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import api from '../../services/api';
 import './CalendarDaysView.css';
 
 const { TextArea } = Input;
@@ -35,9 +36,36 @@ const presetResourcesData = [
   { id: 'activity', type: 'activity', title: '团队活动', icon: '🎯', duration: 2, description: '互动游戏', isUnique: true }
 ];
 
+const DEFAULT_UNIQUE_DURATION = 2;
+
+const buildUniqueResources = (locations) => {
+  if (!locations || locations.length === 0) {
+    return presetResourcesData.filter((resource) => resource.isUnique);
+  }
+
+  return locations.map((location) => ({
+    id: `loc-${location.id}`,
+    type: 'visit',
+    title: location.name,
+    icon: '🏛️',
+    duration: DEFAULT_UNIQUE_DURATION,
+    description: location.address
+      ? `${location.address} · 容量${location.capacity || 0}人`
+      : `容量${location.capacity || 0}人`,
+    isUnique: true,
+    locationId: location.id
+  }));
+};
+
 const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
-  // 管理可用的资源卡片
-  const [availableResources, setAvailableResources] = useState(presetResourcesData);
+  const repeatableResources = useMemo(
+    () => presetResourcesData.filter((resource) => !resource.isUnique),
+    []
+  );
+  const [uniqueResources, setUniqueResources] = useState(buildUniqueResources([]));
+  const [availableUniqueResources, setAvailableUniqueResources] = useState(
+    buildUniqueResources([])
+  );
   const [activities, setActivities] = useState(schedules);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -57,6 +85,43 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
   const [form] = Form.useForm();
   const calendarRef = useRef(null);
   const dragPreviewRef = useRef(null);
+
+  // 加载行程资源（地点）作为单一活动
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadLocations = async () => {
+      try {
+        const response = await api.get('/locations');
+        if (!isMounted) return;
+        const resources = buildUniqueResources(response.data);
+        setUniqueResources(resources);
+      } catch (error) {
+        if (!isMounted) return;
+        setUniqueResources(buildUniqueResources([]));
+      }
+    };
+
+    loadLocations();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // 同步外部日程数据，并根据已使用的单一活动重置资源池
+  useEffect(() => {
+    setActivities(schedules || []);
+
+    const usedUniqueIds = new Set(
+      (schedules || [])
+        .map((activity) => activity.resourceId)
+        .filter(Boolean)
+    );
+
+    setAvailableUniqueResources(
+      uniqueResources.filter((resource) => !usedUniqueIds.has(resource.id))
+    );
+  }, [groupData?.id, schedules, uniqueResources]);
 
   // 全局拖拽结束事件监听 - 确保清理所有拖拽状态
   useEffect(() => {
@@ -432,7 +497,8 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
         endTime: `${endHour.toString().padStart(2, '0')}:00`,
         type: draggedResource.type,
         title: draggedResource.title,
-        location: '',
+        location: draggedResource.locationName || draggedResource.title || '',
+        locationId: draggedResource.locationId || null,
         description: draggedResource.description,
         color: activityTypes[draggedResource.type].color,
         resourceId: draggedResource.id,  // 记录资源ID
@@ -445,7 +511,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
 
       // 如果是单一活动，从资源列表中移除
       if (draggedResource.isUnique) {
-        setAvailableResources(prev => prev.filter(r => r.id !== draggedResource.id));
+        setAvailableUniqueResources(prev => prev.filter(r => r.id !== draggedResource.id));
       }
 
       // 清除拖拽状态
@@ -955,141 +1021,148 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     <div className="calendar-days-view calendar-fully-maximized" ref={calendarRef}>
       {/* 移除独立工具栏，集成到顶部 */}
 
-      {/* 日历容器 */}
-      <div className="calendar-container">
-        <div className="calendar-scroll-wrapper">
-          <div
-            className={`calendar-grid ${isDragging ? 'dragging-active' : ''}`}
-            style={{
-              gridTemplateColumns: `60px repeat(${days.length}, 1fr)`,
-              gridTemplateRows: `30px repeat(${timeSlots.length}, minmax(30px, 1fr))`  // 自适应高度，最小30px
-            }}
-          >
-            {renderGridContent()}
+      <div className="calendar-layout">
+        {/* 日历容器 */}
+        <div className="calendar-container">
+          <div className="calendar-scroll-wrapper">
+            <div
+              className={`calendar-grid ${isDragging ? 'dragging-active' : ''}`}
+              style={{
+                gridTemplateColumns: `60px repeat(${days.length}, 1fr)`,
+                gridTemplateRows: `30px repeat(${timeSlots.length}, minmax(30px, 1fr))`  // 自适应高度，最小30px
+              }}
+            >
+              {renderGridContent()}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* 行程资源卡片区域 */}
-      <div className="resource-cards-container"
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          // 处理从日历拖回的活动
-          if (draggedActivity && draggedActivity.isFromResource) {
-            // 如果是单一活动，恢复到资源列表
-            const resourceData = presetResourcesData.find(r => r.id === draggedActivity.resourceId);
-            if (resourceData && resourceData.isUnique) {
-              setAvailableResources(prev => {
-                if (!prev.find(r => r.id === resourceData.id)) {
-                  return [...prev, resourceData].sort((a, b) => {
-                    // 保持原有顺序
-                    const aIndex = presetResourcesData.findIndex(r => r.id === a.id);
-                    const bIndex = presetResourcesData.findIndex(r => r.id === b.id);
-                    return aIndex - bIndex;
-                  });
-                }
-                return prev;
-              });
+        {/* 行程资源卡片区域 */}
+        <div className="resource-cards-container"
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            // 处理从日历拖回的活动
+            if (draggedActivity && draggedActivity.isFromResource) {
+              // 如果是单一活动，恢复到资源列表
+              const resourceData = uniqueResources.find(r => r.id === draggedActivity.resourceId)
+                || presetResourcesData.find(r => r.id === draggedActivity.resourceId);
+              if (resourceData && resourceData.isUnique) {
+                const sortReference = uniqueResources.length
+                  ? uniqueResources
+                  : presetResourcesData.filter(r => r.isUnique);
 
-              // 从活动列表中移除
-              const updatedActivities = activities.filter(a => a.id !== draggedActivity.id);
-              setActivities(updatedActivities);
-              onUpdate(updatedActivities);
+                setAvailableUniqueResources(prev => {
+                  if (!prev.find(r => r.id === resourceData.id)) {
+                    return [...prev, resourceData].sort((a, b) => {
+                      const aIndex = sortReference.findIndex(r => r.id === a.id);
+                      const bIndex = sortReference.findIndex(r => r.id === b.id);
+                      return aIndex - bIndex;
+                    });
+                  }
+                  return prev;
+                });
 
-              message.success(`已将 ${draggedActivity.title} 返回资源区`, 1);
+                // 从活动列表中移除
+                const updatedActivities = activities.filter(a => a.id !== draggedActivity.id);
+                setActivities(updatedActivities);
+                onUpdate(updatedActivities);
+
+                message.success(`已将 ${draggedActivity.title} 返回资源区`, 1);
+              }
             }
-          }
 
-          // 清除所有拖拽状态
-          setDraggedActivity(null);
-          setDraggedResource(null);
-          // dragGhost已移除
-          setDropIndicator(null);
-          setIsDragging(false);
-          setReturningActivity(null);
-          // 清除拖拽偏移
-          dragOffsetRef.current = { x: 0, y: 0 };
-        }}
-      >
-        <div className="resource-header">
-          <span className="resource-title">行程资源</span>
-          <span className="resource-hint">拖拽卡片到日历中创建活动</span>
-        </div>
-
-        {/* 可重复活动区域 */}
-        <div className="resource-section">
-          <div className="section-label">可重复活动</div>
-          <div className="resource-cards">
-            {availableResources.filter(r => !r.isUnique).map(resource => (
-              <div
-                key={resource.id}
-                className={`resource-card ${resource.type} repeatable`}
-                draggable={true}
-                onDragStart={(e) => {
-                  setDraggedResource(resource);
-                  setIsDragging(true);
-                  e.dataTransfer.effectAllowed = 'copy';
-                  e.dataTransfer.setData('resource', JSON.stringify(resource));
-                }}
-                onDragEnd={() => {
-                  setDraggedResource(null);
-                  setIsDragging(false);
-                }}
-                style={{
-                  background: activityTypes[resource.type].color,
-                  cursor: 'grab'
-                }}
-                title={resource.description}
-              >
-                <div className="resource-icon">{resource.icon}</div>
-                <div className="resource-info">
-                  <div className="resource-name">{resource.title}</div>
-                  <div className="resource-duration">{resource.duration}小时</div>
-                </div>
-              </div>
-            ))}
+            // 清除所有拖拽状态
+            setDraggedActivity(null);
+            setDraggedResource(null);
+            // dragGhost已移除
+            setDropIndicator(null);
+            setIsDragging(false);
+            setReturningActivity(null);
+            // 清除拖拽偏移
+            dragOffsetRef.current = { x: 0, y: 0 };
+          }}
+        >
+          <div className="resource-header">
+            <span className="resource-title">行程资源</span>
+            <span className="resource-hint">拖拽卡片到日历中创建活动</span>
           </div>
-        </div>
 
-        {/* 单一活动区域 */}
-        <div className="resource-section">
-          <div className="section-label">单一活动（仅使用一次）</div>
-          <div className="resource-cards">
-            {availableResources.filter(r => r.isUnique).map(resource => (
-              <div
-                key={resource.id}
-                className={`resource-card ${resource.type} unique`}
-                draggable={true}
-                onDragStart={(e) => {
-                  setDraggedResource(resource);
-                  setIsDragging(true);
-                  e.dataTransfer.effectAllowed = 'copy';
-                  e.dataTransfer.setData('resource', JSON.stringify(resource));
-                }}
-                onDragEnd={() => {
-                  setDraggedResource(null);
-                  setIsDragging(false);
-                }}
-                style={{
-                  background: activityTypes[resource.type].color,
-                  cursor: 'grab'
-                }}
-                title={resource.description}
-              >
-                <div className="resource-icon">{resource.icon}</div>
-                <div className="resource-info">
-                  <div className="resource-name">
-                    {resource.title}
-                    <span className="unique-badge">1</span>
-                  </div>
-                  <div className="resource-duration">{resource.duration}小时</div>
+          <div className="resource-columns">
+            {/* 单一活动区域 */}
+            <div className="resource-column">
+              <div className="resource-section unique-section">
+                <div className="section-label">单一活动（仅使用一次）</div>
+                <div className="resource-cards">
+                  {availableUniqueResources.map(resource => (
+                    <div
+                      key={resource.id}
+                      className={`resource-card ${resource.type} unique`}
+                      draggable={true}
+                      onDragStart={(e) => {
+                        setDraggedResource(resource);
+                        setIsDragging(true);
+                        e.dataTransfer.effectAllowed = 'copy';
+                        e.dataTransfer.setData('resource', JSON.stringify(resource));
+                      }}
+                      onDragEnd={() => {
+                        setDraggedResource(null);
+                        setIsDragging(false);
+                      }}
+                      style={{
+                        background: activityTypes[resource.type].color,
+                        cursor: 'grab'
+                      }}
+                      title={resource.description}
+                    >
+                      <div className="resource-info">
+                        <div className="resource-name">{resource.title}</div>
+                        <div className="resource-duration">{resource.duration}小时</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
+            </div>
+
+            {/* 可重复活动区域 */}
+            <div className="resource-column">
+              <div className="resource-section repeatable-section">
+                <div className="section-label">可重复活动</div>
+                <div className="resource-cards">
+                  {repeatableResources.map(resource => (
+                    <div
+                      key={resource.id}
+                      className={`resource-card ${resource.type} repeatable`}
+                      draggable={true}
+                      onDragStart={(e) => {
+                        setDraggedResource(resource);
+                        setIsDragging(true);
+                        e.dataTransfer.effectAllowed = 'copy';
+                        e.dataTransfer.setData('resource', JSON.stringify(resource));
+                      }}
+                      onDragEnd={() => {
+                        setDraggedResource(null);
+                        setIsDragging(false);
+                      }}
+                      style={{
+                        background: activityTypes[resource.type].color,
+                        cursor: 'grab'
+                      }}
+                      title={resource.description}
+                    >
+                      <div className="resource-info">
+                        <div className="resource-name">{resource.title}</div>
+                        <div className="resource-duration">{resource.duration}小时</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

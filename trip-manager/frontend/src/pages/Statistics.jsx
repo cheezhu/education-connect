@@ -120,7 +120,10 @@ function Statistics() {
     const labels = {
       'AM': '上午',
       'PM1': '下午1',
-      'PM2': '下午2'
+      'PM2': '下午2',
+      'MORNING': '上午',
+      'AFTERNOON': '下午',
+      'EVENING': '晚上'
     };
     return labels[slot] || slot;
   };

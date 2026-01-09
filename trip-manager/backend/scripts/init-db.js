@@ -1,4 +1,4 @@
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 const fs = require('fs');
 const path = require('path');
 
@@ -14,37 +14,27 @@ if (fs.existsSync(dbPath)) {
 }
 
 // 创建数据库连接
-const db = new sqlite3.Database(dbPath);
+const db = new Database(dbPath);
 
 try {
   // 读取SQL脚本
   const sql = fs.readFileSync(sqlPath, 'utf8');
-  
+
   // 执行SQL脚本
-  db.exec(sql, (err) => {
-    if (err) {
-      console.error('数据库初始化失败:', err);
-      process.exit(1);
-    } else {
-      console.log('数据库初始化完成！');
-      console.log('默认管理员账号: admin/admin123');
-      
-      // 验证数据
-      db.get('SELECT COUNT(*) as count FROM users', (err, userCount) => {
-        if (!err) {
-          console.log(`已创建 ${userCount.count} 个用户`);
-        }
-      });
-      
-      db.get('SELECT COUNT(*) as count FROM locations', (err, locationCount) => {
-        if (!err) {
-          console.log(`已创建 ${locationCount.count} 个参访地点`);
-        }
-        db.close();
-      });
-    }
-  });
+  db.exec(sql);
+
+  console.log('数据库初始化完成！');
+  console.log('默认管理员账号: admin/admin123');
+
+  // 验证数据
+  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
+  console.log(`已创建 ${userCount.count} 个用户`);
+
+  const locationCount = db.prepare('SELECT COUNT(*) as count FROM locations').get();
+  console.log(`已创建 ${locationCount.count} 个参访地点`);
 } catch (error) {
-  console.error('读取SQL文件失败:', error);
+  console.error('数据库初始化失败:', error);
   process.exit(1);
+} finally {
+  db.close();
 }
