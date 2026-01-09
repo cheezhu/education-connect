@@ -1,6 +1,6 @@
 import React from 'react';
 
-const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
+const GroupInfoSimple = ({ groupData, itineraryPlans, onUpdate, handleAutoSave, isNew }) => {
   return (
     <div className="unified-info-view">
       {/* 卡片容器 */}
@@ -84,6 +84,28 @@ const GroupInfoSimple = ({ groupData, onUpdate, handleAutoSave, isNew }) => {
               <div className="duration-display">
                 <span className="duration-number">{groupData.duration || 0}</span> 天
               </div>
+            </div>
+          </div>
+
+          {/* 行程方案 */}
+          <div className="info-row">
+            <div className="info-item full-width">
+              <label>行程方案</label>
+              <select
+                value={groupData.itinerary_plan_id ?? ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  onUpdate('itinerary_plan_id', value ? Number(value) : null);
+                  handleAutoSave();
+                }}
+              >
+                <option value="">未选择</option>
+                {(itineraryPlans || []).map(plan => (
+                  <option key={plan.id} value={plan.id}>
+                    {plan.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

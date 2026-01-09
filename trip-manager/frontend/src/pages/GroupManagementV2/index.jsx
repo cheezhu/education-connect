@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Select, Input, Tag, Button, Space, Spin, Empty, Badge, Progress, Tooltip, message } from 'antd';
+import { Card, Select, Input, Tag, Button, Space, Table, message } from 'antd';
 import {
   PlusOutlined,
-  SearchOutlined,
-  CalendarOutlined,
-  TeamOutlined,
-  EnvironmentOutlined,
-  PhoneOutlined,
-  CheckCircleOutlined,
-  ClockCircleOutlined,
   FileTextOutlined,
   ExportOutlined
 } from '@ant-design/icons';
@@ -37,14 +30,6 @@ const GroupManagementV2 = () => {
     '进行中': 'green',
     '已完成': 'default',
     '已取消': 'red'
-  };
-
-  // 状态图标映射
-  const statusIcons = {
-    '准备中': <ClockCircleOutlined />,
-    '进行中': <CheckCircleOutlined />,
-    '已完成': <CheckCircleOutlined />,
-    '已取消': <ClockCircleOutlined />
   };
 
   // 加载团组数据
@@ -141,126 +126,108 @@ const GroupManagementV2 = () => {
     fetchGroups();
   }, []);
 
-  // 渲染团组卡片
-  const renderGroupCard = (group) => {
-    const startDate = dayjs(group.start_date);
-    const endDate = dayjs(group.end_date);
-
-    return (
-      <Card
-        hoverable
-        className="group-card-v2"
-        style={{ borderLeft: `4px solid ${group.color || '#1890ff'}` }}
-        actions={[
+  const columns = [
+    {
+      title: '团组名称',
+      dataIndex: 'name',
+      key: 'name',
+      render: (text, record) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div
+            style={{
+              width: '12px',
+              height: '12px',
+              backgroundColor: record.color || '#1890ff',
+              borderRadius: '2px'
+            }}
+          />
+          {text}
+        </div>
+      )
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status) => (
+        <Tag color={statusColors[status] || 'default'}>
+          {status || '—'}
+        </Tag>
+      )
+    },
+    {
+      title: '类型',
+      dataIndex: 'type',
+      key: 'type',
+      render: (type) => (type === 'primary' ? '小学' : '中学')
+    },
+    {
+      title: '人数',
+      key: 'participants',
+      render: (_, record) => `${record.student_count + record.teacher_count}人`
+    },
+    {
+      title: '开始日期',
+      dataIndex: 'start_date',
+      key: 'start_date',
+      render: (date) => dayjs(date).format('YYYY-MM-DD')
+    },
+    {
+      title: '结束日期',
+      dataIndex: 'end_date',
+      key: 'end_date',
+      render: (date) => dayjs(date).format('YYYY-MM-DD')
+    },
+    {
+      title: '行程天数',
+      dataIndex: 'duration',
+      key: 'duration',
+      render: (duration) => `${duration}天`
+    },
+    {
+      title: '联系人',
+      key: 'contact',
+      render: (_, record) => `${record.contact_person || ''} ${record.contact_phone || ''}`.trim() || '—'
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
           <Button
-            type="link"
             icon={<FileTextOutlined />}
-            onClick={() => navigate(`/groups/v2/edit/${group.id}`)}
+            size="small"
+            onClick={() => navigate(`/groups/v2/edit/${record.id}`)}
           >
             查看详情
-          </Button>,
+          </Button>
           <Button
-            type="link"
             icon={<PlusOutlined />}
-            onClick={() => navigate(`/groups/v2/edit/${group.id}`)}
+            size="small"
+            onClick={() => navigate(`/groups/v2/edit/${record.id}`)}
           >
             编辑团组
-          </Button>,
+          </Button>
           <Button
-            type="link"
             icon={<ExportOutlined />}
+            size="small"
             onClick={() => message.info('导出功能开发中')}
           >
             导出报告
           </Button>
-        ]}
-      >
-        <div className="card-header">
-          <div className="group-name">
-            <h3>{group.name}</h3>
-            <Badge
-              status={group.status === '进行中' ? 'processing' : 'default'}
-              text={
-                <Tag color={statusColors[group.status]} icon={statusIcons[group.status]}>
-                  {group.status}
-                </Tag>
-              }
-            />
-          </div>
-        </div>
-
-        <div className="card-content">
-          <Space direction="vertical" size="small" style={{ width: '100%' }}>
-            <div className="info-row">
-              <CalendarOutlined />
-              <span>{startDate.format('YYYY.MM.DD')} - {endDate.format('MM.DD')} ({group.duration}天)</span>
-            </div>
-
-            <div className="info-row">
-              <TeamOutlined />
-              <span>学生: {group.student_count}人 | 老师: {group.teacher_count}人</span>
-            </div>
-
-            <div className="info-row">
-              <EnvironmentOutlined />
-              <span>行程完成度:</span>
-              <Progress
-                percent={group.completion_rate}
-                size="small"
-                style={{ width: 120, marginLeft: 8 }}
-                strokeColor={{
-                  '0%': '#108ee9',
-                  '100%': '#87d068',
-                }}
-              />
-            </div>
-
-            <div className="info-row">
-              <CheckCircleOutlined />
-              <span>已安排活动: {group.completed_activities}个 | 待安排: {group.activity_count - group.completed_activities}个</span>
-            </div>
-
-            <div className="info-row">
-              <PhoneOutlined />
-              <span>联系人: {group.contact_person} {group.contact_phone}</span>
-            </div>
-
-            {group.tags && group.tags.length > 0 && (
-              <div className="tags-row">
-                {group.tags.map((tag, index) => (
-                  <Tag key={index} color="blue">{tag}</Tag>
-                ))}
-              </div>
-            )}
-          </Space>
-        </div>
-      </Card>
-    );
-  };
+        </Space>
+      )
+    }
+  ];
 
   return (
     <div className="group-management-v2">
-      {/* 页面标题和操作栏 */}
-      <div className="page-header">
-        <div className="header-content">
-          <h1>团组管理 V2</h1>
-          <span className="subtitle">专业版团组管理系统</span>
-        </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          size="large"
-          onClick={() => navigate('/groups/v2/new')}
-        >
-          创建新团组
-        </Button>
-      </div>
-
       {/* 筛选栏 */}
       <Card className="filter-card">
-        <Space size="middle" wrap>
+        <Space size="small" wrap>
           <Select
-            style={{ width: 140 }}
+            size="small"
+            style={{ width: 120 }}
             value={filters.status}
             onChange={val => setFilters({...filters, status: val})}
             placeholder="选择状态"
@@ -273,7 +240,8 @@ const GroupManagementV2 = () => {
           </Select>
 
           <Select
-            style={{ width: 120 }}
+            size="small"
+            style={{ width: 100 }}
             value={filters.type}
             onChange={val => setFilters({...filters, type: val})}
             placeholder="团组类型"
@@ -284,44 +252,39 @@ const GroupManagementV2 = () => {
           </Select>
 
           <Search
+            size="small"
             placeholder="搜索团组名称、联系人或标签"
             allowClear
-            style={{ width: 300 }}
+            style={{ width: 200 }}
             onSearch={val => setFilters({...filters, searchText: val})}
             onChange={e => !e.target.value && setFilters({...filters, searchText: ''})}
           />
 
-          <div style={{ marginLeft: 'auto' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
             <span style={{ color: '#999' }}>
               共 {filteredGroups.length} 个团组
             </span>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              size="small"
+              onClick={() => navigate('/groups/v2/new')}
+            >
+              创建新团组
+            </Button>
           </div>
         </Space>
       </Card>
 
-      {/* 团组卡片列表 */}
-      <Spin spinning={loading}>
-        {filteredGroups.length > 0 ? (
-          <Row gutter={[16, 16]}>
-            {filteredGroups.map(group => (
-              <Col xs={24} sm={24} md={12} lg={8} xl={8} xxl={6} key={group.id}>
-                {renderGroupCard(group)}
-              </Col>
-            ))}
-          </Row>
-        ) : (
-          <Empty
-            description={loading ? "加载中..." : "暂无团组数据"}
-            style={{ marginTop: 60 }}
-          >
-            {!loading && (
-              <Button type="primary" onClick={() => navigate('/groups/v2/new')}>
-                创建第一个团组
-              </Button>
-            )}
-          </Empty>
-        )}
-      </Spin>
+      <Table
+        columns={columns}
+        dataSource={filteredGroups}
+        loading={loading}
+        rowKey="id"
+        size="small"
+        className="group-table"
+        pagination={{ pageSize: 10, size: 'small' }}
+      />
     </div>
   );
 };

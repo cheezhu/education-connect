@@ -22,6 +22,7 @@ CREATE TABLE groups (
     end_date DATE NOT NULL,
     duration INTEGER CHECK(duration > 0) DEFAULT 5,
     color VARCHAR(7) DEFAULT '#1890ff',
+    itinerary_plan_id INTEGER,
     contact_person VARCHAR(100),
     contact_phone VARCHAR(20),
     notes TEXT,
@@ -77,6 +78,22 @@ CREATE TABLE schedules (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 4.6 行程方案表
+CREATE TABLE itinerary_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(200) NOT NULL,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE itinerary_plan_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id INTEGER NOT NULL REFERENCES itinerary_plans(id) ON DELETE CASCADE,
+    location_id INTEGER NOT NULL REFERENCES locations(id),
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
+
 -- 5. 编辑锁表
 CREATE TABLE edit_lock (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -101,6 +118,9 @@ CREATE INDEX idx_activities_location ON activities(location_id);
 CREATE INDEX idx_activities_schedule ON activities(schedule_id);
 CREATE INDEX idx_schedules_group_date ON schedules(group_id, activity_date);
 CREATE INDEX idx_groups_date_range ON groups(start_date, end_date);
+CREATE INDEX idx_groups_itinerary_plan ON groups(itinerary_plan_id);
+CREATE INDEX idx_itinerary_plan_items_plan ON itinerary_plan_items(plan_id);
+CREATE INDEX idx_itinerary_plan_items_location ON itinerary_plan_items(location_id);
 
 -- 创建视图简化查询
 CREATE VIEW calendar_view AS

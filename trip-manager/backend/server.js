@@ -32,11 +32,35 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_schedules_group_date ON schedules(group_id, activity_date);
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS itinerary_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(200) NOT NULL,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS itinerary_plan_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id INTEGER NOT NULL REFERENCES itinerary_plans(id) ON DELETE CASCADE,
+    location_id INTEGER NOT NULL REFERENCES locations(id),
+    sort_order INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS idx_itinerary_plan_items_plan ON itinerary_plan_items(plan_id);
+  CREATE INDEX IF NOT EXISTS idx_itinerary_plan_items_location ON itinerary_plan_items(location_id);
+`);
+
 const activityColumns = db.prepare("PRAGMA table_info(activities)").all().map(col => col.name);
 if (!activityColumns.includes('schedule_id')) {
   db.exec('ALTER TABLE activities ADD COLUMN schedule_id INTEGER');
 }
 db.exec('CREATE INDEX IF NOT EXISTS idx_activities_schedule ON activities(schedule_id)');
+
+const groupColumns = db.prepare("PRAGMA table_info(groups)").all().map(col => col.name);
+if (!groupColumns.includes('itinerary_plan_id')) {
+  db.exec('ALTER TABLE groups ADD COLUMN itinerary_plan_id INTEGER');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_groups_itinerary_plan ON groups(itinerary_plan_id)');
+}
 
 // 中间件
 app.use(cors());
@@ -78,6 +102,7 @@ app.use('/api/groups', require('./src/routes/groups'));
 app.use('/api/locations', require('./src/routes/locations'));
 app.use('/api/activities', require('./src/routes/activities'));
 app.use('/api/statistics', require('./src/routes/statistics'));
+app.use('/api/itinerary-plans', require('./src/routes/itineraryPlans'));
 
 // 错误处理
 app.use((err, req, res, next) => {

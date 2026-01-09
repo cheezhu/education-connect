@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, Checkbox, message, Space } from 'antd';
+import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, Checkbox, message, Space, Tabs, Tag } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import api from '../services/api';
 
@@ -9,9 +9,15 @@ const { TextArea } = Input;
 function LocationManagement({ editMode }) {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('locations');
+  const [plans, setPlans] = useState([]);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [planModalVisible, setPlanModalVisible] = useState(false);
+  const [editingPlan, setEditingPlan] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingLocation, setEditingLocation] = useState(null);
   const [form] = Form.useForm();
+  const [planForm] = Form.useForm();
 
   // 星期选项
   const weekdayOptions = [
@@ -37,8 +43,21 @@ function LocationManagement({ editMode }) {
     }
   };
 
+  const loadPlans = async () => {
+    setPlanLoading(true);
+    try {
+      const response = await api.get('/itinerary-plans');
+      setPlans(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      message.error('加载行程方案失败');
+    } finally {
+      setPlanLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadLocations();
+    loadPlans();
   }, []);
 
   // 显示创建/编辑对话框
@@ -85,6 +104,7 @@ function LocationManagement({ editMode }) {
       setModalVisible(false);
       form.resetFields();
       loadLocations();
+      loadPlans();
     } catch (error) {
       message.error('保存失败');
     }
@@ -105,6 +125,76 @@ function LocationManagement({ editMode }) {
           await api.delete(`/locations/${location.id}`);
           message.success('地点已禁用');
           loadLocations();
+          loadPlans();
+        } catch (error) {
+          message.error(error.response?.data?.error || '删除失败');
+        }
+      }
+    });
+  };
+
+  // 显示创建/编辑行程方案
+  const showPlanModal = (plan = null) => {
+    if (!editMode && !plan) {
+      message.warning('请先进入编辑模式');
+      return;
+    }
+
+    setEditingPlan(plan);
+    setPlanModalVisible(true);
+
+    if (plan) {
+      planForm.setFieldsValue({
+        name: plan.name,
+        description: plan.description || '',
+        locationIds: (plan.items || []).map(item => item.location_id)
+      });
+    } else {
+      planForm.resetFields();
+      planForm.setFieldsValue({ locationIds: [] });
+    }
+  };
+
+  // 保存行程方案
+  const handlePlanSave = async (values) => {
+    try {
+      const payload = {
+        name: values.name,
+        description: values.description || '',
+        locationIds: values.locationIds || []
+      };
+
+      if (editingPlan) {
+        await api.put(`/itinerary-plans/${editingPlan.id}`, payload);
+        message.success('行程方案更新成功');
+      } else {
+        await api.post('/itinerary-plans', payload);
+        message.success('行程方案创建成功');
+      }
+
+      setPlanModalVisible(false);
+      planForm.resetFields();
+      loadPlans();
+    } catch (error) {
+      message.error('保存失败');
+    }
+  };
+
+  // 删除行程方案
+  const handlePlanDelete = (plan) => {
+    if (!editMode) {
+      message.warning('请先进入编辑模式');
+      return;
+    }
+
+    Modal.confirm({
+      title: '确认删除行程方案？',
+      content: `确定要删除方案"${plan.name}"吗？`,
+      onOk: async () => {
+        try {
+          await api.delete(`/itinerary-plans/${plan.id}`);
+          message.success('行程方案已删除');
+          loadPlans();
         } catch (error) {
           message.error(error.response?.data?.error || '删除失败');
         }
@@ -191,26 +281,125 @@ function LocationManagement({ editMode }) {
     }
   ];
 
-  return (
-    <Card 
-      title="地点管理" 
-      extra={
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />} 
-          onClick={() => showModal()}
-          disabled={!editMode}
-        >
-          添加地点
-        </Button>
+  const planColumns = [
+    {
+      title: '方案名称',
+      dataIndex: 'name',
+      key: 'name'
+    },
+    {
+      title: '说明',
+      dataIndex: 'description',
+      key: 'description',
+      ellipsis: true,
+      render: (text) => text || '—'
+    },
+    {
+      title: '包含地点',
+      key: 'items',
+      render: (_, record) => {
+        const items = record.items || [];
+        if (items.length === 0) {
+          return '未选择';
+        }
+        return (
+          <Space wrap>
+            {items.map(item => (
+              <Tag key={`${record.id}-${item.location_id}`}>{item.location_name}</Tag>
+            ))}
+          </Space>
+        );
       }
+    },
+    {
+      title: '地点数',
+      key: 'count',
+      width: 90,
+      render: (_, record) => `${(record.items || []).length}个`
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Button
+            icon={<EditOutlined />}
+            size="small"
+            onClick={() => showPlanModal(record)}
+            disabled={!editMode}
+          >
+            编辑
+          </Button>
+          <Button
+            icon={<DeleteOutlined />}
+            size="small"
+            danger
+            onClick={() => handlePlanDelete(record)}
+            disabled={!editMode}
+          >
+            删除
+          </Button>
+        </Space>
+      )
+    }
+  ];
+
+  const extraAction = activeTab === 'plans' ? (
+    <Button
+      type="primary"
+      icon={<PlusOutlined />}
+      onClick={() => showPlanModal()}
+      disabled={!editMode}
     >
-      <Table
-        columns={columns}
-        dataSource={locations}
-        loading={loading}
-        rowKey="id"
-        pagination={{ pageSize: 10 }}
+      创建方案
+    </Button>
+  ) : (
+    <Button
+      type="primary"
+      icon={<PlusOutlined />}
+      onClick={() => showModal()}
+      disabled={!editMode}
+    >
+      添加地点
+    </Button>
+  );
+
+  return (
+    <Card
+      title="行程资源"
+      extra={extraAction}
+    >
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={[
+          {
+            key: 'locations',
+            label: '地点',
+            children: (
+              <Table
+                columns={columns}
+                dataSource={locations}
+                loading={loading}
+                rowKey="id"
+                pagination={{ pageSize: 10 }}
+              />
+            )
+          },
+          {
+            key: 'plans',
+            label: '行程方案',
+            children: (
+              <Table
+                columns={planColumns}
+                dataSource={plans}
+                loading={planLoading}
+                rowKey="id"
+                pagination={{ pageSize: 10 }}
+              />
+            )
+          }
+        ]}
       />
 
       <Modal
@@ -249,9 +438,9 @@ function LocationManagement({ editMode }) {
               label="最大容量"
               rules={[{ required: true, type: 'number', min: 1 }]}
             >
-              <InputNumber 
-                min={1} 
-                max={1000} 
+              <InputNumber
+                min={1}
+                max={1000}
                 addonAfter="人"
                 style={{ width: '100%' }}
                 placeholder="最大容量"
@@ -299,6 +488,55 @@ function LocationManagement({ editMode }) {
             label="备注"
           >
             <TextArea rows={3} placeholder="请输入备注信息" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={editingPlan ? '编辑行程方案' : '创建行程方案'}
+        open={planModalVisible}
+        onCancel={() => {
+          setPlanModalVisible(false);
+          planForm.resetFields();
+        }}
+        onOk={() => planForm.submit()}
+        width={600}
+      >
+        <Form
+          form={planForm}
+          layout="vertical"
+          onFinish={handlePlanSave}
+        >
+          <Form.Item
+            name="name"
+            label="方案名称"
+            rules={[{ required: true, message: '请输入方案名称' }]}
+          >
+            <Input placeholder="请输入方案名称" />
+          </Form.Item>
+
+          <Form.Item
+            name="description"
+            label="说明"
+          >
+            <TextArea rows={2} placeholder="可选，补充方案说明" />
+          </Form.Item>
+
+          <Form.Item
+            name="locationIds"
+            label="包含地点"
+          >
+            <Select
+              mode="multiple"
+              placeholder="选择地点组成方案"
+              optionFilterProp="children"
+            >
+              {locations.map(location => (
+                <Option key={location.id} value={location.id}>
+                  {location.name}
+                </Option>
+              ))}
+            </Select>
           </Form.Item>
         </Form>
       </Modal>

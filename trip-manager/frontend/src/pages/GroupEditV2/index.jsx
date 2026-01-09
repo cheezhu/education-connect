@@ -4,7 +4,8 @@ import {
   ArrowLeftOutlined,
   TeamOutlined,
   CalendarOutlined,
-  UnorderedListOutlined
+  UnorderedListOutlined,
+  SaveOutlined
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import GroupInfoSimple from './GroupInfoSimple';
@@ -20,13 +21,14 @@ const GroupEditV2 = () => {
   const [activeTab, setActiveTab] = useState('info');
   const [groupData, setGroupData] = useState(null);
   const [groupSchedules, setGroupSchedules] = useState([]);
+  const [itineraryPlans, setItineraryPlans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const autoSaveTimeoutRef = useRef(null);
 
   // 是否为新建模式
-  const isNew = id === 'new';
+  const isNew = id === 'new' || !id;
 
   // 加载团组数据
   const fetchGroupData = async () => {
@@ -41,6 +43,7 @@ const GroupEditV2 = () => {
         end_date: dayjs().add(4, 'day').format('YYYY-MM-DD'),
         duration: 5,
         color: '#1890ff',
+        itinerary_plan_id: null,
         status: '准备中',
         contact_person: '',
         contact_phone: '',
@@ -88,6 +91,19 @@ const GroupEditV2 = () => {
     fetchGroupData();
   }, [id]);
 
+  const fetchItineraryPlans = async () => {
+    try {
+      const response = await api.get('/itinerary-plans');
+      setItineraryPlans(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      setItineraryPlans([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchItineraryPlans();
+  }, []);
+
   const fetchSchedules = async () => {
     if (isNew) {
       setGroupSchedules([]);
@@ -126,6 +142,7 @@ const GroupEditV2 = () => {
           end_date: groupData.end_date,
           duration: groupData.duration,
           color: groupData.color,
+          itinerary_plan_id: groupData.itinerary_plan_id,
           status: groupData.status,
           contact_person: groupData.contact_person,
           contact_phone: groupData.contact_phone,
@@ -161,6 +178,7 @@ const GroupEditV2 = () => {
         end_date: groupData.end_date,
         duration: groupData.duration,
         color: groupData.color,
+        itinerary_plan_id: groupData.itinerary_plan_id,
         status: groupData.status,
         contact_person: groupData.contact_person,
         contact_phone: groupData.contact_phone,
@@ -294,10 +312,33 @@ const GroupEditV2 = () => {
 
         {/* 右侧内容区 */}
         <div className="main-content">
+          <div
+            style={{
+              background: '#fff',
+              borderBottom: '1px solid #e8e8e8',
+              padding: '12px 16px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}
+          >
+            <div style={{ fontSize: '13px', color: '#595959' }}>
+              {isNew ? '新建团组' : '团组信息编辑'}
+            </div>
+            <Button
+              type="primary"
+              icon={<SaveOutlined />}
+              loading={saving}
+              onClick={handleSave}
+            >
+              {isNew ? '创建团组' : '保存'}
+            </Button>
+          </div>
           {activeTab === 'info' && (
             <GroupInfoSimple
               groupData={groupData}
               schedules={groupSchedules}
+              itineraryPlans={itineraryPlans}
               onUpdate={updateGroupData}
               handleAutoSave={handleAutoSave}
               isNew={isNew}

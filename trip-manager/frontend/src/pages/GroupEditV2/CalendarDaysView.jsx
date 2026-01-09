@@ -36,36 +36,17 @@ const presetResourcesData = [
   { id: 'activity', type: 'activity', title: '团队活动', icon: '🎯', duration: 2, description: '互动游戏', isUnique: true }
 ];
 
-const DEFAULT_UNIQUE_DURATION = 2;
-
-const buildUniqueResources = (locations) => {
-  if (!locations || locations.length === 0) {
-    return presetResourcesData.filter((resource) => resource.isUnique);
-  }
-
-  return locations.map((location) => ({
-    id: `loc-${location.id}`,
-    type: 'visit',
-    title: location.name,
-    icon: '🏛️',
-    duration: DEFAULT_UNIQUE_DURATION,
-    description: location.address
-      ? `${location.address} · 容量${location.capacity || 0}人`
-      : `容量${location.capacity || 0}人`,
-    isUnique: true,
-    locationId: location.id
-  }));
-};
+const DEFAULT_PLAN_DURATION = 2;
 
 const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
   const repeatableResources = useMemo(
     () => presetResourcesData.filter((resource) => !resource.isUnique),
     []
   );
-  const [uniqueResources, setUniqueResources] = useState(buildUniqueResources([]));
-  const [availableUniqueResources, setAvailableUniqueResources] = useState(
-    buildUniqueResources([])
-  );
+  const [itineraryPlans, setItineraryPlans] = useState([]);
+  const [planResources, setPlanResources] = useState([]);
+  const [availablePlanResources, setAvailablePlanResources] = useState([]);
+  const [activePlan, setActivePlan] = useState(null);
   const [activities, setActivities] = useState(schedules);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -86,42 +67,75 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
   const calendarRef = useRef(null);
   const dragPreviewRef = useRef(null);
 
-  // 加载行程资源（地点）作为单一活动
+  // 加载行程方案
   useEffect(() => {
     let isMounted = true;
 
-    const loadLocations = async () => {
+    const loadPlans = async () => {
       try {
-        const response = await api.get('/locations');
+        const response = await api.get('/itinerary-plans');
         if (!isMounted) return;
-        const resources = buildUniqueResources(response.data);
-        setUniqueResources(resources);
+        setItineraryPlans(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
         if (!isMounted) return;
-        setUniqueResources(buildUniqueResources([]));
+        setItineraryPlans([]);
       }
     };
 
-    loadLocations();
+    loadPlans();
     return () => {
       isMounted = false;
     };
   }, []);
 
-  // 同步外部日程数据，并根据已使用的单一活动重置资源池
+  // 同步外部日程数据
   useEffect(() => {
     setActivities(schedules || []);
+  }, [groupData?.id, schedules]);
 
-    const usedUniqueIds = new Set(
+  // 根据团组选中的行程方案生成资源卡片
+  useEffect(() => {
+    const selectedPlan = itineraryPlans.find(
+      (plan) => plan.id === groupData?.itinerary_plan_id
+    );
+    setActivePlan(selectedPlan || null);
+
+    if (!selectedPlan || !Array.isArray(selectedPlan.items)) {
+      setPlanResources([]);
+      setAvailablePlanResources([]);
+      return;
+    }
+
+    const resources = [...selectedPlan.items]
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((item) => ({
+        id: `plan-${selectedPlan.id}-loc-${item.location_id}`,
+        type: 'visit',
+        title: item.location_name,
+        icon: '🏛️',
+        duration: DEFAULT_PLAN_DURATION,
+        description: item.address
+          ? `${item.address} · 容量${item.capacity || 0}人`
+          : `容量${item.capacity || 0}人`,
+        isUnique: true,
+        locationId: item.location_id,
+        planId: selectedPlan.id
+      }));
+
+    setPlanResources(resources);
+  }, [groupData?.itinerary_plan_id, itineraryPlans]);
+
+  useEffect(() => {
+    const usedResourceIds = new Set(
       (schedules || [])
         .map((activity) => activity.resourceId)
         .filter(Boolean)
     );
 
-    setAvailableUniqueResources(
-      uniqueResources.filter((resource) => !usedUniqueIds.has(resource.id))
+    setAvailablePlanResources(
+      planResources.filter((resource) => !usedResourceIds.has(resource.id))
     );
-  }, [groupData?.id, schedules, uniqueResources]);
+  }, [planResources, schedules]);
 
   // 全局拖拽结束事件监听 - 确保清理所有拖拽状态
   useEffect(() => {
@@ -508,11 +522,6 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
       const updatedActivities = [...activities, newActivity];
       setActivities(updatedActivities);
       onUpdate(updatedActivities);
-
-      // 如果是单一活动，从资源列表中移除
-      if (draggedResource.isUnique) {
-        setAvailableUniqueResources(prev => prev.filter(r => r.id !== draggedResource.id));
-      }
 
       // 清除拖拽状态
       setDraggedResource(null);
@@ -1046,34 +1055,29 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
           onDrop={(e) => {
             e.preventDefault();
             // 处理从日历拖回的活动
-            if (draggedActivity && draggedActivity.isFromResource) {
-              // 如果是单一活动，恢复到资源列表
-              const resourceData = uniqueResources.find(r => r.id === draggedActivity.resourceId)
-                || presetResourcesData.find(r => r.id === draggedActivity.resourceId);
-              if (resourceData && resourceData.isUnique) {
-                const sortReference = uniqueResources.length
-                  ? uniqueResources
-                  : presetResourcesData.filter(r => r.isUnique);
+    if (draggedActivity && draggedActivity.isFromResource) {
+      const resourceId = draggedActivity.resourceId || '';
+      const isPlanResource = typeof resourceId === 'string' && resourceId.startsWith('plan-');
+      if (isPlanResource) {
+        setAvailablePlanResources(prev => {
+          if (prev.find(r => r.id === resourceId)) {
+            return prev;
+          }
+          const resource = planResources.find(r => r.id === resourceId);
+          if (!resource) return prev;
+          return [...prev, resource].sort((a, b) => {
+            const aIndex = planResources.findIndex(r => r.id === a.id);
+            const bIndex = planResources.findIndex(r => r.id === b.id);
+            return aIndex - bIndex;
+          });
+        });
 
-                setAvailableUniqueResources(prev => {
-                  if (!prev.find(r => r.id === resourceData.id)) {
-                    return [...prev, resourceData].sort((a, b) => {
-                      const aIndex = sortReference.findIndex(r => r.id === a.id);
-                      const bIndex = sortReference.findIndex(r => r.id === b.id);
-                      return aIndex - bIndex;
-                    });
-                  }
-                  return prev;
-                });
-
-                // 从活动列表中移除
-                const updatedActivities = activities.filter(a => a.id !== draggedActivity.id);
-                setActivities(updatedActivities);
-                onUpdate(updatedActivities);
-
-                message.success(`已将 ${draggedActivity.title} 返回资源区`, 1);
-              }
-            }
+        const updatedActivities = activities.filter(a => a.id !== draggedActivity.id);
+        setActivities(updatedActivities);
+        onUpdate(updatedActivities);
+        message.success(`已将 ${draggedActivity.title} 返回方案`, 1);
+      }
+    }
 
             // 清除所有拖拽状态
             setDraggedActivity(null);
@@ -1087,17 +1091,23 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
           }}
         >
           <div className="resource-header">
-            <span className="resource-title">行程资源</span>
-            <span className="resource-hint">拖拽卡片到日历中创建活动</span>
+            <span className="resource-title">行程方案</span>
+            <span className="resource-hint">
+              {activePlan ? `当前方案：${activePlan.name}` : '请先在团组信息选择行程方案'}
+            </span>
           </div>
 
           <div className="resource-columns">
-            {/* 单一活动区域 */}
+            {/* 行程方案区域 */}
             <div className="resource-column">
               <div className="resource-section unique-section">
-                <div className="section-label">单一活动（仅使用一次）</div>
+                <div className="section-label">方案行程点</div>
                 <div className="resource-cards">
-                  {availableUniqueResources.map(resource => (
+                  {availablePlanResources.length === 0 ? (
+                    <div style={{ fontSize: '12px', color: '#999', padding: '8px 4px' }}>
+                      暂无可用方案行程点
+                    </div>
+                  ) : availablePlanResources.map(resource => (
                     <div
                       key={resource.id}
                       className={`resource-card ${resource.type} unique`}

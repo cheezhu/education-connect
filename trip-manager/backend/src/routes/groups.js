@@ -36,6 +36,7 @@ router.post('/', requireEditLock, (req, res) => {
     endDate,
     duration, 
     color = '#1890ff',
+    itineraryPlanId,
     contactPerson,
     contactPhone,
     notes,
@@ -43,6 +44,7 @@ router.post('/', requireEditLock, (req, res) => {
     teacher_count,
     start_date,
     end_date,
+    itinerary_plan_id,
     contact_person,
     contact_phone
   } = req.body;
@@ -54,6 +56,7 @@ router.post('/', requireEditLock, (req, res) => {
   const resolvedDuration = duration ?? calculateDuration(resolvedStartDate, resolvedEndDate);
   const resolvedContactPerson = contactPerson ?? contact_person;
   const resolvedContactPhone = contactPhone ?? contact_phone;
+  const resolvedItineraryPlanId = itineraryPlanId ?? itinerary_plan_id ?? null;
 
   if (!name || !type || !resolvedStartDate || !resolvedEndDate) {
     return res.status(400).json({ 
@@ -65,13 +68,13 @@ router.post('/', requireEditLock, (req, res) => {
     const result = req.db.prepare(`
       INSERT INTO groups (
         name, type, student_count, teacher_count, 
-        start_date, end_date, duration, color, contact_person, 
+        start_date, end_date, duration, color, itinerary_plan_id, contact_person,
         contact_phone, notes
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name, type, resolvedStudentCount, resolvedTeacherCount,
-      resolvedStartDate, resolvedEndDate, resolvedDuration, color, resolvedContactPerson,
-      resolvedContactPhone, notes
+      resolvedStartDate, resolvedEndDate, resolvedDuration, color, resolvedItineraryPlanId,
+      resolvedContactPerson, resolvedContactPhone, notes
     );
 
     const newGroup = req.db.prepare('SELECT * FROM groups WHERE id = ?').get(result.lastInsertRowid);
@@ -92,7 +95,7 @@ router.put('/:id', requireEditLock, (req, res) => {
   const allowedFields = [
     'name', 'type', 'student_count', 'teacher_count',
     'start_date', 'end_date', 'duration', 'color', 'contact_person',
-    'contact_phone', 'notes'
+    'contact_phone', 'notes', 'itinerary_plan_id'
   ];
 
   allowedFields.forEach(field => {
