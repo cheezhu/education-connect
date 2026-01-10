@@ -1,6 +1,10 @@
 /* 日程管理容器 */
 .schedule-management {
   padding: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 日历容器 */
@@ -20,7 +24,7 @@
 
 /* 日历网格 */
 .calendar-grid {
-  min-width: 800px;
+  min-width: 400px;
   position: relative;
 }
 
@@ -75,7 +79,7 @@
 /* 时间格 */
 .time-slot {
   border-right: 1px solid #f0f0f0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: none;
   cursor: pointer;
   transition: background-color 0.2s;
   position: relative;

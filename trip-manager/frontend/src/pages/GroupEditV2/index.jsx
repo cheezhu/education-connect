@@ -7,7 +7,7 @@ import {
   UnorderedListOutlined,
   SaveOutlined
 } from '@ant-design/icons';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import GroupInfoSimple from './GroupInfoSimple';
 import ScheduleManagement from './ScheduleManagement';
 import ScheduleDetail from './ScheduleDetail';
@@ -18,7 +18,17 @@ import './GroupEditV2.css';
 const GroupEditV2 = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('info');
+  const location = useLocation();
+
+  const getInitialTab = () => {
+    const tab = new URLSearchParams(location.search).get('tab');
+    if (tab === 'schedule' || tab === 'schedule-detail' || tab === 'info') {
+      return tab;
+    }
+    return 'info';
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [groupData, setGroupData] = useState(null);
   const [groupSchedules, setGroupSchedules] = useState([]);
   const [itineraryPlans, setItineraryPlans] = useState([]);
@@ -29,6 +39,44 @@ const GroupEditV2 = () => {
 
   // 是否为新建模式
   const isNew = id === 'new' || !id;
+
+  useEffect(() => {
+    const content = document.querySelector('.ant-layout-content');
+    if (!content) return undefined;
+
+    const prev = {
+      overflow: content.style.overflow,
+      height: content.style.height,
+      boxSizing: content.style.boxSizing,
+      padding: content.style.padding,
+      display: content.style.display,
+      flexDirection: content.style.flexDirection
+    };
+    const prevBody = {
+      overflow: document.body.style.overflow,
+      overflowHtml: document.documentElement.style.overflow
+    };
+
+    content.style.overflow = 'hidden';
+    content.style.height = 'calc(100vh - 42px)';
+    content.style.boxSizing = 'border-box';
+    content.style.padding = '0';
+    content.style.display = 'flex';
+    content.style.flexDirection = 'column';
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      content.style.overflow = prev.overflow;
+      content.style.height = prev.height;
+      content.style.boxSizing = prev.boxSizing;
+      content.style.padding = prev.padding;
+      content.style.display = prev.display;
+      content.style.flexDirection = prev.flexDirection;
+      document.body.style.overflow = prevBody.overflow;
+      document.documentElement.style.overflow = prevBody.overflowHtml;
+    };
+  }, []);
 
   // 加载团组数据
   const fetchGroupData = async () => {
@@ -90,6 +138,16 @@ const GroupEditV2 = () => {
   useEffect(() => {
     fetchGroupData();
   }, [id]);
+
+  useEffect(() => {
+    const tab = new URLSearchParams(location.search).get('tab');
+    if (isNew) {
+      return;
+    }
+    if (tab === 'schedule' || tab === 'schedule-detail' || tab === 'info') {
+      setActiveTab(tab);
+    }
+  }, [id, isNew, location.search]);
 
   const fetchItineraryPlans = async () => {
     try {
@@ -312,28 +370,30 @@ const GroupEditV2 = () => {
 
         {/* 右侧内容区 */}
         <div className="main-content">
-          <div
-            style={{
-              background: '#fff',
-              borderBottom: '1px solid #e8e8e8',
-              padding: '12px 16px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}
-          >
-            <div style={{ fontSize: '13px', color: '#595959' }}>
-              {isNew ? '新建团组' : '团组信息编辑'}
-            </div>
-            <Button
-              type="primary"
-              icon={<SaveOutlined />}
-              loading={saving}
-              onClick={handleSave}
+          {activeTab === 'info' && (
+            <div
+              style={{
+                background: '#fff',
+                borderBottom: '1px solid #e8e8e8',
+                padding: '12px 16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
             >
-              {isNew ? '创建团组' : '保存'}
-            </Button>
-          </div>
+              <div style={{ fontSize: '13px', color: '#595959' }}>
+                {isNew ? '新建团组' : '团组信息编辑'}
+              </div>
+              <Button
+                type="primary"
+                icon={<SaveOutlined />}
+                loading={saving}
+                onClick={handleSave}
+              >
+                {isNew ? '创建团组' : '保存'}
+              </Button>
+            </div>
+          )}
           {activeTab === 'info' && (
             <GroupInfoSimple
               groupData={groupData}

@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Select, Input, Tag, Button, Space, Table, message } from 'antd';
+import React, { useState, useEffect, useRef } from 'react';
+import { Card, Select, Input, Tag, Button, Space, Table, Modal, message } from 'antd';
 import {
   PlusOutlined,
-  FileTextOutlined,
-  ExportOutlined
+  FileTextOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import dayjs from 'dayjs';
+import GroupInfoSimple from '../GroupEditV2/GroupInfoSimple';
+import ScheduleDetail from '../GroupEditV2/ScheduleDetail';
 import './GroupManagementV2.css';
 
 const { Option } = Select;
@@ -18,11 +19,18 @@ const GroupManagementV2 = () => {
   const [groups, setGroups] = useState([]);
   const [filteredGroups, setFilteredGroups] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [itineraryPlans, setItineraryPlans] = useState([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalView, setModalView] = useState(null);
+  const [modalGroup, setModalGroup] = useState(null);
+  const [modalSchedules, setModalSchedules] = useState([]);
+  const [modalLoading, setModalLoading] = useState(false);
   const [filters, setFilters] = useState({
     status: 'all',
     type: 'all',
     searchText: ''
   });
+  const autoSaveTimeoutRef = useRef(null);
 
   // 状态颜色映射
   const statusColors = {
@@ -126,6 +134,95 @@ const GroupManagementV2 = () => {
     fetchGroups();
   }, []);
 
+  const fetchItineraryPlans = async () => {
+    try {
+      const response = await api.get('/itinerary-plans');
+      setItineraryPlans(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      setItineraryPlans([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchItineraryPlans();
+  }, []);
+
+  useEffect(() => () => {
+    clearTimeout(autoSaveTimeoutRef.current);
+  }, []);
+
+  const loadSchedules = async (groupId) => {
+    setModalLoading(true);
+    try {
+      const response = await api.get(`/groups/${groupId}/schedules`);
+      setModalSchedules(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      message.error('加载日程失败');
+      setModalSchedules([]);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const openModal = async (view, group) => {
+    if (view === 'calendar' && group?.id) {
+      navigate(`/groups/v2/edit/${group.id}?tab=schedule`);
+      return;
+    }
+    setModalView(view);
+    setModalGroup(group);
+    setModalVisible(true);
+    if (view === 'detail' && group?.id) {
+      await loadSchedules(group.id);
+    }
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setModalView(null);
+    setModalGroup(null);
+    setModalSchedules([]);
+  };
+
+  const updateModalGroup = (field, value) => {
+    setModalGroup(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, [field]: value };
+      if (field === 'start_date' || field === 'end_date') {
+        if (updated.start_date && updated.end_date) {
+          updated.duration = dayjs(updated.end_date).diff(dayjs(updated.start_date), 'day') + 1;
+        }
+      }
+      return updated;
+    });
+  };
+
+  const handleAutoSave = () => {
+    clearTimeout(autoSaveTimeoutRef.current);
+    autoSaveTimeoutRef.current = setTimeout(async () => {
+      if (!modalGroup?.id) return;
+      try {
+        await api.put(`/groups/${modalGroup.id}`, {
+          name: modalGroup.name,
+          type: modalGroup.type,
+          student_count: modalGroup.student_count,
+          teacher_count: modalGroup.teacher_count,
+          start_date: modalGroup.start_date,
+          end_date: modalGroup.end_date,
+          duration: modalGroup.duration,
+          color: modalGroup.color,
+          itinerary_plan_id: modalGroup.itinerary_plan_id,
+          contact_person: modalGroup.contact_person,
+          contact_phone: modalGroup.contact_phone,
+          notes: modalGroup.notes
+        });
+        fetchGroups();
+      } catch (error) {
+        message.error('保存团组信息失败');
+      }
+    }, 800);
+  };
+
   const columns = [
     {
       title: '团组名称',
@@ -197,23 +294,22 @@ const GroupManagementV2 = () => {
           <Button
             icon={<FileTextOutlined />}
             size="small"
-            onClick={() => navigate(`/groups/v2/edit/${record.id}`)}
+            onClick={() => openModal('info', record)}
           >
-            查看详情
+            团组信息
           </Button>
           <Button
             icon={<PlusOutlined />}
             size="small"
-            onClick={() => navigate(`/groups/v2/edit/${record.id}`)}
+            onClick={() => openModal('calendar', record)}
           >
-            编辑团组
+            日历详情
           </Button>
           <Button
-            icon={<ExportOutlined />}
             size="small"
-            onClick={() => message.info('导出功能开发中')}
+            onClick={() => openModal('detail', record)}
           >
-            导出报告
+            详细日程
           </Button>
         </Space>
       )
@@ -285,6 +381,45 @@ const GroupManagementV2 = () => {
         className="group-table"
         pagination={{ pageSize: 10, size: 'small' }}
       />
+
+      <Modal
+        open={modalVisible}
+        onCancel={closeModal}
+        footer={null}
+        width={720}
+        bodyStyle={{
+          maxHeight: '70vh',
+          overflow: 'auto',
+          padding: '16px'
+        }}
+        title={
+          modalGroup
+            ? `${modalGroup.name || '团组'} · ${
+                modalView === 'info' ? '团组信息' : '详细日程'
+              }`
+            : ''
+        }
+        destroyOnClose
+      >
+        {modalLoading ? (
+          <div style={{ padding: '24px', textAlign: 'center' }}>加载中...</div>
+        ) : null}
+        {!modalLoading && modalView === 'info' && modalGroup ? (
+          <GroupInfoSimple
+            groupData={modalGroup}
+            itineraryPlans={itineraryPlans}
+            onUpdate={updateModalGroup}
+            handleAutoSave={handleAutoSave}
+            isNew={false}
+          />
+        ) : null}
+        {!modalLoading && modalView === 'detail' && modalGroup ? (
+          <ScheduleDetail
+            groupData={modalGroup}
+            schedules={modalSchedules}
+          />
+        ) : null}
+      </Modal>
     </div>
   );
 };

@@ -4,9 +4,7 @@ import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
-  CopyOutlined,
-  ClockCircleOutlined,
-  EnvironmentOutlined
+  CopyOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from '../../services/api';
@@ -14,6 +12,13 @@ import './CalendarDaysView.css';
 
 const { TextArea } = Input;
 const { Option } = Select;
+
+const START_HOUR = 6;
+const END_HOUR = 20;
+const SLOT_MINUTES = 15;
+const HEADER_HEIGHT = 30;
+const SLOT_HEIGHT = 10;
+const SLOTS_PER_HOUR = Math.max(1, Math.round(60 / SLOT_MINUTES));
 
 // 拖拽影子组件已移除 - 使用简单虚线框代替
 
@@ -166,11 +171,15 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     free: { label: '自由活动', color: '#13c2c2', icon: '🚶' }
   };
 
-  // 生成时间槽（6:00-20:00，每1小时） - 优化范围完全适应屏幕
+  // 生成时间槽（6:00-20:45，每15分钟）
   const generateTimeSlots = () => {
     const slots = [];
-    for (let hour = 6; hour <= 20; hour++) {
-      slots.push(`${hour.toString().padStart(2, '0')}:00`);
+    for (let hour = START_HOUR; hour <= END_HOUR; hour++) {
+      for (let minute = 0; minute < 60; minute += SLOT_MINUTES) {
+        slots.push(
+          `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+        );
+      }
     }
     return slots;
   };
@@ -210,14 +219,15 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
   // 时间转换为网格位置
   const timeToGridRow = (time) => {
     const [hour, minute] = time.split(':').map(Number);
-    const totalMinutes = (hour - 6) * 60 + minute;  // 从6点开始
-    return Math.floor(totalMinutes / 60) + 2; // +2 因为第一行是header，每小时一格
+    const totalMinutes = (hour - START_HOUR) * 60 + minute;
+    const slotIndex = Math.max(0, Math.round(totalMinutes / SLOT_MINUTES));
+    return slotIndex + 2; // +2 因为第一行是header
   };
 
   // 网格位置转换为时间
   const gridRowToTime = (row) => {
-    const totalMinutes = (row - 2) * 60; // -2 因为第一行是header，每小时一格
-    const hour = Math.floor(totalMinutes / 60) + 6;  // 从6点开始
+    const totalMinutes = (row - 2) * SLOT_MINUTES; // -2 因为第一行是header
+    const hour = Math.floor(totalMinutes / 60) + START_HOUR;
     const minute = totalMinutes % 60;
     return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
   };
@@ -425,8 +435,8 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     const activityTopY = mouseY - dragOffsetRef.current.y;
 
     // 计算目标时间槽
-    const headerHeight = 30;
-    const slotHeight = 40;
+    const headerHeight = HEADER_HEIGHT;
+    const slotHeight = SLOT_HEIGHT;
     const adjustedY = activityTopY - headerHeight;
 
     // 使用与handleDrop相同的逻辑
@@ -443,7 +453,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     const duration = originalEnd - originalStart;
 
     // 限制索引范围（与handleDrop保持一致）
-    const maxStartIndex = Math.max(0, timeSlots.length - duration);
+    const maxStartIndex = Math.max(0, timeSlots.length - duration - 1);
     const constrainedIndex = Math.max(0, Math.min(maxStartIndex, targetSlotIndex));
 
     // 获取当前悬停的列（日期）
@@ -501,14 +511,20 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     if (draggedResource) {
       console.log('处理资源卡片拖拽:', draggedResource.title);
       // 创建新活动
-      const startHour = parseInt(targetTime.split(':')[0]);
-      const endHour = Math.min(20, startHour + Math.ceil(draggedResource.duration));
+      const durationSlots = Math.max(1, Math.ceil((draggedResource.duration * 60) / SLOT_MINUTES));
+      const startIndex = Math.max(0, timeSlots.indexOf(targetTime));
+      const maxStartIndex = Math.max(0, timeSlots.length - durationSlots - 1);
+      const constrainedIndex = Math.min(maxStartIndex, startIndex);
+      const adjustedStartTime = timeSlots[constrainedIndex] || targetTime;
+      const startRow = constrainedIndex + 2;
+      const endRow = Math.min(startRow + durationSlots, timeSlots.length + 1);
+      const endTime = gridRowToTime(endRow);
       const newActivity = {
         id: Date.now(),
         groupId: groupData.id,
         date: targetDate,
-        startTime: targetTime,
-        endTime: `${endHour.toString().padStart(2, '0')}:00`,
+        startTime: adjustedStartTime,
+        endTime,
         type: draggedResource.type,
         title: draggedResource.title,
         location: draggedResource.locationName || draggedResource.title || '',
@@ -588,8 +604,8 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     const duration = originalEnd - originalStart;
 
     // 每个时间槽40px（1小时），头部30px
-    const headerHeight = 30;
-    const slotHeight = 40;
+    const headerHeight = HEADER_HEIGHT;
+    const slotHeight = SLOT_HEIGHT;
 
     // 计算活动上沿对应的时间槽索引
     const adjustedY = activityTopY - headerHeight;
@@ -605,7 +621,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
     }
 
     // 确保索引在有效范围内
-    const maxStartIndex = Math.max(0, timeSlots.length - duration);
+    const maxStartIndex = Math.max(0, timeSlots.length - duration - 1);
     const constrainedIndex = Math.max(0, Math.min(maxStartIndex, targetSlotIndex));
     const adjustedStartTime = timeSlots[constrainedIndex];
 
@@ -700,8 +716,8 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
       const relativeY = moveEvent.clientY - wrapperRect.top + scrollTop;
 
       // 每个时间槽的高度是40px（1小时），第一行是30px的日期头部
-      const headerHeight = 30;
-      const rowHeight = 40;
+      const headerHeight = HEADER_HEIGHT;
+      const rowHeight = SLOT_HEIGHT;
 
       // 计算鼠标位置对应的时间槽行数
       const adjustedY = relativeY - headerHeight;
@@ -826,18 +842,21 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
 
   // 渲染活动卡片
   const renderActivity = (activity, dayIndex) => {
-    const type = activityTypes[activity.type];
     const isDragged = draggedActivity?.id === activity.id;
 
     // 计算活动的网格位置和大小
     const startRow = timeToGridRow(activity.startTime);
     const endRow = timeToGridRow(activity.endTime);
 
+    const durationRows = Math.max(1, endRow - startRow);
     const style = {
       gridColumn: dayIndex + 2, // +2 因为第一列是时间标签
       gridRow: `${startRow} / ${endRow}`,
-      zIndex: isDragged ? 1 : 20
+      zIndex: isDragged ? 1 : 20,
+      '--activity-height': `${durationRows * SLOT_HEIGHT}px`
     };
+
+    const displayLocation = activity.location || activity.title || '未命名';
 
     return (
       <div
@@ -851,20 +870,11 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
         onContextMenu={(e) => handleActivityContextMenu(e, activity)}
         title="右键编辑活动"
       >
-        <div className="activity-content">
-          <div className="activity-header">
-            <span className="activity-icon">{type.icon}</span>
-            <span className="activity-time">
-              {activity.startTime}-{activity.endTime}
-            </span>
+        <div className="activity-content simple-activity">
+          <div className="activity-time">
+            {activity.startTime}-{activity.endTime}
           </div>
-          <div className="activity-title">{activity.title || '未命名'}</div>
-          {activity.location && (
-            <div className="activity-location">
-              <EnvironmentOutlined />
-              <span>{activity.location}</span>
-            </div>
-          )}
+          <div className="activity-title">{displayLocation}</div>
         </div>
 
         {/* 时间调整手柄 */}
@@ -906,40 +916,48 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
         ))}
 
         {/* 时间标签和时间槽 */}
-        {timeSlots.map((time, timeIndex) => (
-          <React.Fragment key={time}>
-            {/* 时间标签 */}
-            <div
-              className="time-label"
-              style={{
-                gridColumn: 1,
-                gridRow: timeIndex + 2
-              }}
-            >
-              {time}
-            </div>
+        {timeSlots.map((time, timeIndex) => {
+          const isHourSlot = time.endsWith(':00');
+          const rowStart = timeIndex + 2;
+          const rowEnd = Math.min(rowStart + SLOTS_PER_HOUR, timeSlots.length + 2);
 
-            {/* 每天的时间格 - 仅用于点击创建和拖拽放置 */}
-            {days.map((day, dayIndex) => (
-              <div
-                key={`${day.dateStr}-${time}`}
-                className={`time-slot ${time.endsWith(':00') ? 'hour-slot' : ''}`}
-                data-date={day.dateStr}
-                data-time={time}
-                onClick={() => handleSlotClick(day.dateStr, time)}
-                onDrop={(e) => handleDrop(e, day.dateStr, time)}
-                onDragOver={handleDragOver}
-                onDragEnter={handleDragEnter}
-                onDragLeave={handleDragLeave}
-                style={{
-                  gridColumn: dayIndex + 2,
-                  gridRow: timeIndex + 2,
-                  height: '40px'
-                }}
-              />
-            ))}
-          </React.Fragment>
-        ))}
+          return (
+            <React.Fragment key={time}>
+              {/* 时间标签 */}
+              {isHourSlot ? (
+                <div
+                  className="time-label hour-label"
+                  style={{
+                    gridColumn: 1,
+                    gridRow: `${rowStart} / ${rowEnd}`
+                  }}
+                >
+                  {time}
+                </div>
+              ) : null}
+
+              {/* 每天的时间格 - 仅用于点击创建和拖拽放置 */}
+              {days.map((day, dayIndex) => (
+                <div
+                  key={`${day.dateStr}-${time}`}
+                  className={`time-slot ${time.endsWith(':00') ? 'hour-slot' : ''}`}
+                  data-date={day.dateStr}
+                  data-time={time}
+                  onClick={() => handleSlotClick(day.dateStr, time)}
+                  onDrop={(e) => handleDrop(e, day.dateStr, time)}
+                  onDragOver={handleDragOver}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  style={{
+                    gridColumn: dayIndex + 2,
+                    gridRow: timeIndex + 2,
+                    height: `${SLOT_HEIGHT}px`
+                  }}
+                />
+              ))}
+            </React.Fragment>
+          );
+        })}
 
         {/* 渲染所有活动卡片 - 简化版本 */}
         {activities.map(activity => {
@@ -1027,7 +1045,11 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
   }
 
   return (
-    <div className="calendar-days-view calendar-fully-maximized" ref={calendarRef}>
+    <div
+      className="calendar-days-view calendar-fully-maximized"
+      ref={calendarRef}
+      style={{ '--slot-height': `${SLOT_HEIGHT}px` }}
+    >
       {/* 移除独立工具栏，集成到顶部 */}
 
       <div className="calendar-layout">
@@ -1038,7 +1060,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
               className={`calendar-grid ${isDragging ? 'dragging-active' : ''}`}
               style={{
                 gridTemplateColumns: `60px repeat(${days.length}, 1fr)`,
-                gridTemplateRows: `30px repeat(${timeSlots.length}, minmax(30px, 1fr))`  // 自适应高度，最小30px
+                gridTemplateRows: `30px repeat(${timeSlots.length}, ${SLOT_HEIGHT}px)`
               }}
             >
               {renderGridContent()}
@@ -1091,9 +1113,8 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
           }}
         >
           <div className="resource-header">
-            <span className="resource-title">行程方案</span>
             <span className="resource-hint">
-              {activePlan ? `当前方案：${activePlan.name}` : '请先在团组信息选择行程方案'}
+              {activePlan ? activePlan.name : '请先在团组信息选择行程方案'}
             </span>
           </div>
 
@@ -1130,7 +1151,6 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
                     >
                       <div className="resource-info">
                         <div className="resource-name">{resource.title}</div>
-                        <div className="resource-duration">{resource.duration}小时</div>
                       </div>
                     </div>
                   ))}
@@ -1166,7 +1186,6 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
                     >
                       <div className="resource-info">
                         <div className="resource-name">{resource.title}</div>
-                        <div className="resource-duration">{resource.duration}小时</div>
                       </div>
                     </div>
                   ))}
@@ -1203,7 +1222,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
               style={{ display: 'inline-block', width: 'calc(50% - 12px)' }}
               rules={[{ required: true, message: '请选择开始时间' }]}
             >
-              <TimePicker format="HH:mm" placeholder="开始时间" />
+              <TimePicker format="HH:mm" minuteStep={SLOT_MINUTES} placeholder="开始时间" />
             </Form.Item>
             <span style={{ display: 'inline-block', width: '24px', textAlign: 'center' }}>-</span>
             <Form.Item
@@ -1211,7 +1230,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
               style={{ display: 'inline-block', width: 'calc(50% - 12px)' }}
               rules={[{ required: true, message: '请选择结束时间' }]}
             >
-              <TimePicker format="HH:mm" placeholder="结束时间" />
+              <TimePicker format="HH:mm" minuteStep={SLOT_MINUTES} placeholder="结束时间" />
             </Form.Item>
           </Form.Item>
 

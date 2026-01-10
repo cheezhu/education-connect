@@ -48,9 +48,15 @@
   align-items: center;
 }
 
+.group-edit-v2 {
+  height: 100%;
+  min-height: 0;
+}
+
 /* 全屏左右布局容器 */
 .group-edit-v2 .edit-content-layout-full {
-  height: 100vh;
+  height: 100%;
+  min-height: 0;
   display: flex;
   overflow: hidden;
 }
@@ -235,6 +241,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 /* 添加底部装饰 - 竖向 */

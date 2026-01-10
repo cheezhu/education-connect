@@ -1,6 +1,9 @@
 /* 日历视图容器 */
 .calendar-days-view {
+  --slot-height: 10px;
   height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -40,6 +43,7 @@
   display: flex;
   flex: 1;
   min-height: 0;
+  height: 100%;
 }
 
 .calendar-container {
@@ -52,17 +56,18 @@
   border-radius: 8px 0 0 8px;
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.04);
   min-height: 0; /* 确保可以收缩 */
+  height: 100%;
 }
 
 /* 滚动包装器 */
 .calendar-scroll-wrapper {
   width: 100%;
-  height: 100%;
-  flex: 1;
-  overflow: hidden; /* 禁用滚动条 */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
   position: relative;
-  min-height: 0; /* 确保flex子元素可以收缩 */
-  display: flex;
+  display: block;
+  height: 100%;
 }
 
 /* 日历网格 */
@@ -70,8 +75,9 @@
   display: grid;
   width: 100%;
   position: relative;
-  height: 100%;
-  flex: 1;
+  height: max-content;
+  min-height: 100%;
+  align-content: start;
 }
 
 /* 角落单元格 */
@@ -152,26 +158,34 @@
   background: #fafafa;
   border-right: 2px solid #e8e8e8;
   border-bottom: 1px solid #f0f0f0;
-  padding: 0 12px;
+  padding: 0 8px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  font-size: 11px;
+  font-size: 10px;
   color: #8c8c8c;
   position: sticky;
   left: 0;
   z-index: 50;
   font-family: 'Monaco', 'Courier New', monospace;
+  line-height: 1;
+  white-space: nowrap;
 }
+
+.time-label.hour-label {
+  font-weight: 500;
+}
+
 
 /* 时间格 */
 .time-slot {
   border-right: 1px solid #f0f0f0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: none;
   cursor: pointer;
   transition: background-color 0.2s;
   position: relative;
   z-index: 1;
+  height: var(--slot-height, 24px);
 }
 
 .time-slot:hover {
@@ -179,8 +193,9 @@
 }
 
 .time-slot.hour-slot {
-  border-bottom: 1px solid #e8e8e8;
+  border-bottom: none;
 }
+
 
 /* 拖拽指示器 */
 .drop-indicator {
@@ -235,7 +250,7 @@
 /* 活动卡片 */
 .calendar-activity {
   margin: 2px;
-  padding: 6px 8px;
+  padding: 2px 4px;
   border-radius: 4px;
   cursor: grab;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
@@ -246,7 +261,8 @@
   flex-direction: column;
   justify-content: flex-start;
   user-select: none;
-  min-height: 35px;
+  min-height: var(--slot-height, 8px);
+  box-sizing: border-box;
 }
 
 .calendar-activity:active {
@@ -351,46 +367,31 @@
 /* 活动内容 */
 .activity-content {
   color: white;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.activity-header {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
-}
-
-.activity-icon {
-  font-size: 14px;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.2;
 }
 
 .activity-time {
-  font-size: 10px;
-  opacity: 0.9;
+  font-size: clamp(8px, calc(var(--activity-height, 40px) * 0.28), 12px);
+  line-height: 1.1;
+  white-space: normal;
+  word-break: break-word;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .activity-title {
   font-weight: 600;
-  font-size: 13px;
-  margin-bottom: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: clamp(8px, calc(var(--activity-height, 40px) * 0.28), 12px);
+  line-height: 1.1;
+  white-space: normal;
+  word-break: break-word;
+  overflow: visible;
+  text-overflow: clip;
 }
 
-.activity-location {
-  font-size: 11px;
-  opacity: 0.9;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.activity-location .anticon {
-  font-size: 10px;
-}
 
 /* 活动类型颜色 */
 .calendar-activity.meal {
@@ -550,7 +551,8 @@
 }
 
 .calendar-fully-maximized .calendar-scroll-wrapper {
-  overflow: hidden; /* 禁用滚动 */
+  overflow: auto;
+  max-height: none;
 }
 
 /* 紧凑角落单元格 */
@@ -644,7 +646,7 @@
   border-left: 1px solid #e8e8e8;
   padding: 10px 12px;
   flex-shrink: 0;
-  width: 280px;
+  width: 20%;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -657,12 +659,6 @@
   margin-bottom: 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid #e8e8e8;
-}
-
-.resource-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #262626;
 }
 
 .resource-hint {
@@ -694,7 +690,7 @@
 
 .resource-columns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 
@@ -714,7 +710,8 @@
 .resource-cards {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  flex-wrap: nowrap;
 }
 
 .resource-card {
@@ -725,8 +722,8 @@
   color: white;
   cursor: grab;
   transition: all 0.2s;
-  min-width: 0;
-  width: 100%;
+  min-width: 50px;
+  width: 50px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
@@ -753,6 +750,7 @@
   font-weight: 600;
   line-height: 1.2;
   overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .resource-duration {
