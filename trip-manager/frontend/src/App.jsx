@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Layout, Dropdown, Badge, Avatar } from 'antd';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import DragDropTable from './components/DragDropTable';
-import GroupManagement from './pages/GroupManagement';
 import GroupManagementV2 from './pages/GroupManagementV2';
 import GroupEditV2 from './pages/GroupEditV2';
 import LocationManagement from './pages/LocationManagement';
@@ -36,11 +35,7 @@ function App() {
             />
             <Route
               path="/groups"
-              element={
-                <GroupManagement
-                  editMode={editMode}
-                />
-              }
+              element={<GroupManagementV2 />}
             />
             <Route
               path="/locations"
@@ -70,6 +65,10 @@ function App() {
               path="/groups/v2"
               element={<GroupManagementV2 />}
             />
+            <Route
+              path="*"
+              element={<Navigate to="/groups" replace />}
+            />
           </Routes>
         </Content>
       </Layout>
@@ -82,10 +81,16 @@ function CompactHeader() {
   const location = useLocation();
   const currentPath = location.pathname;
 
+  const isActivePath = (path) => {
+    if (path === '/') {
+      return currentPath === '/';
+    }
+    return currentPath.startsWith(path);
+  };
+
   // 导航菜单项
   const menuItems = [
-    { path: '/groups', label: '团组管理V1' },
-    { path: '/groups/v2', label: '团组管理V2' },
+    { path: '/groups', label: '团组管理' },
     { path: '/designer', label: '行程设计器' },
     { path: '/', label: '日历视图' },
     { path: '/locations', label: '行程资源' },
@@ -152,7 +157,9 @@ function CompactHeader() {
         gap: '4px',
         marginRight: '16px'
       }}>
-        {menuItems.map(item => (
+        {menuItems.map(item => {
+          const isActive = isActivePath(item.path);
+          return (
           <Link
             key={item.path}
             to={item.path}
@@ -160,22 +167,22 @@ function CompactHeader() {
               padding: '0 12px',
               height: '32px',
               lineHeight: '32px',
-              color: currentPath.startsWith(item.path) ? '#667eea' : 'rgba(255,255,255,0.65)',
+              color: isActive ? '#667eea' : 'rgba(255,255,255,0.65)',
               fontSize: '13px',
               borderRadius: '4px',
-              background: currentPath.startsWith(item.path) ? 'rgba(102,126,234,0.12)' : 'transparent',
+              background: isActive ? 'rgba(102,126,234,0.12)' : 'transparent',
               textDecoration: 'none',
               transition: 'all 0.2s',
               display: 'inline-block'
             }}
             onMouseEnter={(e) => {
-              if (!currentPath.startsWith(item.path)) {
+              if (!isActive) {
                 e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
                 e.currentTarget.style.color = 'rgba(255,255,255,0.9)';
               }
             }}
             onMouseLeave={(e) => {
-              if (!currentPath.startsWith(item.path)) {
+              if (!isActive) {
                 e.currentTarget.style.background = 'transparent';
                 e.currentTarget.style.color = 'rgba(255,255,255,0.65)';
               }
@@ -183,7 +190,8 @@ function CompactHeader() {
           >
             {item.label}
           </Link>
-        ))}
+        );
+        })}
       </div>
 
       {/* 占位符，让设置和用户信息靠右 */}
