@@ -654,8 +654,9 @@
 
 .resource-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   margin-bottom: 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid #e8e8e8;
@@ -663,6 +664,114 @@
 
 .resource-hint {
   font-size: 12px;
+  color: #8c8c8c;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.resource-hint-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.resource-hint-label {
+  font-size: 11px;
+  color: #8c8c8c;
+}
+
+.ai-rule-link {
+  padding: 0;
+  height: auto;
+  font-size: 11px;
+}
+
+.resource-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.resource-history {
+  margin-top: 4px;
+}
+
+.resource-history .ant-btn {
+  padding: 0;
+  height: auto;
+  font-size: 11px;
+}
+
+.ai-rule-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-rule-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 16px 1fr;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-rule-label {
+  font-size: 12px;
+  color: #595959;
+}
+
+.ai-rule-sep {
+  text-align: center;
+  color: #8c8c8c;
+}
+
+.ai-history-list {
+  display: grid;
+  gap: 12px;
+}
+
+.ai-history-item {
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fafafa;
+  font-size: 12px;
+}
+
+.ai-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.ai-history-time {
+  font-weight: 400;
+  color: #8c8c8c;
+  font-size: 11px;
+}
+
+.ai-history-meta {
+  margin-top: 6px;
+  color: #595959;
+  font-size: 11px;
+}
+
+.ai-history-issues {
+  margin-top: 6px;
+  color: #595959;
+}
+
+.ai-history-issue-list {
+  margin-top: 4px;
+  display: grid;
+  gap: 4px;
+}
+
+.ai-history-issue {
   color: #8c8c8c;
 }
 
@@ -703,15 +812,15 @@
 .resource-column .resource-cards {
   display: flex;
   gap: 6px;
-  flex-direction: column;
-  flex-wrap: nowrap;
+  flex-direction: row;
+  flex-wrap: wrap;
 }
 
 .resource-cards {
   display: flex;
   gap: 8px;
-  flex-direction: column;
-  flex-wrap: nowrap;
+  flex-direction: row;
+  flex-wrap: wrap;
 }
 
 .resource-card {

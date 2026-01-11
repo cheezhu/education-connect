@@ -4,6 +4,9 @@ const basicAuth = require('express-basic-auth');
 const Database = require('better-sqlite3');
 const path = require('path');
 const bcrypt = require('bcrypt');
+const dotenv = require('dotenv');
+
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -62,6 +65,14 @@ if (!groupColumns.includes('itinerary_plan_id')) {
   db.exec('CREATE INDEX IF NOT EXISTS idx_groups_itinerary_plan ON groups(itinerary_plan_id)');
 }
 
+const locationColumns = db.prepare("PRAGMA table_info(locations)").all().map(col => col.name);
+if (!locationColumns.includes('open_hours')) {
+  db.exec('ALTER TABLE locations ADD COLUMN open_hours TEXT');
+}
+if (!locationColumns.includes('closed_dates')) {
+  db.exec('ALTER TABLE locations ADD COLUMN closed_dates TEXT');
+}
+
 // 中间件
 app.use(cors());
 app.use(express.json());
@@ -103,6 +114,8 @@ app.use('/api/locations', require('./src/routes/locations'));
 app.use('/api/activities', require('./src/routes/activities'));
 app.use('/api/statistics', require('./src/routes/statistics'));
 app.use('/api/itinerary-plans', require('./src/routes/itineraryPlans'));
+app.use('/api/ai', require('./src/routes/aiPlanner'));
+app.use('/api/config', require('./src/routes/systemConfig'));
 
 // 错误处理
 app.use((err, req, res, next) => {

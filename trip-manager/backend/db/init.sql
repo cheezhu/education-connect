@@ -39,6 +39,8 @@ CREATE TABLE locations (
     contact_person VARCHAR(100),
     contact_phone VARCHAR(20),
     blocked_weekdays VARCHAR(20), -- '3,4' 表示周三周四不可用
+    open_hours TEXT, -- JSON: { "default": [{"start":9,"end":17}], "3": [{"start":9,"end":12}] }
+    closed_dates TEXT, -- JSON: ["2025-01-01"]
     target_groups VARCHAR(20), -- 'primary' 或 'secondary' 或 'all'
     notes TEXT,
     is_active BOOLEAN DEFAULT 1,

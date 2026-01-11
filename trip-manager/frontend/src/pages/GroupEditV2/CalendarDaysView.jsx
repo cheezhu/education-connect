@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Modal, Form, Input, Select, TimePicker, ColorPicker, message, Tooltip, Dropdown, Button } from 'antd';
+import { Modal, Form, Input, Select, TimePicker, ColorPicker, message, Tooltip, Dropdown, Button, Checkbox, InputNumber } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
@@ -43,16 +43,35 @@ const presetResourcesData = [
 
 const DEFAULT_PLAN_DURATION = 2;
 
-const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
+const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange }) => {
   const repeatableResources = useMemo(
     () => presetResourcesData.filter((resource) => !resource.isUnique),
     []
   );
+  const defaultAiRules = useMemo(() => ({
+    timeSlots: ['MORNING', 'AFTERNOON'],
+    slotWindows: {
+      MORNING: { start: 9, end: 12 },
+      AFTERNOON: { start: 14, end: 17 },
+      EVENING: { start: 19, end: 21 }
+    },
+    requireAllPlanItems: false
+  }), []);
   const [itineraryPlans, setItineraryPlans] = useState([]);
   const [planResources, setPlanResources] = useState([]);
   const [availablePlanResources, setAvailablePlanResources] = useState([]);
   const [activePlan, setActivePlan] = useState(null);
+  const [selectedPlanId, setSelectedPlanId] = useState(groupData?.itinerary_plan_id ?? null);
   const [activities, setActivities] = useState(schedules);
+  const [aiRules, setAiRules] = useState(null);
+  const [aiRulesVisible, setAiRulesVisible] = useState(false);
+  const [aiPlanning, setAiPlanning] = useState(false);
+  const [aiConflictsVisible, setAiConflictsVisible] = useState(false);
+  const [aiConflicts, setAiConflicts] = useState([]);
+  const [aiConflictSummary, setAiConflictSummary] = useState(null);
+  const [aiHistoryVisible, setAiHistoryVisible] = useState(false);
+  const [aiHistoryLoading, setAiHistoryLoading] = useState(false);
+  const [aiHistory, setAiHistory] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingActivity, setEditingActivity] = useState(null);
@@ -69,6 +88,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [form] = Form.useForm();
+  const [aiRulesForm] = Form.useForm();
   const calendarRef = useRef(null);
   const dragPreviewRef = useRef(null);
 
@@ -87,21 +107,46 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
       }
     };
 
+    const loadAiRules = async () => {
+      try {
+        const response = await api.get('/ai/rules');
+        if (!isMounted) return;
+        setAiRules(response.data || null);
+      } catch (error) {
+        if (!isMounted) return;
+        setAiRules(null);
+      }
+    };
+
     loadPlans();
+    loadAiRules();
     return () => {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!aiRules) return;
+    aiRulesForm.setFieldsValue({
+      timeSlots: aiRules.timeSlots,
+      requireAllPlanItems: aiRules.requireAllPlanItems,
+      slotWindows: aiRules.slotWindows
+    });
+  }, [aiRules, aiRulesForm]);
 
   // 同步外部日程数据
   useEffect(() => {
     setActivities(schedules || []);
   }, [groupData?.id, schedules]);
 
+  useEffect(() => {
+    setSelectedPlanId(groupData?.itinerary_plan_id ?? null);
+  }, [groupData?.itinerary_plan_id]);
+
   // 根据团组选中的行程方案生成资源卡片
   useEffect(() => {
     const selectedPlan = itineraryPlans.find(
-      (plan) => plan.id === groupData?.itinerary_plan_id
+      (plan) => plan.id === selectedPlanId
     );
     setActivePlan(selectedPlan || null);
 
@@ -128,7 +173,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
       }));
 
     setPlanResources(resources);
-  }, [groupData?.itinerary_plan_id, itineraryPlans]);
+  }, [selectedPlanId, itineraryPlans]);
 
   useEffect(() => {
     const usedResourceIds = new Set(
@@ -141,6 +186,98 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
       planResources.filter((resource) => !usedResourceIds.has(resource.id))
     );
   }, [planResources, schedules]);
+
+  const handleResetSchedules = () => {
+    Modal.confirm({
+      title: '确认重置行程？',
+      content: '将清空当前日历中的所有日程，且无法恢复。',
+      okText: '确认重置',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        setActivities([]);
+        onUpdate?.([]);
+        message.success('已清空所有日程', 1);
+      }
+    });
+  };
+
+  const handleAutoPlan = async () => {
+    if (!groupData?.id) return;
+    if (!selectedPlanId && !groupData?.itinerary_plan_id) {
+      message.warning('请先选择行程方案');
+      return;
+    }
+    setAiPlanning(true);
+    try {
+      const response = await api.post(
+        '/ai/plan/itinerary',
+        {
+          groupId: groupData.id,
+          planId: selectedPlanId ?? groupData?.itinerary_plan_id
+        },
+        { timeout: 60000 }
+      );
+      const scheduleList = Array.isArray(response.data?.scheduleList)
+        ? response.data.scheduleList
+        : [];
+      const conflicts = Array.isArray(response.data?.conflicts)
+        ? response.data.conflicts
+        : [];
+      const summary = response.data?.summary || null;
+
+      if (scheduleList.length > 0) {
+        setActivities(scheduleList);
+        onUpdate?.(scheduleList);
+      }
+
+      if (conflicts.length > 0) {
+        setAiConflicts(conflicts);
+        setAiConflictSummary(summary);
+        setAiConflictsVisible(true);
+        message.warning(`已安排${response.data?.summary?.planned || 0}个，${conflicts.length}个未排入`, 2);
+      } else {
+        message.success('已生成行程', 1);
+      }
+    } catch (error) {
+      if (error?.code === 'ECONNABORTED') {
+        message.error('AI行程生成超时，请稍后重试');
+        return;
+      }
+      const status = error?.response?.status;
+      if (status === 409) {
+        const conflicts = Array.isArray(error?.response?.data?.conflicts)
+          ? error.response.data.conflicts
+          : [];
+        const summary = error?.response?.data?.summary || null;
+        if (conflicts.length > 0) {
+          setAiConflicts(conflicts);
+          setAiConflictSummary(summary);
+          setAiConflictsVisible(true);
+        }
+        message.error('无法排完全部方案行程点，请调整日期/时段或资源限制');
+      } else {
+        message.error('AI行程生成失败');
+      }
+    } finally {
+      setAiPlanning(false);
+    }
+  };
+
+  const handleOpenAiHistory = async () => {
+    setAiHistoryVisible(true);
+    setAiHistoryLoading(true);
+    try {
+      const response = await api.get('/ai/history');
+      const items = Array.isArray(response.data?.items) ? response.data.items : [];
+      setAiHistory(items);
+    } catch (error) {
+      setAiHistory([]);
+      message.error('加载AI记录失败');
+    } finally {
+      setAiHistoryLoading(false);
+    }
+  };
 
   // 全局拖拽结束事件监听 - 确保清理所有拖拽状态
   useEffect(() => {
@@ -1113,9 +1250,58 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
           }}
         >
           <div className="resource-header">
-            <span className="resource-hint">
-              {activePlan ? activePlan.name : '请先在团组信息选择行程方案'}
-            </span>
+            <div className="resource-hint">
+              <div className="resource-hint-header">
+                <span className="resource-hint-label">行程方案</span>
+                <Button
+                  type="link"
+                  size="small"
+                  className="ai-rule-link"
+                  onClick={() => {
+                    const nextRules = aiRules || defaultAiRules;
+                    aiRulesForm.setFieldsValue({
+                      timeSlots: nextRules.timeSlots,
+                      requireAllPlanItems: nextRules.requireAllPlanItems,
+                      slotWindows: nextRules.slotWindows
+                    });
+                    setAiRulesVisible(true);
+                  }}
+                >
+                  AI规则
+                </Button>
+              </div>
+              <Select
+                size="small"
+                allowClear
+                placeholder="请选择行程方案"
+                value={selectedPlanId ?? undefined}
+                style={{ width: '100%' }}
+                onChange={(value) => {
+                  const nextPlanId = value ?? null;
+                  setSelectedPlanId(nextPlanId);
+                  onPlanChange?.(nextPlanId);
+                }}
+              >
+                {(itineraryPlans || []).map(plan => (
+                  <Option key={plan.id} value={plan.id}>
+                    {plan.name}
+                  </Option>
+                ))}
+              </Select>
+            </div>
+            <div className="resource-actions">
+              <Button size="small" danger onClick={handleResetSchedules}>
+                重置行程
+              </Button>
+              <Button size="small" onClick={handleAutoPlan} loading={aiPlanning}>
+                AI行程
+              </Button>
+            </div>
+            <div className="resource-history">
+              <Button type="link" size="small" onClick={handleOpenAiHistory}>
+                AI使用记录
+              </Button>
+            </div>
           </div>
 
           <div className="resource-columns">
@@ -1275,6 +1461,174 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate }) => {
             >
               删除活动
             </Button>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        title="AI行程规则"
+        open={aiRulesVisible}
+        onOk={async () => {
+          try {
+            const values = await aiRulesForm.validateFields();
+            const response = await api.put('/ai/rules', values);
+            setAiRules(response.data || values);
+            setAiRulesVisible(false);
+            message.success('AI规则已保存', 1);
+          } catch (error) {
+            if (error?.errorFields) return;
+            message.error('保存AI规则失败');
+          }
+        }}
+        onCancel={() => setAiRulesVisible(false)}
+        okText="保存规则"
+        cancelText="取消"
+        width={520}
+        destroyOnClose
+      >
+        <Form form={aiRulesForm} layout="vertical">
+          <Form.Item
+            name="timeSlots"
+            label="启用时段"
+            rules={[{ required: true, message: '请选择至少一个时段' }]}
+          >
+            <Checkbox.Group
+              options={[
+                { label: '上午', value: 'MORNING' },
+                { label: '下午', value: 'AFTERNOON' },
+                { label: '晚上', value: 'EVENING' }
+              ]}
+            />
+          </Form.Item>
+
+          <Form.Item label="时段时间（小时）">
+            <div className="ai-rule-grid">
+              <div className="ai-rule-row">
+                <span className="ai-rule-label">上午</span>
+                <Form.Item name={['slotWindows', 'MORNING', 'start']} noStyle>
+                  <InputNumber min={0} max={23} />
+                </Form.Item>
+                <span className="ai-rule-sep">-</span>
+                <Form.Item name={['slotWindows', 'MORNING', 'end']} noStyle>
+                  <InputNumber min={0} max={23} />
+                </Form.Item>
+              </div>
+              <div className="ai-rule-row">
+                <span className="ai-rule-label">下午</span>
+                <Form.Item name={['slotWindows', 'AFTERNOON', 'start']} noStyle>
+                  <InputNumber min={0} max={23} />
+                </Form.Item>
+                <span className="ai-rule-sep">-</span>
+                <Form.Item name={['slotWindows', 'AFTERNOON', 'end']} noStyle>
+                  <InputNumber min={0} max={23} />
+                </Form.Item>
+              </div>
+              <div className="ai-rule-row">
+                <span className="ai-rule-label">晚上</span>
+                <Form.Item name={['slotWindows', 'EVENING', 'start']} noStyle>
+                  <InputNumber min={0} max={23} />
+                </Form.Item>
+                <span className="ai-rule-sep">-</span>
+                <Form.Item name={['slotWindows', 'EVENING', 'end']} noStyle>
+                  <InputNumber min={0} max={23} />
+                </Form.Item>
+              </div>
+            </div>
+          </Form.Item>
+
+          <Form.Item name="requireAllPlanItems" valuePropName="checked">
+            <Checkbox>必须安排完所有方案行程点</Checkbox>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="AI行程冲突"
+        open={aiConflictsVisible}
+        onOk={() => setAiConflictsVisible(false)}
+        onCancel={() => setAiConflictsVisible(false)}
+        okText="知道了"
+        cancelButtonProps={{ style: { display: 'none' } }}
+        width={520}
+      >
+        <div style={{ marginBottom: 12, color: '#595959' }}>
+          {aiConflictSummary
+            ? `共需安排 ${aiConflictSummary.total || 0} 个，已安排 ${aiConflictSummary.planned || 0} 个，未安排 ${aiConflictSummary.conflicts || 0} 个`
+            : `未能安排 ${aiConflicts.length} 个行程点`}
+        </div>
+        {aiConflicts.length === 0 ? (
+          <div style={{ color: '#8c8c8c' }}>暂无冲突明细</div>
+        ) : (
+          <div style={{ display: 'grid', gap: '8px' }}>
+            {aiConflicts.map((item, index) => (
+              <div
+                key={`${item.locationId || item.location_id || 'loc'}-${index}`}
+                style={{
+                  padding: '8px 10px',
+                  border: '1px solid #f0f0f0',
+                  borderRadius: 6,
+                  background: '#fafafa',
+                  fontSize: 12
+                }}
+              >
+                <div style={{ fontWeight: 600, color: '#262626' }}>
+                  {item.locationName || item.location_name || '未命名地点'}
+                </div>
+                <div style={{ color: '#8c8c8c', marginTop: 4 }}>
+                  {item.reason || '无可用时段/容量'}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        title="AI使用记录"
+        open={aiHistoryVisible}
+        onOk={() => setAiHistoryVisible(false)}
+        onCancel={() => setAiHistoryVisible(false)}
+        okText="关闭"
+        cancelButtonProps={{ style: { display: 'none' } }}
+        width={620}
+      >
+        {aiHistoryLoading ? (
+          <div style={{ padding: '12px 0', color: '#8c8c8c' }}>加载中...</div>
+        ) : aiHistory.length === 0 ? (
+          <div style={{ padding: '12px 0', color: '#8c8c8c' }}>暂无记录</div>
+        ) : (
+          <div className="ai-history-list">
+            {aiHistory.map((item) => {
+              const summary = item.summary || {};
+              const conflicts = Array.isArray(item.conflicts) ? item.conflicts : [];
+              return (
+                <div key={item.id} className="ai-history-item">
+                  <div className="ai-history-header">
+                    <span>{item.groupName || '未命名团组'}</span>
+                    <span className="ai-history-time">
+                      {item.created_at ? dayjs(item.created_at).format('YYYY-MM-DD HH:mm') : ''}
+                    </span>
+                  </div>
+                  <div className="ai-history-meta">
+                    方案：{item.planName || '-'} · 需安排{summary.total || 0}个 · 已安排{summary.planned || 0}个 · 未安排{summary.conflicts || 0}个
+                  </div>
+                  {conflicts.length > 0 ? (
+                    <div className="ai-history-issues">
+                      问题：
+                      <div className="ai-history-issue-list">
+                        {conflicts.map((conflict, index) => (
+                          <div key={`${item.id}-${index}`} className="ai-history-issue">
+                            {conflict.locationName || conflict.location_name || '未命名地点'}：{conflict.reason || '无可用时段/容量'}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="ai-history-issues">问题：无</div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </Modal>

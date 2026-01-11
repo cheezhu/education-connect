@@ -28,6 +28,8 @@ router.post('/', requireEditLock, (req, res) => {
     contactPerson,
     contactPhone,
     blockedWeekdays = '',
+    openHours = null,
+    closedDates = null,
     targetGroups = 'all',
     notes
   } = req.body;
@@ -40,11 +42,11 @@ router.post('/', requireEditLock, (req, res) => {
     const result = req.db.prepare(`
       INSERT INTO locations (
         name, address, capacity, contact_person, 
-        contact_phone, blocked_weekdays, target_groups, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        contact_phone, blocked_weekdays, open_hours, closed_dates, target_groups, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name, address, capacity, contactPerson,
-      contactPhone, blockedWeekdays, targetGroups, notes
+      contactPhone, blockedWeekdays, openHours, closedDates, targetGroups, notes
     );
 
     const newLocation = req.db.prepare('SELECT * FROM locations WHERE id = ?').get(result.lastInsertRowid);
@@ -64,7 +66,7 @@ router.put('/:id', requireEditLock, (req, res) => {
   // 构建更新字段
   const allowedFields = [
     'name', 'address', 'capacity', 'contact_person',
-    'contact_phone', 'blocked_weekdays', 'target_groups', 
+    'contact_phone', 'blocked_weekdays', 'open_hours', 'closed_dates', 'target_groups', 
     'notes', 'is_active'
   ];
 

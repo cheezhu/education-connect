@@ -36,6 +36,7 @@ const GroupEditV2 = () => {
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const autoSaveTimeoutRef = useRef(null);
+  const groupDataRef = useRef(null);
 
   // 是否为新建模式
   const isNew = id === 'new' || !id;
@@ -140,6 +141,10 @@ const GroupEditV2 = () => {
   }, [id]);
 
   useEffect(() => {
+    groupDataRef.current = groupData;
+  }, [groupData]);
+
+  useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
     if (isNew) {
       return;
@@ -182,32 +187,34 @@ const GroupEditV2 = () => {
   }, [id, isNew]);
 
   // 自动保存
-  const handleAutoSave = async () => {
+  const handleAutoSave = async (overrides = {}) => {
     // 清除之前的定时器
     clearTimeout(autoSaveTimeoutRef.current);
 
     // 延迟800ms后执行保存
     autoSaveTimeoutRef.current = setTimeout(async () => {
-      if (!groupData.name || isNew) return;
+      const baseData = groupDataRef.current;
+      if (!baseData?.name || isNew) return;
+      const nextData = { ...baseData, ...overrides };
 
       try {
         const dataToSave = {
-          name: groupData.name,
-          type: groupData.type,
-          student_count: groupData.student_count,
-          teacher_count: groupData.teacher_count,
-          start_date: groupData.start_date,
-          end_date: groupData.end_date,
-          duration: groupData.duration,
-          color: groupData.color,
-          itinerary_plan_id: groupData.itinerary_plan_id,
-          status: groupData.status,
-          contact_person: groupData.contact_person,
-          contact_phone: groupData.contact_phone,
-          emergency_contact: groupData.emergency_contact,
-          emergency_phone: groupData.emergency_phone,
-          tags: groupData.tags,
-          notes: groupData.notes
+          name: nextData.name,
+          type: nextData.type,
+          student_count: nextData.student_count,
+          teacher_count: nextData.teacher_count,
+          start_date: nextData.start_date,
+          end_date: nextData.end_date,
+          duration: nextData.duration,
+          color: nextData.color,
+          itinerary_plan_id: nextData.itinerary_plan_id,
+          status: nextData.status,
+          contact_person: nextData.contact_person,
+          contact_phone: nextData.contact_phone,
+          emergency_contact: nextData.emergency_contact,
+          emergency_phone: nextData.emergency_phone,
+          tags: nextData.tags,
+          notes: nextData.notes
         };
 
         await api.put(`/groups/${id}`, dataToSave);
@@ -412,6 +419,10 @@ const GroupEditV2 = () => {
               schedules={groupSchedules}
               onUpdate={(schedules) => {
                 setGroupSchedules(schedules);
+              }}
+              onPlanChange={(planId) => {
+                updateGroupData('itinerary_plan_id', planId);
+                handleAutoSave({ itinerary_plan_id: planId });
               }}
             />
           )}

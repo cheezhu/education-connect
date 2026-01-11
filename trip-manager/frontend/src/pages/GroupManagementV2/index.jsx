@@ -151,6 +151,39 @@ const GroupManagementV2 = () => {
     clearTimeout(autoSaveTimeoutRef.current);
   }, []);
 
+  const handlePlanChange = async (group, planId) => {
+    const nextPlanId = planId ?? null;
+    const prevPlanId = group.itinerary_plan_id ?? null;
+
+    setGroups(prev =>
+      prev.map(item =>
+        item.id === group.id ? { ...item, itinerary_plan_id: nextPlanId } : item
+      )
+    );
+    setFilteredGroups(prev =>
+      prev.map(item =>
+        item.id === group.id ? { ...item, itinerary_plan_id: nextPlanId } : item
+      )
+    );
+
+    try {
+      await api.put(`/groups/${group.id}`, { itinerary_plan_id: nextPlanId });
+      message.success('行程方案已保存', 1);
+    } catch (error) {
+      setGroups(prev =>
+        prev.map(item =>
+          item.id === group.id ? { ...item, itinerary_plan_id: prevPlanId } : item
+        )
+      );
+      setFilteredGroups(prev =>
+        prev.map(item =>
+          item.id === group.id ? { ...item, itinerary_plan_id: prevPlanId } : item
+        )
+      );
+      message.error('保存行程方案失败');
+    }
+  };
+
   const loadSchedules = async (groupId) => {
     setModalLoading(true);
     try {
@@ -282,9 +315,24 @@ const GroupManagementV2 = () => {
       render: (duration) => `${duration}天`
     },
     {
-      title: '联系人',
-      key: 'contact',
-      render: (_, record) => `${record.contact_person || ''} ${record.contact_phone || ''}`.trim() || '—'
+      title: '行程方案',
+      key: 'itinerary_plan_id',
+      render: (_, record) => (
+        <Select
+          size="small"
+          allowClear
+          placeholder="未选择"
+          value={record.itinerary_plan_id ?? undefined}
+          style={{ width: 160 }}
+          onChange={(value) => handlePlanChange(record, value)}
+        >
+          {(itineraryPlans || []).map(plan => (
+            <Option key={plan.id} value={plan.id}>
+              {plan.name}
+            </Option>
+          ))}
+        </Select>
+      )
     },
     {
       title: '操作',

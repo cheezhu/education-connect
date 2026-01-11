@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Modal, Form, Select, InputNumber, message, Checkbox, Tooltip, Badge } from 'antd';
+import { Card, Button, Modal, Form, Select, InputNumber, Input, message, Checkbox, Tooltip, Badge, DatePicker, Drawer } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
   LeftOutlined,
   RightOutlined,
+  StepBackwardOutlined,
+  StepForwardOutlined,
   SettingOutlined,
-  SaveOutlined,
-  EyeOutlined,
   ExportOutlined,
-  DragOutlined
+  DragOutlined,
+  CalendarOutlined
 } from '@ant-design/icons';
 import api from '../services/api';
 import dayjs from 'dayjs';
@@ -20,19 +21,27 @@ import './ItineraryDesigner.css';
 const { Option } = Select;
 
 function ItineraryDesigner() {
+  const timeSlotKeys = ['MORNING', 'AFTERNOON', 'EVENING'];
   const [groups, setGroups] = useState([]);
   const [activities, setActivities] = useState([]);
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState([]);
-  const [currentWeekStart, setCurrentWeekStart] = useState(0);
+  const [weekStartDate, setWeekStartDate] = useState(() => dayjs().startOf('day'));
+  const [groupPanelVisible, setGroupPanelVisible] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [enabledTimeSlots, setEnabledTimeSlots] = useState(timeSlotKeys);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
   const [draggedActivity, setDraggedActivity] = useState(null);
-  const [cardStyle, setCardStyle] = useState('tag'); // 卡片样式：tag, minimal
+  const cardStyle = 'minimal';
   const [batchMode, setBatchMode] = useState(false); // 批量选择模式
   const [selectedActivities, setSelectedActivities] = useState([]); // 选中的活动
+  const [aiModalVisible, setAiModalVisible] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiPreview, setAiPreview] = useState(null);
   const [form] = Form.useForm();
+  const [aiForm] = Form.useForm();
   const { registerRefreshCallback } = useDataSync();
 
   // 时间段定义
@@ -41,6 +50,8 @@ function ItineraryDesigner() {
     { key: 'AFTERNOON', label: '下午', time: '14:00-17:00', color: '#f6ffed', borderColor: '#52c41a' },
     { key: 'EVENING', label: '晚上', time: '19:00-21:00', color: '#fff2e8', borderColor: '#fa8c16' }
   ];
+
+  const visibleTimeSlots = timeSlots.filter((slot) => enabledTimeSlots.includes(slot.key));
 
   // 加载数据
   const loadData = async (preserveSelection = false) => {
@@ -71,25 +82,85 @@ function ItineraryDesigner() {
     await loadData(true);
   };
 
+  const loadWeekStartDate = async () => {
+    try {
+      const response = await api.get('/config/itinerary-week-start');
+      if (response.data?.date && dayjs(response.data.date).isValid()) {
+        setWeekStartDate(dayjs(response.data.date));
+      }
+    } catch (error) {
+      message.warning('读取周起始日期失败');
+    }
+  };
+
+  const persistWeekStartDate = async (nextDate) => {
+    const normalized = dayjs(nextDate).startOf('day');
+    setWeekStartDate(normalized);
+    try {
+      await api.put('/config/itinerary-week-start', {
+        date: normalized.format('YYYY-MM-DD')
+      });
+    } catch (error) {
+      message.error('保存周起始日期失败');
+    }
+  };
+
+  const loadTimeSlotConfig = async () => {
+    try {
+      const response = await api.get('/config/itinerary-time-slots');
+      const slots = response.data?.slots;
+      if (Array.isArray(slots)) {
+        setEnabledTimeSlots(slots);
+      }
+    } catch (error) {
+      message.warning('读取时间段设置失败');
+    }
+  };
+
+  const persistTimeSlotConfig = async (slots) => {
+    setEnabledTimeSlots(slots);
+    try {
+      await api.put('/config/itinerary-time-slots', {
+        slots
+      });
+    } catch (error) {
+      message.error('保存时间段设置失败');
+    }
+  };
+
+  const handleTimeSlotToggle = (slots) => {
+    const normalized = timeSlotKeys.filter((key) => slots.includes(key));
+    persistTimeSlotConfig(normalized);
+  };
+
+  const handleWeekStartChange = (value) => {
+    if (!value) return;
+    persistWeekStartDate(value);
+    setDatePickerOpen(false);
+  };
+
+  const handleWeekShift = (days) => {
+    const baseDate = weekStartDate ? dayjs(weekStartDate) : dayjs();
+    persistWeekStartDate(baseDate.add(days, 'day'));
+  };
+
   useEffect(() => {
     loadData();
+    loadWeekStartDate();
+    loadTimeSlotConfig();
     const unregister = registerRefreshCallback(refreshData);
     return unregister;
   }, [registerRefreshCallback]);
 
   // 生成日期范围（7天一页）
-  const generateDateRange = (weekOffset = 0) => {
-    const dates = [];
-    const today = new Date();
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + weekOffset * 7 + i);
-      dates.push(date);
-    }
-    return dates;
+  const generateDateRange = (startDate) => {
+    const baseDate = startDate ? dayjs(startDate) : dayjs();
+    return Array.from({ length: 7 }, (_, index) => (
+      baseDate.add(index, 'day').toDate()
+    ));
   };
 
-  const dateRange = generateDateRange(currentWeekStart);
+  const dateRange = generateDateRange(weekStartDate);
 
   // 格式化日期
   const formatDateString = (date) => {
@@ -97,6 +168,66 @@ function ItineraryDesigner() {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  const getTimeSlotLabel = (slotKey) => {
+    return timeSlots.find(slot => slot.key === slotKey)?.label || slotKey;
+  };
+
+  const openAiModal = () => {
+    setAiPreview(null);
+    setAiModalVisible(true);
+    aiForm.setFieldsValue({
+      groupIds: selectedGroups.length ? selectedGroups : groups.map(group => group.id),
+      planNamePrefix: 'AI方案',
+      replaceExisting: true,
+      useAI: true,
+      dateRange: [dayjs(dateRange[0]), dayjs(dateRange[6])]
+    });
+  };
+
+  const buildAiPayload = (values, dryRun) => {
+    const slotKeys = visibleTimeSlots.map(slot => slot.key);
+    const [start, end] = values.dateRange || [];
+    return {
+      groupIds: values.groupIds,
+      startDate: start ? start.format('YYYY-MM-DD') : formatDateString(dateRange[0]),
+      endDate: end ? end.format('YYYY-MM-DD') : formatDateString(dateRange[6]),
+      timeSlots: slotKeys,
+      planNamePrefix: values.planNamePrefix || 'AI方案',
+      replaceExisting: values.replaceExisting !== false,
+      useAI: values.useAI !== false,
+      dryRun
+    };
+  };
+
+  const handleAiPreview = async () => {
+    try {
+      const values = await aiForm.validateFields();
+      setAiLoading(true);
+      const response = await api.post('/ai/plan/global', buildAiPayload(values, true));
+      setAiPreview(response.data);
+    } catch (error) {
+      message.error('AI 预览失败');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleAiApply = async () => {
+    try {
+      const values = await aiForm.validateFields();
+      setAiLoading(true);
+      const response = await api.post('/ai/plan/global', buildAiPayload(values, false));
+      message.success(`AI 生成完成：${response.data?.summary?.assignments || 0} 条安排`);
+      setAiModalVisible(false);
+      setAiPreview(null);
+      refreshData();
+    } catch (error) {
+      message.error('AI 生成失败');
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   // 获取指定时段的活动
@@ -111,9 +242,9 @@ function ItineraryDesigner() {
   };
 
   // 团组控制台
-  const renderGroupPanel = () => (
+  const renderGroupPanel = (showTitle = true) => (
     <Card
-      title="团组控制台"
+      title={showTitle ? '团组控制台' : null}
       size="small"
       style={{
         height: '100%',
@@ -127,14 +258,14 @@ function ItineraryDesigner() {
         overflow: 'auto',
         padding: '12px'
       }}
-      extra={
+      extra={showTitle ? (
         <Button
           type="text"
           icon={<SettingOutlined />}
           size="small"
           title="设置"
         />
-      }
+      ) : null}
     >
       <div style={{ marginBottom: '16px' }}>
         <Button
@@ -194,194 +325,8 @@ function ItineraryDesigner() {
     </Card>
   );
 
-  // 获取当前周的统计数据
-  const getWeekStatistics = () => {
-    const weekActivities = activities.filter(activity => {
-      const activityDate = new Date(activity.date);
-      return dateRange.some(date =>
-        date.toDateString() === activityDate.toDateString()
-      ) && selectedGroups.includes(activity.groupId);
-    });
+  // 工具面板已移除
 
-    const conflictCount = 0; // 这里可以添加冲突检测逻辑
-    const locationsUsed = [...new Set(weekActivities
-      .filter(a => a.locationId)
-      .map(a => a.locationId))].length;
-
-    return {
-      totalActivities: weekActivities.length,
-      conflictCount,
-      locationsUsed,
-      unassignedActivities: weekActivities.filter(a => !a.locationId).length
-    };
-  };
-
-  const weekStats = getWeekStatistics();
-
-  // 工具面板
-  const renderToolPanel = () => (
-    <Card
-      title="设计工具"
-      size="small"
-      style={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        border: 'none',
-        borderRadius: 0
-      }}
-      bodyStyle={{
-        flex: 1,
-        overflow: 'auto',
-        padding: '12px'
-      }}
-    >
-      <div style={{ marginBottom: '16px' }}>
-        <h4>📊 当前周统计</h4>
-        <div style={{ fontSize: '12px', lineHeight: '1.6', background: '#f8f9fa', padding: '8px', borderRadius: '4px' }}>
-          <div>选中团组: {selectedGroups.length}个</div>
-          <div>总人数: {groups.filter(g => selectedGroups.includes(g.id))
-            .reduce((sum, g) => sum + g.student_count + g.teacher_count, 0)}人</div>
-          <div>活动总数: {weekStats.totalActivities}个</div>
-          <div>使用地点: {weekStats.locationsUsed}个</div>
-          <div style={{ color: weekStats.unassignedActivities > 0 ? '#fa8c16' : '#52c41a' }}>
-            未安排地点: {weekStats.unassignedActivities}个
-          </div>
-          {weekStats.conflictCount > 0 && (
-            <div style={{ color: '#f5222d' }}>冲突数: {weekStats.conflictCount}个</div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '16px' }}>
-        <h4>⚡ 批量操作</h4>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <Button
-            size="small"
-            type={batchMode ? "primary" : "default"}
-            block
-            onClick={() => {
-              setBatchMode(!batchMode);
-              setSelectedActivities([]);
-              message.info(batchMode ? '退出批量选择模式' : '进入批量选择模式，点击活动进行选择');
-            }}
-          >
-            {batchMode ? '✓ 退出批量模式' : '☐ 批量选择'}
-          </Button>
-
-          {batchMode && selectedActivities.length > 0 && (
-            <>
-              <div style={{ fontSize: '11px', color: '#666', padding: '4px' }}>
-                已选择 {selectedActivities.length} 个活动
-              </div>
-              <Button
-                size="small"
-                type="default"
-                block
-                onClick={() => {
-                  Modal.confirm({
-                    title: '批量分配地点',
-                    content: (
-                      <Select
-                        placeholder="选择地点"
-                        style={{ width: '100%', marginTop: '10px' }}
-                        onChange={(locationId) => {
-                          selectedActivities.forEach(activityId => {
-                            handleUpdateActivity(activityId, { locationId });
-                          });
-                          setSelectedActivities([]);
-                          setBatchMode(false);
-                        }}
-                      >
-                        {locations.map(loc => (
-                          <Option key={loc.id} value={loc.id}>
-                            {loc.name}
-                          </Option>
-                        ))}
-                      </Select>
-                    ),
-                    okText: '确定',
-                    cancelText: '取消'
-                  });
-                }}
-              >
-                🏛️ 批量分配地点
-              </Button>
-              <Button
-                size="small"
-                danger
-                block
-                onClick={() => {
-                  Modal.confirm({
-                    title: '确认删除',
-                    content: `确定要删除选中的 ${selectedActivities.length} 个活动吗？`,
-                    onOk: () => {
-                      selectedActivities.forEach(activityId => {
-                        handleDeleteActivity(activityId);
-                      });
-                      setSelectedActivities([]);
-                      setBatchMode(false);
-                    }
-                  });
-                }}
-              >
-                🗑️ 批量删除
-              </Button>
-            </>
-          )}
-
-          <Button
-            size="small"
-            type="default"
-            block
-            onClick={() => {
-              message.info('检查冲突中...');
-              setTimeout(() => {
-                message.success(`检查完成，发现 ${weekStats.conflictCount} 个冲突`);
-              }, 1000);
-            }}
-          >
-            ⚠️ 冲突检测
-          </Button>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '16px' }}>
-        <h4>🎨 卡片样式</h4>
-        <Select
-          size="small"
-          value={cardStyle}
-          onChange={setCardStyle}
-          style={{ width: '100%', marginBottom: '8px' }}
-        >
-          <Option value="tag">标签式（默认）</Option>
-          <Option value="minimal">极简式</Option>
-        </Select>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <Checkbox defaultChecked size="small">显示团组颜色</Checkbox>
-          <Checkbox size="small">显示地点容量</Checkbox>
-          <Checkbox size="small">高亮冲突活动</Checkbox>
-        </div>
-      </div>
-
-      <div>
-        <h4>🚀 模板操作</h4>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <Button size="small" type="link" style={{ padding: '0', height: 'auto', textAlign: 'left' }}>
-            💾 保存为模板
-          </Button>
-          <Button size="small" type="link" style={{ padding: '0', height: 'auto', textAlign: 'left' }}>
-            📂 应用模板
-          </Button>
-          <Button size="small" type="link" style={{ padding: '0', height: 'auto', textAlign: 'left' }}>
-            🔄 重置本周
-          </Button>
-        </div>
-      </div>
-    </Card>
-  );
-
-  // 时间轴头部
   const renderTimelineHeader = () => (
     <div style={{
       background: '#fafafa',
@@ -394,32 +339,77 @@ function ItineraryDesigner() {
       height: '56px'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <h3 style={{ margin: 0 }}>🗓️ 行程设计器</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Button
+            size="small"
+            onClick={() => setGroupPanelVisible(true)}
+          >
+            团组控制台
+          </Button>
+          <Button
+            size="small"
+            icon={<CalendarOutlined />}
+            onClick={() => setDatePickerOpen(true)}
+          />
+          <DatePicker
+            value={weekStartDate}
+            onChange={handleWeekStartChange}
+            allowClear={false}
+            size="small"
+            format="YYYY-MM-DD"
+            placeholder="请选择日期"
+            open={datePickerOpen}
+            onOpenChange={(open) => setDatePickerOpen(open)}
+          />
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Button
             type="text"
             icon={<LeftOutlined />}
-            onClick={() => setCurrentWeekStart(prev => prev - 1)}
+            onClick={() => handleWeekShift(-7)}
             title="前一周"
           />
-          <span style={{ minWidth: '160px', textAlign: 'center', fontWeight: 'bold' }}>
-            {dayjs(dateRange[0]).format('YYYY年MM月DD日')} ~ {dayjs(dateRange[6]).format('MM月DD日')}
+          <span style={{ minWidth: '160px', textAlign: 'center', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <Button
+              type="text"
+              size="small"
+              icon={<StepBackwardOutlined />}
+              onClick={() => handleWeekShift(-1)}
+              title="上一天"
+            />
+            <span>
+              {dayjs(dateRange[0]).format('YYYY年MM月DD日')} ~ {dayjs(dateRange[6]).format('MM月DD日')}
+            </span>
+            <Button
+              type="text"
+              size="small"
+              icon={<StepForwardOutlined />}
+              onClick={() => handleWeekShift(1)}
+              title="下一天"
+            />
           </span>
           <Button
             type="text"
             icon={<RightOutlined />}
-            onClick={() => setCurrentWeekStart(prev => prev + 1)}
+            onClick={() => handleWeekShift(7)}
             title="后一周"
+          />
+          <Checkbox.Group
+            value={enabledTimeSlots}
+            onChange={handleTimeSlotToggle}
+            options={timeSlots.map(slot => ({ label: slot.label, value: slot.key }))}
+            style={{ marginLeft: '8px' }}
           />
         </div>
       </div>
 
       <div style={{ display: 'flex', gap: '8px' }}>
-        <Button icon={<SaveOutlined />} type="primary" size="small">
-          保存
-        </Button>
-        <Button icon={<EyeOutlined />} size="small">
-          预览
+        <Button
+          icon={<SettingOutlined />}
+          size="small"
+          onClick={openAiModal}
+        >
+          AI 多团组生成
         </Button>
         <Button
           icon={<ExportOutlined />}
@@ -440,20 +430,20 @@ function ItineraryDesigner() {
         <div className="time-label-cell">时间段</div>
         {dateRange.map((date, index) => (
           <div key={index} className="date-header-cell">
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontWeight: 'bold' }}>
+            <div style={{ textAlign: 'center', display: 'flex', justifyContent: 'center', gap: '6px' }}>
+              <span style={{ fontWeight: 'bold' }}>
                 {dayjs(date).format('MM-DD')}
-              </div>
-              <div style={{ fontSize: '12px', color: '#666' }}>
+              </span>
+              <span style={{ fontSize: '12px', color: '#666' }}>
                 {dayjs(date).format('ddd')}
-              </div>
+              </span>
             </div>
           </div>
         ))}
       </div>
 
       {/* 表格主体 */}
-      {timeSlots.map(timeSlot => (
+      {visibleTimeSlots.map(timeSlot => (
         <div key={timeSlot.key} className="timeline-row">
           <div
             className="time-label-cell"
@@ -1022,18 +1012,6 @@ function ItineraryDesigner() {
       {renderTimelineHeader()}
 
       <div style={{ display: 'flex', height: 'calc(100vh - 56px)', flex: 1 }}>
-        {/* 左侧团组面板 */}
-        <div style={{
-          width: '180px',
-          borderRight: '1px solid #e8e8e8',
-          height: '100%',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          {renderGroupPanel()}
-        </div>
-
         {/* 中央时间轴 */}
         <div style={{
           flex: 1,
@@ -1043,19 +1021,22 @@ function ItineraryDesigner() {
         }}>
           {renderTimelineGrid()}
         </div>
-
-        {/* 右侧工具面板 */}
-        <div style={{
-          width: '180px',
-          borderLeft: '1px solid #e8e8e8',
-          height: '100%',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          {renderToolPanel()}
-        </div>
       </div>
+
+      <Drawer
+        title="团组控制台"
+        placement="left"
+        open={groupPanelVisible}
+        onClose={() => setGroupPanelVisible(false)}
+        width={240}
+        mask={false}
+        closable
+        bodyStyle={{ padding: 0 }}
+        getContainer={false}
+        style={{ position: 'absolute' }}
+      >
+        {renderGroupPanel(false)}
+      </Drawer>
 
       {/* 详情编辑弹窗 */}
       <Modal
@@ -1206,6 +1187,83 @@ function ItineraryDesigner() {
             </div>
           )}
         </div>
+      </Modal>
+
+      <Modal
+        title="AI 多团组生成"
+        open={aiModalVisible}
+        onCancel={() => {
+          setAiModalVisible(false);
+          setAiPreview(null);
+        }}
+        width={720}
+        footer={[
+          <Button key="preview" onClick={handleAiPreview} loading={aiLoading}>
+            预览
+          </Button>,
+          <Button key="apply" type="primary" onClick={handleAiApply} loading={aiLoading}>
+            生成并保存
+          </Button>
+        ]}
+        destroyOnClose
+      >
+        <Form form={aiForm} layout="vertical">
+          <Form.Item
+            name="groupIds"
+            label="选择团组"
+            rules={[{ required: true, message: '请选择团组' }]}
+          >
+            <Select mode="multiple" placeholder="选择需要生成的团组">
+              {groups.map(group => (
+                <Option key={group.id} value={group.id}>
+                  {group.name}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="dateRange"
+            label="日期范围"
+            rules={[{ required: true, message: '请选择日期范围' }]}
+          >
+            <DatePicker.RangePicker />
+          </Form.Item>
+
+          <Form.Item name="planNamePrefix" label="方案前缀">
+            <Input placeholder="例如：AI方案" />
+          </Form.Item>
+
+          <Form.Item name="replaceExisting" valuePropName="checked">
+            <Checkbox>覆盖该日期范围内已有安排</Checkbox>
+          </Form.Item>
+
+          <Form.Item name="useAI" valuePropName="checked">
+            <Checkbox>使用AI排序偏好（需联网）</Checkbox>
+          </Form.Item>
+        </Form>
+
+        {aiPreview ? (
+          <div style={{ marginTop: 12, background: '#fafafa', padding: 12, borderRadius: 6 }}>
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '8px' }}>
+              <span>团组数：{aiPreview.summary?.groups || 0}</span>
+              <span>天数：{aiPreview.summary?.days || 0}</span>
+              <span>安排数：{aiPreview.summary?.assignments || 0}</span>
+              <span>冲突：{aiPreview.summary?.conflicts || 0}</span>
+            </div>
+            {aiPreview.conflicts?.length ? (
+              <div style={{ maxHeight: 160, overflow: 'auto', fontSize: 12, color: '#d4380d' }}>
+                {aiPreview.conflicts.slice(0, 20).map((item, index) => (
+                  <div key={`${item.groupId}-${index}`}>
+                    {item.groupName} · {item.date} · {getTimeSlotLabel(item.timeSlot)} · {item.reason}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: '#52c41a' }}>未发现冲突</div>
+            )}
+          </div>
+        ) : null}
       </Modal>
     </div>
   );

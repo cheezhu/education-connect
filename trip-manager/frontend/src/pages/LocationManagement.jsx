@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, Checkbox, message, Space, Tabs, Tag } from 'antd';
+import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, Checkbox, message, Space, Tag } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import api from '../services/api';
+import './LocationManagement.css';
 
 const { Option } = Select;
-const { TextArea } = Input;
+const { TextArea, Search } = Input;
 
 function LocationManagement({ editMode }) {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('locations');
+  const [searchText, setSearchText] = useState('');
+  const [filteredLocations, setFilteredLocations] = useState([]);
   const [plans, setPlans] = useState([]);
   const [planLoading, setPlanLoading] = useState(false);
+  const [filteredPlans, setFilteredPlans] = useState([]);
   const [planModalVisible, setPlanModalVisible] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -60,6 +64,52 @@ function LocationManagement({ editMode }) {
     loadPlans();
   }, []);
 
+  useEffect(() => {
+    setFilteredLocations(locations);
+  }, [locations]);
+
+  useEffect(() => {
+    setFilteredPlans(plans);
+  }, [plans]);
+
+  useEffect(() => {
+    const keyword = searchText.trim().toLowerCase();
+    if (!keyword) {
+      setFilteredLocations(locations);
+      setFilteredPlans(plans);
+      return;
+    }
+
+    setFilteredLocations(
+      locations.filter((location) => {
+        const haystack = [
+          location.name,
+          location.address,
+          location.notes,
+          location.contact_person,
+          location.contact_phone
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(keyword);
+      })
+    );
+
+    setFilteredPlans(
+      plans.filter((plan) => {
+        const itemNames = Array.isArray(plan.items)
+          ? plan.items.map(item => item.location_name).filter(Boolean).join(' ')
+          : '';
+        const haystack = [plan.name, plan.description, itemNames]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(keyword);
+      })
+    );
+  }, [searchText, locations, plans]);
+
   // 显示创建/编辑对话框
   const showModal = (location = null) => {
     if (!editMode && !location) {
@@ -72,7 +122,13 @@ function LocationManagement({ editMode }) {
     
     if (location) {
       form.setFieldsValue({
-        ...location,
+        name: location.name,
+        address: location.address,
+        capacity: location.capacity,
+        notes: location.notes,
+        targetGroups: location.target_groups || 'all',
+        contactPerson: location.contact_person || '',
+        contactPhone: location.contact_phone || '',
         blockedWeekdays: location.blocked_weekdays ? location.blocked_weekdays.split(',') : []
       });
     } else {
@@ -88,9 +144,14 @@ function LocationManagement({ editMode }) {
   // 保存地点
   const handleSave = async (values) => {
     try {
+      const blockedValue = values.blockedWeekdays ? values.blockedWeekdays.join(',') : '';
       const data = {
         ...values,
-        blockedWeekdays: values.blockedWeekdays ? values.blockedWeekdays.join(',') : ''
+        blockedWeekdays: blockedValue,
+        blocked_weekdays: blockedValue,
+        target_groups: values.targetGroups,
+        contact_person: values.contactPerson,
+        contact_phone: values.contactPhone
       };
 
       if (editingLocation) {
@@ -365,42 +426,64 @@ function LocationManagement({ editMode }) {
   );
 
   return (
-    <Card
-      title="行程资源"
-      extra={extraAction}
-    >
-      <Tabs
-        activeKey={activeTab}
-        onChange={setActiveTab}
-        items={[
-          {
-            key: 'locations',
-            label: '地点',
-            children: (
-              <Table
-                columns={columns}
-                dataSource={locations}
-                loading={loading}
-                rowKey="id"
-                pagination={{ pageSize: 10 }}
-              />
-            )
-          },
-          {
-            key: 'plans',
-            label: '行程方案',
-            children: (
-              <Table
-                columns={planColumns}
-                dataSource={plans}
-                loading={planLoading}
-                rowKey="id"
-                pagination={{ pageSize: 10 }}
-              />
-            )
-          }
-        ]}
-      />
+    <div className="location-management">
+      <Card className="filter-card">
+        <Space size="small" wrap>
+          <div className="resource-page-title">行程资源</div>
+          <div className="resource-tabs">
+            <Button
+              size="small"
+              type={activeTab === 'locations' ? 'primary' : 'default'}
+              onClick={() => setActiveTab('locations')}
+            >
+              地点
+            </Button>
+            <Button
+              size="small"
+              type={activeTab === 'plans' ? 'primary' : 'default'}
+              onClick={() => setActiveTab('plans')}
+            >
+              行程方案
+            </Button>
+          </div>
+          <Search
+            size="small"
+            placeholder={activeTab === 'locations' ? '搜索地点/地址/联系人' : '搜索方案/地点'}
+            allowClear
+            style={{ width: 220 }}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+          />
+          <div className="resource-meta">
+            <span>
+              共{activeTab === 'locations' ? filteredLocations.length : filteredPlans.length}个
+            </span>
+            {extraAction}
+          </div>
+        </Space>
+      </Card>
+
+      {activeTab === 'locations' ? (
+        <Table
+          columns={columns}
+          dataSource={filteredLocations}
+          loading={loading}
+          rowKey="id"
+          size="small"
+          className="resource-table"
+          pagination={{ pageSize: 10, size: 'small' }}
+        />
+      ) : (
+        <Table
+          columns={planColumns}
+          dataSource={filteredPlans}
+          loading={planLoading}
+          rowKey="id"
+          size="small"
+          className="resource-table"
+          pagination={{ pageSize: 10, size: 'small' }}
+        />
+      )}
 
       <Modal
         title={editingLocation ? '编辑地点' : '添加地点'}
@@ -540,7 +623,7 @@ function LocationManagement({ editMode }) {
           </Form.Item>
         </Form>
       </Modal>
-    </Card>
+    </div>
   );
 }
 
