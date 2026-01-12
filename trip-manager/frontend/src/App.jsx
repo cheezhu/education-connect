@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Layout, Dropdown, Badge, Avatar } from 'antd';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import DragDropTable from './components/DragDropTable';
 import GroupManagementV2 from './pages/GroupManagementV2';
 import GroupEditV2 from './pages/GroupEditV2';
 import LocationManagement from './pages/LocationManagement';
@@ -25,14 +24,6 @@ function App() {
           overflow: 'auto'
         }}>
           <Routes>
-            <Route
-              path="/"
-              element={
-                <DragDropTable
-                  editMode={editMode}
-                />
-              }
-            />
             <Route
               path="/groups"
               element={<GroupManagementV2 />}
@@ -92,7 +83,6 @@ function CompactHeader() {
   const menuItems = [
     { path: '/groups', label: '团组管理' },
     { path: '/designer', label: '行程设计器' },
-    { path: '/', label: '日历视图' },
     { path: '/locations', label: '行程资源' },
     { path: '/statistics', label: '统计报表' }
   ];

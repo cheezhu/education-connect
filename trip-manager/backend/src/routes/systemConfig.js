@@ -4,6 +4,7 @@ const router = express.Router();
 
 const WEEK_START_KEY = 'itinerary_week_start';
 const TIME_SLOTS_KEY = 'itinerary_time_slots';
+const DAILY_FOCUS_KEY = 'itinerary_daily_focus';
 const DEFAULT_TIME_SLOTS = ['MORNING', 'AFTERNOON', 'EVENING'];
 
 const isValidDate = (value) => {
@@ -28,6 +29,13 @@ const upsertConfig = (db, key, value, description) => {
 const normalizeSlots = (slots) => {
   if (!Array.isArray(slots)) return null;
   return DEFAULT_TIME_SLOTS.filter((slot) => slots.includes(slot));
+};
+
+const normalizeBoolean = (value) => {
+  if (typeof value === 'boolean') return value;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return null;
 };
 
 router.get('/itinerary-week-start', (req, res) => {
@@ -73,6 +81,26 @@ router.put('/itinerary-time-slots', (req, res) => {
   upsertConfig(req.db, TIME_SLOTS_KEY, JSON.stringify(normalized), '行程设计器显示时间段');
 
   res.json({ slots: normalized });
+});
+
+router.get('/itinerary-daily-focus', (req, res) => {
+  const row = req.db.prepare('SELECT value FROM system_config WHERE key = ?').get(DAILY_FOCUS_KEY);
+  if (!row || typeof row.value !== 'string') {
+    return res.json({ enabled: true });
+  }
+  const normalized = normalizeBoolean(row.value);
+  return res.json({ enabled: normalized ?? true });
+});
+
+router.put('/itinerary-daily-focus', (req, res) => {
+  const normalized = normalizeBoolean(req.body?.enabled);
+  if (normalized === null) {
+    return res.status(400).json({ error: '无效配置' });
+  }
+
+  upsertConfig(req.db, DAILY_FOCUS_KEY, normalized ? 'true' : 'false', '行程设计器每日关注显示');
+
+  res.json({ enabled: normalized });
 });
 
 module.exports = router;

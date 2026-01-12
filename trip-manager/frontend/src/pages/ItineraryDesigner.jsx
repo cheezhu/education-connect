@@ -31,6 +31,7 @@ function ItineraryDesigner() {
   const [groupPanelVisible, setGroupPanelVisible] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [enabledTimeSlots, setEnabledTimeSlots] = useState(timeSlotKeys);
+  const [showDailyFocus, setShowDailyFocus] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
   const [draggedActivity, setDraggedActivity] = useState(null);
@@ -117,6 +118,16 @@ function ItineraryDesigner() {
     }
   };
 
+  const loadDailyFocusConfig = async () => {
+    try {
+      const response = await api.get('/config/itinerary-daily-focus');
+      if (typeof response.data?.enabled === 'boolean') {
+        setShowDailyFocus(response.data.enabled);
+      }
+    } catch (error) {
+    }
+  };
+
   const persistTimeSlotConfig = async (slots) => {
     setEnabledTimeSlots(slots);
     try {
@@ -128,9 +139,23 @@ function ItineraryDesigner() {
     }
   };
 
+  const persistDailyFocusConfig = async (enabled) => {
+    setShowDailyFocus(enabled);
+    try {
+      await api.put('/config/itinerary-daily-focus', {
+        enabled
+      });
+    } catch (error) {
+    }
+  };
+
   const handleTimeSlotToggle = (slots) => {
     const normalized = timeSlotKeys.filter((key) => slots.includes(key));
     persistTimeSlotConfig(normalized);
+  };
+
+  const handleDailyFocusToggle = (event) => {
+    persistDailyFocusConfig(event.target.checked);
   };
 
   const handleWeekStartChange = (value) => {
@@ -148,6 +173,7 @@ function ItineraryDesigner() {
     loadData();
     loadWeekStartDate();
     loadTimeSlotConfig();
+    loadDailyFocusConfig();
     const unregister = registerRefreshCallback(refreshData);
     return unregister;
   }, [registerRefreshCallback]);
@@ -172,6 +198,40 @@ function ItineraryDesigner() {
 
   const getTimeSlotLabel = (slotKey) => {
     return timeSlots.find(slot => slot.key === slotKey)?.label || slotKey;
+  };
+
+  const getArrivalsForDate = (dateString) => {
+    return groups.filter(group => (
+      group.start_date === dateString && selectedGroups.includes(group.id)
+    ));
+  };
+
+  const getDeparturesForDate = (dateString) => {
+    return groups.filter(group => (
+      group.end_date === dateString && selectedGroups.includes(group.id)
+    ));
+  };
+
+  const getLocationTotalsForDate = (dateString, slotKey) => {
+    const totals = new Map();
+    activities.forEach((activity) => {
+      if (activity.date !== dateString || activity.timeSlot !== slotKey) return;
+      if (!selectedGroups.includes(activity.groupId)) return;
+      const locationId = activity.locationId ?? 'none';
+      const current = totals.get(locationId) || 0;
+      totals.set(locationId, current + (activity.participantCount || 0));
+    });
+
+    return Array.from(totals.entries())
+      .map(([locationId, total]) => {
+        const location = locations.find(loc => loc.id === locationId);
+        return {
+          locationId,
+          total,
+          name: location ? location.name : '未设置场地'
+        };
+      })
+      .sort((a, b) => b.total - a.total);
   };
 
   const openAiModal = () => {
@@ -394,12 +454,19 @@ function ItineraryDesigner() {
             onClick={() => handleWeekShift(7)}
             title="后一周"
           />
-          <Checkbox.Group
-            value={enabledTimeSlots}
-            onChange={handleTimeSlotToggle}
-            options={timeSlots.map(slot => ({ label: slot.label, value: slot.key }))}
-            style={{ marginLeft: '8px' }}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
+            <Checkbox
+              checked={showDailyFocus}
+              onChange={handleDailyFocusToggle}
+            >
+              每日关注
+            </Checkbox>
+            <Checkbox.Group
+              value={enabledTimeSlots}
+              onChange={handleTimeSlotToggle}
+              options={timeSlots.map(slot => ({ label: slot.label, value: slot.key }))}
+            />
+          </div>
         </div>
       </div>
 
@@ -524,6 +591,57 @@ function ItineraryDesigner() {
           })}
         </div>
       ))}
+
+      {showDailyFocus && (
+        <div
+          className="daily-focus-row"
+          style={{ gridTemplateColumns: `100px repeat(${dateRange.length}, minmax(0, 1fr))` }}
+        >
+          <div className="daily-focus-label-cell">
+            <div className="daily-focus-title">每日关注</div>
+          </div>
+          {dateRange.map((date) => {
+            const dateString = formatDateString(date);
+            const arrivals = getArrivalsForDate(dateString);
+            const departures = getDeparturesForDate(dateString);
+
+            return (
+              <div key={dateString} className="daily-focus-cell">
+                <div className="daily-focus-section">
+                  <div className="daily-focus-item">
+                    {arrivals.length
+                      ? arrivals.map(group => `${group.name}团组抵达`).join('，')
+                      : '暂无团组抵达'}
+                  </div>
+                  <div className="daily-focus-item">
+                    {departures.length
+                      ? departures.map(group => `${group.name}团组结束`).join('，')
+                      : '暂无团组结束'}
+                  </div>
+                </div>
+
+                {visibleTimeSlots.map((slot) => {
+                  const totals = getLocationTotalsForDate(dateString, slot.key);
+                  return (
+                    <div key={`${dateString}-${slot.key}`} className="daily-focus-section">
+                      <div className="daily-focus-section-title">{slot.label}</div>
+                      {totals.length ? (
+                        totals.map(item => (
+                          <div key={`${item.locationId}-${slot.key}`} className="daily-focus-item">
+                            {item.name} {item.total}人
+                          </div>
+                        ))
+                      ) : (
+                        <div className="daily-focus-item">暂无安排</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 
@@ -1013,14 +1131,11 @@ function ItineraryDesigner() {
 
       <div style={{ display: 'flex', height: 'calc(100vh - 56px)', flex: 1 }}>
         {/* 中央时间轴 */}
-        <div style={{
-          flex: 1,
-          overflow: 'auto',
-          height: '100%',
-          minWidth: 0  // 确保flex item可以收缩
-        }}>
+        <div className="itinerary-center">
+        <div className="timeline-wrapper">
           {renderTimelineGrid()}
         </div>
+      </div>
       </div>
 
       <Drawer
