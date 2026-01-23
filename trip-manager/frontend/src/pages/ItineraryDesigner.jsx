@@ -22,16 +22,56 @@ const { Option } = Select;
 
 function ItineraryDesigner() {
   const timeSlotKeys = ['MORNING', 'AFTERNOON', 'EVENING'];
+  const getStoredWeekStartDate = () => {
+    try {
+      const stored = localStorage.getItem('itinerary_week_start');
+      if (stored && dayjs(stored).isValid()) {
+        return dayjs(stored);
+      }
+    } catch (error) {
+      // ignore
+    }
+    return dayjs().startOf('day');
+  };
+  const getStoredTimeSlots = () => {
+    try {
+      const stored = localStorage.getItem('itinerary_time_slots');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          const filtered = timeSlotKeys.filter((key) => parsed.includes(key));
+          if (filtered.length) {
+            return filtered;
+          }
+        }
+      }
+    } catch (error) {
+      // ignore
+    }
+    return timeSlotKeys;
+  };
+
+  const getStoredDailyFocus = () => {
+    try {
+      const stored = localStorage.getItem('itinerary_daily_focus');
+      if (stored === 'true') return true;
+      if (stored === 'false') return false;
+    } catch (error) {
+      // ignore
+    }
+    return true;
+  };
+
   const [groups, setGroups] = useState([]);
   const [activities, setActivities] = useState([]);
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState([]);
-  const [weekStartDate, setWeekStartDate] = useState(() => dayjs().startOf('day'));
+  const [weekStartDate, setWeekStartDate] = useState(() => getStoredWeekStartDate());
   const [groupPanelVisible, setGroupPanelVisible] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [enabledTimeSlots, setEnabledTimeSlots] = useState(timeSlotKeys);
-  const [showDailyFocus, setShowDailyFocus] = useState(true);
+  const [enabledTimeSlots, setEnabledTimeSlots] = useState(() => getStoredTimeSlots());
+  const [showDailyFocus, setShowDailyFocus] = useState(() => getStoredDailyFocus());
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
   const [draggedActivity, setDraggedActivity] = useState(null);
@@ -87,7 +127,15 @@ function ItineraryDesigner() {
     try {
       const response = await api.get('/config/itinerary-week-start');
       if (response.data?.date && dayjs(response.data.date).isValid()) {
-        setWeekStartDate(dayjs(response.data.date));
+        const nextDate = dayjs(response.data.date);
+        if (!weekStartDate || !nextDate.isSame(weekStartDate, 'day')) {
+          setWeekStartDate(nextDate);
+        }
+        try {
+          localStorage.setItem('itinerary_week_start', nextDate.format('YYYY-MM-DD'));
+        } catch (error) {
+          // ignore
+        }
       }
     } catch (error) {
       message.warning('读取周起始日期失败');
@@ -97,6 +145,11 @@ function ItineraryDesigner() {
   const persistWeekStartDate = async (nextDate) => {
     const normalized = dayjs(nextDate).startOf('day');
     setWeekStartDate(normalized);
+    try {
+      localStorage.setItem('itinerary_week_start', normalized.format('YYYY-MM-DD'));
+    } catch (error) {
+      // ignore
+    }
     try {
       await api.put('/config/itinerary-week-start', {
         date: normalized.format('YYYY-MM-DD')
@@ -111,7 +164,18 @@ function ItineraryDesigner() {
       const response = await api.get('/config/itinerary-time-slots');
       const slots = response.data?.slots;
       if (Array.isArray(slots)) {
-        setEnabledTimeSlots(slots);
+        const normalized = timeSlotKeys.filter((key) => slots.includes(key));
+        const current = enabledTimeSlots;
+        const same = normalized.length === current.length
+          && normalized.every((slot, index) => slot === current[index]);
+        if (!same) {
+          setEnabledTimeSlots(normalized);
+        }
+        try {
+          localStorage.setItem('itinerary_time_slots', JSON.stringify(normalized));
+        } catch (error) {
+          // ignore
+        }
       }
     } catch (error) {
       message.warning('读取时间段设置失败');
@@ -122,7 +186,15 @@ function ItineraryDesigner() {
     try {
       const response = await api.get('/config/itinerary-daily-focus');
       if (typeof response.data?.enabled === 'boolean') {
-        setShowDailyFocus(response.data.enabled);
+        const nextValue = response.data.enabled;
+        if (nextValue !== showDailyFocus) {
+          setShowDailyFocus(nextValue);
+        }
+        try {
+          localStorage.setItem('itinerary_daily_focus', nextValue ? 'true' : 'false');
+        } catch (error) {
+          // ignore
+        }
       }
     } catch (error) {
     }
@@ -130,6 +202,11 @@ function ItineraryDesigner() {
 
   const persistTimeSlotConfig = async (slots) => {
     setEnabledTimeSlots(slots);
+    try {
+      localStorage.setItem('itinerary_time_slots', JSON.stringify(slots));
+    } catch (error) {
+      // ignore
+    }
     try {
       await api.put('/config/itinerary-time-slots', {
         slots
@@ -141,6 +218,11 @@ function ItineraryDesigner() {
 
   const persistDailyFocusConfig = async (enabled) => {
     setShowDailyFocus(enabled);
+    try {
+      localStorage.setItem('itinerary_daily_focus', enabled ? 'true' : 'false');
+    } catch (error) {
+      // ignore
+    }
     try {
       await api.put('/config/itinerary-daily-focus', {
         enabled
@@ -525,70 +607,98 @@ function ItineraryDesigner() {
             </div>
           </div>
 
-          {dateRange.map((date, dateIndex) => {
-            const slotActivities = getActivitiesForSlot(date, timeSlot.key);
+          {(() => {
+            const groupNamesForSlot = new Set();
+            dateRange.forEach((date) => {
+              const slotActivities = getActivitiesForSlot(date, timeSlot.key);
+              slotActivities.forEach((activity) => {
+                const group = groups.find(g => g.id === activity.groupId);
+                const groupName = group?.name || '未命名团组';
+                groupNamesForSlot.add(groupName);
+              });
+            });
+            const orderedGroupNames = Array.from(groupNamesForSlot).sort((a, b) => a.localeCompare(b, 'zh'));
 
-            return (
-              <div
-                key={`${timeSlot.key}-${dateIndex}`}
-                className="timeline-cell"
-                style={{ backgroundColor: timeSlot.color }}
-                onClick={() => handleCellClick(date, timeSlot.key, slotActivities)}
-                onDragOver={handleDragOver}
-                onDragEnter={handleDragEnter}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, date, timeSlot.key)}
-              >
-                {slotActivities.length === 0 ? (
-                  <div className="empty-cell">
-                    <PlusOutlined style={{ color: '#999' }} />
-                    <div style={{ fontSize: '10px', color: '#999' }}>点击添加</div>
-                  </div>
-                ) : (
-                  <div className="activity-summary">
-                    {/* 根据选择的样式渲染不同的卡片 */}
-                    {slotActivities.map(activity => {
-                      const group = groups.find(g => g.id === activity.groupId);
-                      const location = locations.find(l => l.id === activity.locationId);
+            return dateRange.map((date, dateIndex) => {
+              const slotActivities = getActivitiesForSlot(date, timeSlot.key);
+              const groupedByName = slotActivities.reduce((acc, activity) => {
+                const group = groups.find(g => g.id === activity.groupId);
+                const groupName = group?.name || '未命名团组';
+                if (!acc.has(groupName)) {
+                  acc.set(groupName, []);
+                }
+                acc.get(groupName).push({ activity, group });
+                return acc;
+              }, new Map());
 
-                      // 标签式和极简式使用统一的渲染函数
-                      const isSelected = selectedActivities.includes(activity.id);
-                      return (
-                        <div
-                          key={activity.id}
-                          draggable={!batchMode}
-                          onDragStart={(e) => !batchMode && handleDragStart(e, activity)}
-                          onDragEnd={!batchMode && handleDragEnd}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (batchMode) {
-                              // 批量选择模式下切换选中状态
-                              if (isSelected) {
-                                setSelectedActivities(prev => prev.filter(id => id !== activity.id));
-                              } else {
-                                setSelectedActivities(prev => [...prev, activity.id]);
-                              }
-                            } else {
-                              // 正常模式下打开编辑
-                              handleCellClick(date, timeSlot.key, [activity]);
-                            }
-                          }}
-                          style={{
-                            opacity: batchMode && !isSelected ? 0.6 : 1,
-                            outline: isSelected ? '2px solid #1890ff' : 'none',
-                            borderRadius: '4px'
-                          }}
-                          title={`${group?.name}${location ? ` - ${location.name}` : ''} (${activity.participantCount}人)`}
-                        >
-                          {renderActivityCard(activity, group, location)}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              return (
+                <div
+                  key={`${timeSlot.key}-${dateIndex}`}
+                  className="timeline-cell"
+                  style={{ backgroundColor: timeSlot.color }}
+                  onClick={() => handleCellClick(date, timeSlot.key, slotActivities)}
+                  onDragOver={handleDragOver}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, date, timeSlot.key)}
+                >
+                  {orderedGroupNames.length === 0 ? (
+                    <div className="empty-cell">
+                      <PlusOutlined style={{ color: '#999' }} />
+                      <div style={{ fontSize: '10px', color: '#999' }}>点击添加</div>
+                    </div>
+                  ) : (
+                    <div className="activity-summary grouped">
+                      {orderedGroupNames.map((groupName) => {
+                        const items = groupedByName.get(groupName) || [];
+                        return (
+                          <div
+                            key={groupName}
+                            className={`activity-group-row ${items.length ? '' : 'empty'}`}
+                          >
+                            {items.map(({ activity, group }) => {
+                              const isCompact = items.length > 1;
+                              const location = locations.find(l => l.id === activity.locationId);
+                              const isSelected = selectedActivities.includes(activity.id);
+
+                              return (
+                                <div
+                                  key={activity.id}
+                                  draggable={!batchMode}
+                                  onDragStart={(e) => !batchMode && handleDragStart(e, activity)}
+                                  onDragEnd={!batchMode && handleDragEnd}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (batchMode) {
+                                      if (isSelected) {
+                                        setSelectedActivities(prev => prev.filter(id => id !== activity.id));
+                                      } else {
+                                        setSelectedActivities(prev => [...prev, activity.id]);
+                                      }
+                                    } else {
+                                      handleCellClick(date, timeSlot.key, [activity]);
+                                    }
+                                  }}
+                                  style={{
+                                    opacity: batchMode && !isSelected ? 0.6 : 1,
+                                    outline: isSelected ? '2px solid #1890ff' : 'none',
+                                    borderRadius: '4px'
+                                  }}
+                                  title={`${group?.name}${location ? ` - ${location.name}` : ''} (${activity.participantCount}人)`}
+                                >
+                                  {renderActivityCard(activity, group, location, isCompact)}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            });
+          })()}
         </div>
       ))}
 
@@ -646,7 +756,7 @@ function ItineraryDesigner() {
   );
 
   // 渲染活动卡片 - 根据不同样式
-  const renderActivityCard = (activity, group, location) => {
+  const renderActivityCard = (activity, group, location, compact = false) => {
     // 标签式（默认）
     if (cardStyle === 'tag') {
       return (
@@ -698,6 +808,48 @@ function ItineraryDesigner() {
 
     // 极简式
     if (cardStyle === 'minimal') {
+      if (compact) {
+        return (
+          <div
+            className="activity-card-minimal compact"
+            style={{
+              borderLeft: `3px solid ${group?.color}`,
+              marginBottom: '4px',
+              cursor: 'grab',
+              backgroundColor: 'rgba(255,255,255,0.5)',
+              padding: '2px 8px',
+              borderRadius: '0 4px 4px 0',
+              position: 'relative'
+            }}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              handleCellClick(null, null, [activity]);
+            }}
+          >
+            <div className="activity-card-line activity-card-group">{group?.name}</div>
+            {location && (
+              <div className="activity-card-line activity-card-location">{location.name}</div>
+            )}
+            <span
+              className="minimal-delete-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteActivity(activity.id);
+              }}
+              style={{
+                padding: '0 4px',
+                color: '#999',
+                fontSize: '10px',
+                display: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              ×
+            </span>
+          </div>
+        );
+      }
+
       return (
         <div
           className="activity-card-minimal"
@@ -795,30 +947,11 @@ function ItineraryDesigner() {
     };
 
     if (conflicts.length > 0) {
-      // 显示冲突提示
-      Modal.confirm({
-        title: '检测到冲突',
-        content: (
-          <div>
-            <p>发现以下冲突：</p>
-            <ul style={{ paddingLeft: '20px' }}>
-              {conflicts.map((c, i) => (
-                <li key={i} style={{ color: c.type === 'time' ? '#ff4d4f' : '#faad14', marginBottom: '4px' }}>
-                  {c.message}
-                </li>
-              ))}
-            </ul>
-            <p style={{ marginTop: '10px' }}>是否仍要继续添加？</p>
-          </div>
-        ),
-        okText: '继续添加',
-        cancelText: '取消',
-        okType: conflicts.some(c => c.type === 'time') ? 'danger' : 'primary',
-        onOk: addActivity
-      });
-    } else {
       await addActivity();
+      return;
     }
+
+    await addActivity();
   };
 
   // 删除活动
@@ -1076,52 +1209,15 @@ function ItineraryDesigner() {
       draggedActivity.participantCount
     );
 
-    if (conflicts.length > 0) {
-      // 显示冲突提示
-      Modal.confirm({
-        title: '检测到冲突',
-        content: (
-          <div>
-            <p>发现以下冲突：</p>
-            <ul style={{ paddingLeft: '20px' }}>
-              {conflicts.map((c, i) => (
-                <li key={i} style={{ color: c.type === 'time' ? '#ff4d4f' : '#faad14', marginBottom: '4px' }}>
-                  {c.message}
-                </li>
-              ))}
-            </ul>
-            <p style={{ marginTop: '10px' }}>是否仍要继续？</p>
-          </div>
-        ),
-        okText: '继续',
-        cancelText: '取消',
-        okType: conflicts.some(c => c.type === 'time') ? 'danger' : 'primary',
-        onOk: async () => {
-          try {
-            // 用户确认后继续更新
-            await handleUpdateActivity(draggedActivity.id, {
-              date: targetDateString,
-              timeSlot: targetTimeSlot
-            });
-
-            message.warning('活动已更新（存在冲突）');
-          } catch (error) {
-            message.error('更新活动失败');
-          }
-        }
+    try {
+      await handleUpdateActivity(draggedActivity.id, {
+        date: targetDateString,
+        timeSlot: targetTimeSlot
       });
-    } else {
-      try {
-        // 无冲突，直接更新
-        await handleUpdateActivity(draggedActivity.id, {
-          date: targetDateString,
-          timeSlot: targetTimeSlot
-        });
 
-        message.success('活动时间调整成功');
-      } catch (error) {
-        message.error('调整活动时间失败');
-      }
+      message.success('活动时间调整成功');
+    } catch (error) {
+      message.error('调整活动时间失败');
     }
   };
 

@@ -211,6 +211,25 @@
   padding: 4px;
 }
 
+.activity-summary.grouped {
+  gap: 4px;
+}
+
+.activity-group-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  flex-wrap: nowrap;
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  min-height: 36px;
+}
+
+.activity-group-row.empty {
+  min-height: 36px;
+}
+
 /* 拖拽相关样式 */
 .dragging {
   opacity: 0.8 !important;
@@ -402,6 +421,35 @@
 
 .activity-card-minimal[draggable="true"]:active {
   cursor: grabbing;
+}
+
+.activity-card-minimal.compact {
+  line-height: 13px;
+  padding-right: 14px;
+}
+
+.activity-card-minimal.compact .activity-card-line {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-card-minimal.compact .activity-card-group {
+  font-size: clamp(9px, 1vw, 10px);
+  font-weight: 500;
+  color: #333;
+}
+
+.activity-card-minimal.compact .activity-card-location {
+  font-size: clamp(8px, 0.9vw, 9px);
+  color: #666;
+}
+
+.activity-card-minimal.compact .minimal-delete-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
 }
 
 
