@@ -81,8 +81,12 @@ function ItineraryDesigner() {
   const [aiModalVisible, setAiModalVisible] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPreview, setAiPreview] = useState(null);
+  const [planningExportVisible, setPlanningExportVisible] = useState(false);
+  const [planningExportLoading, setPlanningExportLoading] = useState(false);
   const [form] = Form.useForm();
   const [aiForm] = Form.useForm();
+  const [planningForm] = Form.useForm();
+  const planningDateRange = Form.useWatch('dateRange', planningForm);
   const { registerRefreshCallback } = useDataSync();
 
   // 时间段定义
@@ -93,6 +97,9 @@ function ItineraryDesigner() {
   ];
 
   const visibleTimeSlots = timeSlots.filter((slot) => enabledTimeSlots.includes(slot.key));
+  const planningAvailableGroups = (planningDateRange && planningDateRange.length === 2)
+    ? filterGroupsByRange(planningDateRange)
+    : [];
 
   // 加载数据
   const loadData = async (preserveSelection = false) => {
@@ -260,6 +267,20 @@ function ItineraryDesigner() {
     return unregister;
   }, [registerRefreshCallback]);
 
+  useEffect(() => {
+    if (!planningDateRange || planningDateRange.length !== 2) {
+      planningForm.setFieldsValue({ groupIds: [] });
+      return;
+    }
+    const availableGroups = filterGroupsByRange(planningDateRange);
+    const allowedIds = new Set(availableGroups.map(group => group.id));
+    const selected = planningForm.getFieldValue('groupIds') || [];
+    const filtered = selected.filter(id => allowedIds.has(id));
+    if (filtered.length !== selected.length) {
+      planningForm.setFieldsValue({ groupIds: filtered });
+    }
+  }, [planningDateRange, groups]);
+
   // 生成日期范围（7天一页）
   const generateDateRange = (startDate) => {
     const baseDate = startDate ? dayjs(startDate) : dayjs();
@@ -371,6 +392,87 @@ function ItineraryDesigner() {
       setAiLoading(false);
     }
   };
+
+
+  const openPlanningExportModal = () => {
+    const defaultRange = [dayjs(dateRange[0]), dayjs(dateRange[6])];
+    const availableGroups = filterGroupsByRange(defaultRange);
+    const availableGroupIds = new Set(availableGroups.map(group => group.id));
+    const defaultGroupIds = (selectedGroups.length ? selectedGroups : groups.map(group => group.id))
+      .filter(id => availableGroupIds.has(id));
+    planningForm.setFieldsValue({
+      dateRange: defaultRange,
+      groupIds: defaultGroupIds
+    });
+    setPlanningExportVisible(true);
+  };
+
+  const buildPlanningPayload = (values) => {
+    const [start, end] = values.dateRange || [];
+    return {
+      groupIds: values.groupIds,
+      startDate: start ? start.format('YYYY-MM-DD') : formatDateString(dateRange[0]),
+      endDate: end ? end.format('YYYY-MM-DD') : formatDateString(dateRange[6]),
+      includeExistingActivities: true,
+      includeExistingSchedules: true,
+      includePlanItemsByGroup: true
+    };
+  };
+
+  const getFilenameFromDisposition = (disposition) => {
+    if (!disposition) return null;
+    const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+    if (utf8Match && utf8Match[1]) {
+      return decodeURIComponent(utf8Match[1]);
+    }
+    const match = /filename=\"?([^\";]+)\"?/i.exec(disposition);
+    return match ? match[1] : null;
+  };
+
+  const triggerDownload = (blob, filename) => {
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePlanningExport = async () => {
+    try {
+      const values = await planningForm.validateFields();
+      setPlanningExportLoading(true);
+      const response = await api.post('/planning/export', buildPlanningPayload(values), {
+        responseType: 'blob'
+      });
+      const disposition = response.headers?.['content-disposition'];
+      const filename = getFilenameFromDisposition(disposition)
+        || `planning_input_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.json`;
+      const blob = new Blob([response.data], { type: 'application/json' });
+      triggerDownload(blob, filename);
+      message.success('导出成功');
+      setPlanningExportVisible(false);
+    } catch (error) {
+      message.error('导出失败');
+    } finally {
+      setPlanningExportLoading(false);
+    }
+  };
+
+  function filterGroupsByRange(range) {
+    if (!Array.isArray(range) || range.length !== 2 || !range[0] || !range[1]) {
+      return groups;
+    }
+    const [start, end] = range;
+    return groups.filter(group => {
+      if (!group.start_date || !group.end_date) return false;
+      const groupStart = dayjs(group.start_date);
+      const groupEnd = dayjs(group.end_date);
+      return !groupStart.isAfter(end, 'day') && !groupEnd.isBefore(start, 'day');
+    });
+  }
 
   // 获取指定时段的活动
   const getActivitiesForSlot = (date, timeSlot) => {
@@ -559,6 +661,13 @@ function ItineraryDesigner() {
           onClick={openAiModal}
         >
           AI 多团组生成
+        </Button>
+        <Button
+          icon={<ExportOutlined />}
+          size="small"
+          onClick={openPlanningExportModal}
+        >
+          导出排程输入包(JSON)
         </Button>
         <Button
           icon={<ExportOutlined />}
@@ -1159,10 +1268,12 @@ function ItineraryDesigner() {
 
         // 3. 检查地点不可用日期
         const dayOfWeek = dayjs(date).day();
-        const unavailableDays = location.unavailable_days || [];
-        const dayMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const blockedWeekdays = (location.blocked_weekdays || '')
+          .split(',')
+          .map(item => item.trim())
+          .filter(Boolean);
 
-        if (unavailableDays.includes(dayMap[dayOfWeek])) {
+        if (blockedWeekdays.includes(String(dayOfWeek))) {
           conflicts.push({
             type: 'unavailable',
             message: `${location.name}在${['周日', '周一', '周二', '周三', '周四', '周五', '周六'][dayOfWeek]}不可用`
@@ -1171,13 +1282,12 @@ function ItineraryDesigner() {
 
         // 4. 检查地点是否适用于团组类型
         const group = groups.find(g => g.id === groupId);
-        if (group && location.allowed_group_types && location.allowed_group_types.length > 0) {
-          if (!location.allowed_group_types.includes(group.type)) {
-            conflicts.push({
-              type: 'groupType',
-              message: `${location.name}不适用于${group.type === 'primary' ? '小学' : '中学'}团组`
-            });
-          }
+        const targetGroups = location.target_groups || 'all';
+        if (group && targetGroups !== 'all' && targetGroups !== group.type) {
+          conflicts.push({
+            type: 'groupType',
+            message: `${location.name}不适用于${group.type === 'primary' ? '小学' : '中学'}团组`
+          });
         }
       }
     }
@@ -1398,6 +1508,82 @@ function ItineraryDesigner() {
             </div>
           )}
         </div>
+      </Modal>
+
+      <Modal
+        title="导出排程输入包(JSON)"
+        open={planningExportVisible}
+        onCancel={() => setPlanningExportVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setPlanningExportVisible(false)}>
+            取消
+          </Button>,
+          <Button
+            key="export"
+            type="primary"
+            onClick={handlePlanningExport}
+            loading={planningExportLoading}
+          >
+            导出
+          </Button>
+        ]}
+        destroyOnClose
+      >
+        <Form form={planningForm} layout="vertical">
+          <Form.Item
+            name="dateRange"
+            label="日期范围"
+            rules={[{ required: true, message: '请选择日期范围' }]}
+          >
+            <DatePicker.RangePicker />
+          </Form.Item>
+
+          <Form.Item
+            name="groupIds"
+            label="选择团组"
+            rules={[{ required: true, message: '请选择团组' }]}
+          >
+            <Select
+              mode="multiple"
+              placeholder={planningAvailableGroups.length ? '选择需要导出的团组' : '请先选择日期范围'}
+              disabled={!planningDateRange || planningDateRange.length !== 2}
+              dropdownRender={(menu) => (
+                <>
+                  <div style={{ padding: '8px', display: 'flex', gap: '8px' }}>
+                    <Button
+                      size="small"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        planningForm.setFieldsValue({
+                          groupIds: planningAvailableGroups.map(group => group.id)
+                        });
+                      }}
+                      disabled={planningAvailableGroups.length === 0}
+                    >
+                      全选
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        planningForm.setFieldsValue({ groupIds: [] });
+                      }}
+                    >
+                      全不选
+                    </Button>
+                  </div>
+                  {menu}
+                </>
+              )}
+            >
+              {planningAvailableGroups.map(group => (
+                <Option key={group.id} value={group.id}>
+                  {group.name}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+        </Form>
       </Modal>
 
       <Modal

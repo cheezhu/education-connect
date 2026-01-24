@@ -116,6 +116,7 @@ app.use('/api/statistics', require('./src/routes/statistics'));
 app.use('/api/itinerary-plans', require('./src/routes/itineraryPlans'));
 app.use('/api/ai', require('./src/routes/aiPlanner'));
 app.use('/api/config', require('./src/routes/systemConfig'));
+app.use('/api/planning', require('./src/routes/planning'));
 
 // 错误处理
 app.use((err, req, res, next) => {

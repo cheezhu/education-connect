@@ -9,12 +9,28 @@ const api = axios.create({
   }
 });
 
+const resolveAuthHeader = () => {
+  const rawAuth = import.meta.env.VITE_API_BASIC_AUTH;
+  const envUser = import.meta.env.VITE_API_USER;
+  const envPassword = import.meta.env.VITE_API_PASSWORD;
+
+  if (rawAuth) {
+    if (rawAuth.includes(':')) {
+      return `Basic ${btoa(rawAuth)}`;
+    }
+    return `Basic ${rawAuth}`;
+  }
+
+  const username = envUser || 'admin';
+  const password = envPassword || 'admin123';
+  return `Basic ${btoa(`${username}:${password}`)}`;
+};
+
 // 请求拦截器
 api.interceptors.request.use(
   (config) => {
-    // 添加基础认证头
-    const credentials = btoa('admin:admin123'); // 默认管理员账号
-    config.headers.Authorization = `Basic ${credentials}`;
+    // 添加基础认证头（可通过 VITE_API_* 覆盖）
+    config.headers.Authorization = resolveAuthHeader();
     return config;
   },
   (error) => {

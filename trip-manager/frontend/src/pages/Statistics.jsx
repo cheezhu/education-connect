@@ -167,7 +167,12 @@ function Statistics() {
       title: '容量利用率',
       key: 'utilization',
       render: (_, record) => {
-        const rate = ((record.participantCount / record.capacity) * 100).toFixed(1);
+        const capacity = Number(record.capacity) || 0;
+        if (capacity <= 0) {
+          return 'N/A';
+        }
+        const participants = Number(record.participantCount) || 0;
+        const rate = ((participants / capacity) * 100).toFixed(1);
         return `${rate}%`;
       }
     }

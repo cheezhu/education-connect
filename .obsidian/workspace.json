@@ -1,0 +1,267 @@
+{
+  "main": {
+    "id": "6940b2597aa91ae1",
+    "type": "split",
+    "children": [
+      {
+        "id": "072c529948404ae5",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "dbdeb634687538fb",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "README.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "README"
+            }
+          },
+          {
+            "id": "a33929ee3595068f",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "debug/fix.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "fix"
+            }
+          },
+          {
+            "id": "0c08f1d3e992b438",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "AI for Planning/导出 planning_input.json.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "导出 planning_input.json"
+            }
+          },
+          {
+            "id": "1f0cd0899f514c1d",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "AI for Planning/Ai Prompt for group planing.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Ai Prompt for group planing"
+            }
+          }
+        ],
+        "currentTab": 3
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "f48bb965e8936d37",
+    "type": "split",
+    "children": [
+      {
+        "id": "43add4204eccf92e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "89dc3204ce9bc06a",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "6d1e9074ef263f02",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "e026e8ec8b90ceba",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "c9dd5fba498e1219",
+    "type": "split",
+    "children": [
+      {
+        "id": "d3ed95a99e0efbf7",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "71c6ce20821b6382",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "README.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for README"
+            }
+          },
+          {
+            "id": "2b9eea87dd1d1a3b",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "README.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from README"
+            }
+          },
+          {
+            "id": "883aac7d591634a2",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "791a769a176b7df5",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "2e7658c70aa4f813",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "README.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of README"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "1f0cd0899f514c1d",
+  "lastOpenFiles": [
+    "AI for Planning/导出 planning_input.json.md",
+    "README.md",
+    "CLAUDE.md",
+    "AI for Planning/Ai Prompt for group planing.md",
+    "AI for Planning",
+    "debug/group-management-issues.md",
+    "design/04-1-database-design.md",
+    "design/04-database-schema.md",
+    "trip-manager/frontend/vite.config.js.timestamp-1769223793374-c094c035bbc6.mjs",
+    "trip-manager/backend/node_modules/@fastify/busboy/lib/utils/parseParams.js",
+    "trip-manager/backend/node_modules/@fastify/busboy/lib/utils/getLimit.js",
+    "trip-manager/backend/node_modules/@fastify/busboy/lib/utils/decodeText.js",
+    "trip-manager/backend/node_modules/@fastify/busboy/lib/types/multipart.js",
+    "trip-manager/backend/node_modules/@fastify/busboy/lib/types/urlencoded.js",
+    "trip-manager/backend/node_modules/@fastify/busboy/lib/utils/Decoder.js",
+    "trip-manager/backend/node_modules/@fastify/busboy/lib/utils/basename.js",
+    "trip-manager/backend/node_modules/@fastify/busboy/lib/main.js",
+    "trip-manager/backend/node_modules/undici/types/README.md",
+    "debug/fix.md",
+    "design/11-known-issues.md",
+    "docs/calendar/schedule-activity-sync.md",
+    "docs/strategy/vision-roadmap.md",
+    "docs/strategy/README.md",
+    "docs/strategy/feasible-integration.md",
+    "docs/history/frontend-backend-interaction-legacy.md",
+    "docs/history/README.md",
+    "docs/architecture/overview.md",
+    "design/13-sample-payloads.md",
+    "design/README.md",
+    "design/12-file-map.md",
+    "design/10-config-auth.md",
+    "design/08-calendar-days-view.md",
+    "design/09-ai-planner.md",
+    "design/07-itinerary-designer.md",
+    "design/06-frontend-ui.md"
+  ]
+}

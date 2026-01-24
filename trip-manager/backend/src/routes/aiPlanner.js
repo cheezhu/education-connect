@@ -2,9 +2,14 @@ const express = require('express');
 const requireEditLock = require('../middleware/editLock');
 
 const router = express.Router();
-const fetchFn = global.fetch
-  ? global.fetch
-  : () => Promise.reject(new Error('fetch is not available'));
+let fetchFn = global.fetch;
+if (!fetchFn) {
+  try {
+    ({ fetch: fetchFn } = require('undici'));
+  } catch (error) {
+    fetchFn = () => Promise.reject(new Error('fetch is not available'));
+  }
+}
 const AI_REQUEST_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS) || 25000;
 
 const DEFAULT_TIME_SLOTS = {

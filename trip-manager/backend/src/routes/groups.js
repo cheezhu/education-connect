@@ -70,7 +70,7 @@ router.post('/', requireEditLock, (req, res) => {
         name, type, student_count, teacher_count, 
         start_date, end_date, duration, color, itinerary_plan_id, contact_person,
         contact_phone, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name, type, resolvedStudentCount, resolvedTeacherCount,
       resolvedStartDate, resolvedEndDate, resolvedDuration, color, resolvedItineraryPlanId,
