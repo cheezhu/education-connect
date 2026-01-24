@@ -112,7 +112,7 @@ B. 前端在 ItineraryDesigner 页面右上角新增按钮：
 
 rules 的来源：
 - 优先读取 system_config key='ai_schedule_rules'（复用 aiPlanner.js 的 normalizeAiRules/getAiRules 思路；可以抽函数或复制最小实现）
-- 若无配置则用默认 timeSlots=MORNING/AFTERNOON，slotWindows=默认(9-12/14-17/19-21)
+- 若无配置则用默认 timeSlots=MORNING/AFTERNOON，slotWindows=默认(06-12/12-18/18-20:45)
 
 ========================
 4) 前端实现细节（尽量复用现有）

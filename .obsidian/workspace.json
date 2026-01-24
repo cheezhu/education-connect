@@ -186,6 +186,9 @@
   "active": "2411584888c4ede4",
   "lastOpenFiles": [
     "trip-manager/backend/db/trip.db-journal",
+    "docs/design/design-workstation-concept.html",
+    "docs/design",
+    "trip-manager/frontend/src/design-workstation-concept.html",
     "docs/arch-overview.md",
     "docs/account-admin.md",
     "docs/ui-frontend.md",
@@ -218,8 +221,6 @@
     "docs/account-admin",
     "trip-manager/frontend/src/pages/Settings.css",
     "trip-manager/frontend/src/pages/Settings.jsx",
-    "trip-manager/frontend/vite.config.js.timestamp-1769251394090-8f109a710b036.mjs",
-    "trip-manager/backend/src/utils/aiConfig.js",
     "trip-manager/backend/node_modules/undici/docs/assets/lifecycle-diagram.png"
   ]
 }

@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EC Pro Workstation - Itinerary Designer</title>
+    <style>
+        :root {
+            /* 专业工坊配色 - Dark/Neutral */
+            --bg-app: #1e1e1e;       /* 应用背景 */
+            --bg-activity: #333333;  /* 最左侧活动栏 */
+            --bg-sidebar: #252526;   /* 侧边栏/面板 */
+            --bg-editor: #1e1e1e;    /* 编辑区/时间轴背景 */
+            --bg-header: #2d2d2d;    /* 顶部命令栏 */
+            --bg-status: #007acc;    /* 底部状态栏 */
+            --bg-modal: #252526;     /* 弹窗背景 */
+            
+            --border-color: #454545; /* 分割线 */
+            --text-main: #cccccc;    /* 主文字 */
+            --text-muted: #858585;   /* 次要文字 */
+            --accent: #0e639c;       /* 强调色/选中色 */
+            --focus-border: #007fd4; /* 焦点边框 */
+            
+            /* 功能色 */
+            --color-conflict: #f14c4c;
+            --color-warning: #cca700;
+            --color-success: #89d185;
+            
+            /* 时间段背景 */
+            --slot-morning: rgba(24, 144, 255, 0.05);
+            --slot-afternoon: rgba(82, 196, 26, 0.05);
+            --slot-evening: rgba(250, 140, 22, 0.05);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', 'SF Pro Text', Consolas, sans-serif;
+            font-size: 13px;
+            color: var(--text-main);
+            background: var(--bg-app);
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* 整体布局 */
+        .app-shell {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            position: relative; /* 为弹窗定位 */
+        }
+
+        /* 1. 最左侧活动栏 */
+        .activity-bar {
+            width: 48px;
+            background: var(--bg-activity);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 10px;
+            flex-shrink: 0;
+            z-index: 100;
+        }
+
+        .activity-item {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 20px;
+            border-left: 2px solid transparent;
+            opacity: 0.7;
+            transition: all 0.1s;
+            position: relative;
+        }
+
+        .activity-item:hover { color: white; opacity: 1; }
+        .activity-item.active { color: white; border-left-color: white; opacity: 1; }
+        
+        .badge {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            width: 8px;
+            height: 8px;
+            background: var(--color-conflict);
+            border-radius: 50%;
+            border: 1px solid var(--bg-activity);
+        }
+
+        .activity-spacer { flex: 1; }
+
+        /* 2. 侧边栏 (Explorer) */
+        .sidebar {
+            width: 260px;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            height: 35px;
+            padding: 0 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            background: rgba(0,0,0,0.1);
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        /* 面板折叠块 */
+        .panel-section {
+            border-bottom: 1px solid var(--border-color);
+        }
+        .panel-header {
+            padding: 6px 10px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            color: #e0e0e0;
+            background: rgba(255,255,255,0.03);
+        }
+        .panel-header:hover { background: #2a2d2e; }
+        .panel-header::before {
+            content: '⌄';
+            display: inline-block;
+            width: 16px;
+            font-size: 14px;
+            transform: translateY(-2px);
+        }
+        
+        /* 团组列表项 */
+        .group-item {
+            padding: 4px 10px 4px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-left: 2px solid transparent;
+        }
+        .group-item:hover { background: #2a2d2e; }
+        .group-item.selected { background: #37373d; border-left-color: var(--focus-border); }
+
+        .checkbox {
+            width: 14px;
+            height: 14px;
+            border: 1px solid #666;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+        .checkbox.checked { background: var(--accent); border-color: var(--accent); color: white; }
+
+        .group-color { width: 8px; height: 8px; border-radius: 2px; }
+        .group-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .group-meta { font-size: 10px; color: #666; }
+
+        /* 3. 主工作区 */
+        .main-stage {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-editor);
+            min-width: 0;
+            position: relative; /* 为内部浮层定位 */
+        }
+
+        /* 顶部栏 */
+        .top-bar {
+            height: 40px;
+            background: var(--bg-header);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 16px;
+        }
+
+        .breadcrumbs {
+            display: flex;
+            align-items: center;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .crumb.active { color: white; font-weight: 500; }
+        .sep { margin: 0 8px; color: #555; }
+
+        /* 周切换器 */
+        .week-navigator {
+            display: flex;
+            align-items: center;
+            background: #3c3c3c;
+            border-radius: 4px;
+            padding: 2px;
+        }
+        .nav-btn {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #ccc;
+        }
+        .nav-btn:hover { background: #555; border-radius: 2px; }
+        .current-week {
+            padding: 0 12px;
+            font-family: Consolas, monospace;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        /* 工具栏 */
+        .editor-toolbar {
+            height: 36px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            background: var(--bg-editor);
+            justify-content: space-between;
+        }
+
+        .tool-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .tool-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .tool-toggle:hover { background: #2a2d2e; color: var(--text-main); }
+        .tool-toggle.active { color: var(--accent); background: rgba(14, 99, 156, 0.1); }
+        .tool-toggle.active::before { content: '✓'; }
+
+        /* 4. 时间轴画布 */
+        .timeline-canvas {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            background: var(--bg-editor);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 网格头 */
+        .grid-header {
+            display: grid;
+            grid-template-columns: 80px repeat(7, 1fr);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            background: var(--bg-editor);
+            z-index: 10;
+        }
+        .grid-cell-header {
+            padding: 10px;
+            text-align: center;
+            border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .day-name { font-size: 11px; color: var(--text-muted); }
+        .day-date { font-size: 14px; font-weight: bold; color: var(--text-main); }
+        .day-date.today { color: var(--accent); }
+
+        /* 时间段行 */
+        .grid-row {
+            display: grid;
+            grid-template-columns: 80px repeat(7, 1fr);
+            border-bottom: 1px solid #333;
+            min-height: 140px;
+        }
+
+        .time-label {
+            padding: 12px;
+            color: var(--text-muted);
+            font-size: 12px;
+            border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+            border-left: 4px solid transparent;
+        }
+
+        .time-label.morning { border-left-color: #1890ff; background: linear-gradient(90deg, rgba(24,144,255,0.05), transparent); }
+        .time-label.afternoon { border-left-color: #52c41a; background: linear-gradient(90deg, rgba(82,196,26,0.05), transparent); }
+        .time-label.evening { border-left-color: #fa8c16; background: linear-gradient(90deg, rgba(250,140,22,0.05), transparent); }
+
+        .grid-cell {
+            border-right: 1px solid #333;
+            padding: 6px;
+            position: relative;
+            transition: background 0.2s;
+        }
+        .grid-cell:hover { background: #252526; }
+        .grid-cell.drag-over { background: rgba(14, 99, 156, 0.2); outline: 2px dashed var(--accent); }
+
+        /* 行程卡片 */
+        .task-card {
+            background: #2d2d2d;
+            border-left: 3px solid #666;
+            padding: 6px 8px;
+            margin-bottom: 6px;
+            font-size: 11px;
+            border-radius: 2px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            position: relative;
+            transition: transform 0.1s;
+        }
+        .task-card:hover { transform: translateY(-1px); background: #333; z-index: 5; }
+        
+        .card-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .card-title { font-weight: 600; color: #e0e0e0; }
+        .card-loc { color: #8ec3eb; font-family: Consolas; }
+        .card-footer { display: flex; justify-content: space-between; color: #666; font-size: 10px; }
+        
+        .task-card.conflict { 
+            border-left-color: var(--color-conflict); 
+            background: rgba(241, 76, 76, 0.1); 
+            border: 1px solid rgba(241, 76, 76, 0.3);
+        }
+
+        /* 每日关注行 */
+        .daily-focus-row {
+            display: grid;
+            grid-template-columns: 80px repeat(7, 1fr);
+            background: #252526;
+            border-top: 2px solid #333;
+            min-height: 80px;
+        }
+        .focus-label {
+            padding: 10px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #fff;
+            border-right: 1px solid #333;
+        }
+        .focus-cell {
+            padding: 8px;
+            border-right: 1px solid #333;
+            font-size: 10px;
+            color: #aaa;
+        }
+        .stat-tag {
+            display: inline-block;
+            background: #333;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-right: 4px;
+            margin-bottom: 4px;
+            color: #ccc;
+        }
+        .stat-tag.highlight { color: var(--accent); background: rgba(14,99,156,0.1); }
+
+        /* 5. 属性面板 */
+        .inspector {
+            width: 300px;
+            background: var(--bg-sidebar);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .prop-group { margin-bottom: 16px; }
+        .prop-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: flex; justify-content: space-between; }
+        
+        .prop-input { 
+            background: #3c3c3c; 
+            border: 1px solid #444; 
+            color: white; 
+            padding: 6px 8px; 
+            width: 100%; 
+            font-size: 12px;
+            border-radius: 2px;
+        }
+        .prop-input:focus { border-color: var(--focus-border); outline: none; }
+        
+        /* 容量条 */
+        .capacity-bar {
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+        .capacity-fill { height: 100%; background: var(--color-success); width: 60%; }
+        .capacity-fill.warning { background: var(--color-warning); }
+        .capacity-fill.error { background: var(--color-conflict); }
+
+        /* 6. 状态栏 */
+        .status-bar {
+            height: 22px;
+            background: var(--bg-status);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px;
+            font-size: 11px;
+            z-index: 200;
+        }
+        .status-section { display: flex; gap: 16px; }
+        .status-item { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+        
+        /* ========================================= */
+        /* 新增弹窗交互设计 */
+        /* ========================================= */
+
+        /* 1. 上下文浮层 (Contextual Popover) - 用于快速编辑 */
+        .popover {
+            position: absolute;
+            background: var(--bg-modal);
+            border: 1px solid #454545;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            border-radius: 4px;
+            width: 320px;
+            z-index: 500;
+            display: none; /* 默认隐藏 */
+            padding: 12px;
+            left: 200px;
+            top: 200px;
+        }
+        
+        .popover.visible { display: block; animation: fadeIn 0.1s ease-out; }
+        
+        .popover-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .popover-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        
+        .btn-sm {
+            padding: 4px 10px;
+            border-radius: 2px;
+            font-size: 11px;
+            cursor: pointer;
+            border: 1px solid #555;
+            background: #333;
+            color: #ccc;
+        }
+        .btn-sm:hover { background: #444; }
+        .btn-primary { background: var(--accent); border-color: var(--accent); color: white; }
+        .btn-primary:hover { background: #005a9e; }
+
+        /* 2. 冲突解决建议 (Resolver) */
+        .resolver-card {
+            background: #252526;
+            border: 1px solid var(--color-conflict);
+            border-left-width: 4px;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 12px;
+        }
+        
+        .suggestion-item {
+            display: flex;
+            align-items: center;
+            padding: 6px;
+            border: 1px solid #333;
+            background: #2d2d2d;
+            margin-top: 6px;
+            border-radius: 2px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .suggestion-item:hover { background: #383838; border-color: #555; }
+        .suggestion-icon { margin-right: 8px; color: var(--color-success); font-weight: bold; }
+
+        /* 3. 全屏差异对比视图 (Diff View Modal) */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.visible { display: flex; }
+        
+        .modal-container {
+            width: 90vw;
+            height: 85vh;
+            background: var(--bg-app);
+            border: 1px solid #454545;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 12px 48px rgba(0,0,0,0.5);
+        }
+        
+        .diff-header {
+            height: 48px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            justify-content: space-between;
+            background: var(--bg-header);
+        }
+        
+        .diff-body {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        .diff-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .diff-pane-header {
+            padding: 8px;
+            text-align: center;
+            background: #252526;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: bold;
+        }
+        .diff-content {
+            flex: 1;
+            overflow: auto;
+            padding: 16px;
+            background: #1e1e1e;
+        }
+        
+        .diff-item {
+            padding: 10px;
+            border: 1px solid #333;
+            margin-bottom: 8px;
+            background: #252526;
+            opacity: 0.5;
+        }
+        .diff-item.changed {
+            opacity: 1;
+            border: 1px solid var(--accent);
+            background: rgba(14, 99, 156, 0.1);
+        }
+        .diff-tag {
+            display: inline-block;
+            padding: 2px 4px;
+            background: var(--accent);
+            color: white;
+            font-size: 10px;
+            border-radius: 2px;
+            margin-bottom: 4px;
+        }
+
+        /* 动画 */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    </style>
+</head>
+<body>
+
+    <div class="app-shell">
+        
+        <!-- Activity Bar -->
+        <div class="activity-bar">
+            <div class="activity-item active" title="行程设计器">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            </div>
+            <!-- ... other icons ... -->
+            <div class="activity-item" title="导入排期结果" onclick="toggleModal()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <span>行程资源管理器</span>
+                <span>...</span>
+            </div>
+            <div class="sidebar-content">
+                <!-- 团组列表 -->
+                <div class="panel-section">
+                    <div class="panel-header">团组控制台 (GROUPS)</div>
+                    <div style="padding: 4px 0;">
+                        <div class="group-item selected">
+                            <div class="checkbox checked">✓</div>
+                            <div class="group-color" style="background: #1890ff;"></div>
+                            <div class="group-name">深圳实验中学</div>
+                            <span class="group-meta">45人</span>
+                        </div>
+                        <!-- ... -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Stage -->
+        <div class="main-stage">
+            
+            <!-- Top Bar -->
+            <div class="top-bar">
+                 <div class="week-navigator">
+                    <div class="nav-btn">◀</div>
+                    <div class="current-week">2025-09-12 ~ 09-18</div>
+                    <div class="nav-btn">▶</div>
+                </div>
+                <div class="breadcrumbs"><span class="crumb active">第2周排期</span></div>
+                <div style="flex:1"></div>
+            </div>
+
+            <!-- Toolbar -->
+            <div class="editor-toolbar">
+                <div class="tool-group">
+                    <div class="tool-toggle active">每日关注</div>
+                    <div class="tool-toggle">仅显示冲突</div>
+                </div>
+            </div>
+
+            <!-- Canvas -->
+            <div class="timeline-canvas">
+                <div class="grid-header">
+                     <div class="grid-cell-header"></div>
+                    <div class="grid-cell-header"><span class="day-name">周一</span><span class="day-date">09-12</span></div>
+                    <div class="grid-cell-header"><span class="day-name">周二</span><span class="day-date today">09-13</span></div>
+                    <!-- ... -->
+                </div>
+
+                <div class="grid-row">
+                    <div class="time-label morning">上午<br>09:00</div>
+                    <div class="grid-cell">
+                        <!-- 正常活动 -->
+                        <div class="task-card" style="border-left-color: #1890ff;" onclick="togglePopover(event, 'normal')">
+                            <div class="card-header"><span class="card-title">深圳实验</span></div>
+                            <div class="card-footer"><span class="card-loc">科技馆A</span><span>45人</span></div>
+                        </div>
+                    </div>
+                    <div class="grid-cell">
+                        <!-- 冲突活动 -->
+                        <div class="task-card conflict" style="border: 1px solid #f14c4c;" onclick="togglePopover(event, 'conflict')">
+                            <div class="card-header"><span class="card-title">冲突警告</span></div>
+                            <div class="card-footer"><span class="card-loc">科技馆A</span><span>超员</span></div>
+                        </div>
+                    </div>
+                    <!-- ... -->
+                </div>
+            </div>
+
+            <!-- Popover: Contextual Edit -->
+            <div id="editPopover" class="popover">
+                <div class="popover-header">
+                    <span>编辑活动</span>
+                    <span style="cursor:pointer; color:#888" onclick="hidePopover()">✕</span>
+                </div>
+                
+                <!-- 正常编辑内容 -->
+                <div id="normalContent">
+                    <div class="prop-group">
+                        <label class="prop-label">团组</label>
+                        <input type="text" class="prop-input" value="深圳实验中学" disabled>
+                    </div>
+                    <div class="prop-group">
+                        <label class="prop-label">地点</label>
+                        <select class="prop-input">
+                            <option>科技馆A厅</option>
+                            <option>植物园</option>
+                        </select>
+                    </div>
+                    <div class="popover-actions">
+                        <button class="btn-sm">取消</button>
+                        <button class="btn-sm btn-primary">保存</button>
+                    </div>
+                </div>
+
+                <!-- 冲突解决内容 -->
+                <div id="conflictContent" style="display:none">
+                    <div class="resolver-card">
+                        <div style="color: #f88; font-weight:bold; margin-bottom:4px">科技馆A厅 容量超限</div>
+                        <div style="font-size:11px; color:#aaa">当前: 85人 / 容量: 50人</div>
+                    </div>
+                    <div style="font-size:11px; color:#ccc; margin-bottom:6px">推荐解决方案：</div>
+                    
+                    <div class="suggestion-item">
+                        <span class="suggestion-icon">A</span>
+                        <div>
+                            <div style="font-weight:bold">更换到 科技馆B厅</div>
+                            <div style="color:#888; font-size:10px">容量充足 (100人)，无冲突</div>
+                        </div>
+                    </div>
+                    <div class="suggestion-item">
+                        <span class="suggestion-icon">B</span>
+                         <div>
+                            <div style="font-weight:bold">推迟到 下午 14:00</div>
+                            <div style="color:#888; font-size:10px">原地点空闲</div>
+                        </div>
+                    </div>
+                     <div class="popover-actions">
+                        <button class="btn-sm" style="color:#f88">强制保存</button>
+                        <button class="btn-sm">取消</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Bar -->
+            <div class="status-bar">
+                <div class="status-section">
+                    <div class="status-item"><span>✔ 在线</span></div>
+                    <div class="status-item" onclick="togglePopover(null, 'conflict', true)"><span>⚠ 1 冲突</span></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Inspector -->
+        <div class="inspector">
+             <div class="sidebar-header"><span>属性</span></div>
+             <div class="sidebar-content" style="padding:16px; color:#666; text-align:center; margin-top:40px">
+                 点击活动查看详情
+             </div>
+        </div>
+
+    </div>
+
+    <!-- Modal: Diff View -->
+    <div id="diffModal" class="modal-overlay">
+        <div class="modal-container">
+            <div class="diff-header">
+                <div style="font-weight:bold; font-size:16px; color:#e0e0e0">排期导入预览 (Diff)</div>
+                <div style="display:flex; gap:10px">
+                    <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#aaa">
+                        <div style="width:10px; height:10px; background:rgba(14,99,156,0.3); border:1px solid #0e639c"></div>
+                        <span>变动</span>
+                    </div>
+                    <button class="btn-sm">取消</button>
+                    <button class="btn-sm btn-primary">确认合并 (Merge)</button>
+                </div>
+            </div>
+            <div class="diff-body">
+                <!-- 左侧：当前 -->
+                <div class="diff-pane" style="border-right:1px solid #333">
+                    <div class="diff-pane-header">当前排期 (Current)</div>
+                    <div class="diff-content">
+                        <div class="diff-item">
+                            <div style="font-weight:bold">周一 上午</div>
+                            <div>深圳实验 @ 科技馆A</div>
+                        </div>
+                        <div class="diff-item changed">
+                            <div class="diff-tag">变更前</div>
+                            <div style="font-weight:bold">周二 下午</div>
+                            <div>广州天河 @ 植物园</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 右侧：导入 -->
+                <div class="diff-pane">
+                    <div class="diff-pane-header">导入排期 (Incoming)</div>
+                    <div class="diff-content">
+                        <div class="diff-item">
+                            <div style="font-weight:bold">周一 上午</div>
+                            <div>深圳实验 @ 科技馆A</div>
+                        </div>
+                        <div class="diff-item changed">
+                            <div class="diff-tag">变更后</div>
+                            <div style="font-weight:bold">周二 下午</div>
+                            <div style="color:var(--accent)">广州天河 @ 科技馆B (调整地点)</div>
+                        </div>
+                         <div class="diff-item changed">
+                            <div class="diff-tag">新增</div>
+                            <div style="font-weight:bold">周三 上午</div>
+                            <div style="color:#89d185">武汉华中 @ 创客室</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function togglePopover(event, type, center = false) {
+            const popover = document.getElementById('editPopover');
+            const normalContent = document.getElementById('normalContent');
+            const conflictContent = document.getElementById('conflictContent');
+            
+            if (popover.classList.contains('visible') && !center) {
+                popover.classList.remove('visible');
+                return;
+            }
+
+            if (type === 'conflict') {
+                normalContent.style.display = 'none';
+                conflictContent.style.display = 'block';
+            } else {
+                normalContent.style.display = 'block';
+                conflictContent.style.display = 'none';
+            }
+
+            if (event) {
+                // 简单定位逻辑
+                const rect = event.currentTarget.getBoundingClientRect();
+                popover.style.left = (rect.right + 10) + 'px';
+                popover.style.top = rect.top + 'px';
+            } else if (center) {
+                popover.style.left = '50%';
+                popover.style.top = '50%';
+                popover.style.transform = 'translate(-50%, -50%)';
+            }
+            
+            popover.classList.add('visible');
+            event?.stopPropagation();
+        }
+
+        function hidePopover() {
+            document.getElementById('editPopover').classList.remove('visible');
+        }
+
+        function toggleModal() {
+            const modal = document.getElementById('diffModal');
+            if (modal.classList.contains('visible')) {
+                modal.classList.remove('visible');
+            } else {
+                modal.classList.add('visible');
+            }
+        }
+        
+        // 点击空白关闭
+        document.body.addEventListener('click', (e) => {
+            if (!e.target.closest('.popover') && !e.target.closest('.task-card') && !e.target.closest('.status-item')) {
+                hidePopover();
+            }
+        });
+    </script>
+</body>
+</html>

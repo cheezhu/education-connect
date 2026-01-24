@@ -1,9 +1,9 @@
 const { getConfigRow, upsertConfig } = require('./configStore');
 
 const DEFAULT_TIME_SLOTS = {
-  MORNING: { start: 9, end: 12 },
-  AFTERNOON: { start: 14, end: 17 },
-  EVENING: { start: 19, end: 21 }
+  MORNING: { start: 6, end: 12 },
+  AFTERNOON: { start: 12, end: 18 },
+  EVENING: { start: 18, end: 20.75 }
 };
 
 const DEFAULT_AI_RULES = {

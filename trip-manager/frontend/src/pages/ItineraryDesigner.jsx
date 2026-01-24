@@ -150,9 +150,9 @@ function ItineraryDesigner() {
 
   // 时间段定义
   const timeSlots = [
-    { key: 'MORNING', label: '上午', time: '9:00-12:00', color: '#e6f7ff', borderColor: '#1890ff' },
-    { key: 'AFTERNOON', label: '下午', time: '14:00-17:00', color: '#f6ffed', borderColor: '#52c41a' },
-    { key: 'EVENING', label: '晚上', time: '19:00-21:00', color: '#fff2e8', borderColor: '#fa8c16' }
+    { key: 'MORNING', label: '上午', time: '06:00-12:00', color: '#e6f7ff', borderColor: '#1890ff' },
+    { key: 'AFTERNOON', label: '下午', time: '12:00-18:00', color: '#f6ffed', borderColor: '#52c41a' },
+    { key: 'EVENING', label: '晚上', time: '18:00-20:45', color: '#fff2e8', borderColor: '#fa8c16' }
   ];
 
   const visibleTimeSlots = timeSlots.filter((slot) => enabledTimeSlots.includes(slot.key));

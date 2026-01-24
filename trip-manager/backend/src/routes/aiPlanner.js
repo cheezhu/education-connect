@@ -76,6 +76,15 @@ const toMinutes = (timeValue) => {
   return hour * 60 + minute;
 };
 
+const formatSlotTime = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '00:00';
+  const totalMinutes = Math.round(numeric * 60);
+  const hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+};
+
 const mapScheduleRow = (row) => ({
   id: row.id,
   groupId: row.group_id,
@@ -700,8 +709,8 @@ router.post('/plan/global', async (req, res) => {
         insertPlanItem.run(planId, item.locationId, index + 1);
 
         const slotWindow = timeSlotWindows[item.timeSlot] || DEFAULT_TIME_SLOTS.MORNING;
-        const startTime = `${String(slotWindow.start).padStart(2, '0')}:00`;
-        const endTime = `${String(slotWindow.end).padStart(2, '0')}:00`;
+        const startTime = formatSlotTime(slotWindow.start);
+        const endTime = formatSlotTime(slotWindow.end);
         const scheduleResult = insertSchedule.run(
           item.groupId,
           item.date,
@@ -865,8 +874,8 @@ router.post('/plan/itinerary', async (req, res) => {
   });
 
   const hasGroupOverlap = (dateStr, slotWindow) => {
-    const startTime = `${String(slotWindow.start).padStart(2, '0')}:00`;
-    const endTime = `${String(slotWindow.end).padStart(2, '0')}:00`;
+    const startTime = formatSlotTime(slotWindow.start);
+    const endTime = formatSlotTime(slotWindow.end);
     const startMinutes = toMinutes(startTime);
     const endMinutes = toMinutes(endTime);
     if (startMinutes === null || endMinutes === null) return true;
@@ -980,8 +989,8 @@ router.post('/plan/itinerary', async (req, res) => {
         existingUsage.set(usageKey, used + participants);
         addScheduleWindow(
           dateStr,
-          `${String(slotWindow.start).padStart(2, '0')}:00`,
-          `${String(slotWindow.end).padStart(2, '0')}:00`
+          formatSlotTime(slotWindow.start),
+          formatSlotTime(slotWindow.end)
         );
         placed = true;
         break;
@@ -1043,8 +1052,8 @@ router.post('/plan/itinerary', async (req, res) => {
   req.db.transaction(() => {
     assignments.forEach((assignment) => {
       const { location, dateStr, slotKey, slotWindow } = assignment;
-      const startTime = `${String(slotWindow.start).padStart(2, '0')}:00`;
-      const endTime = `${String(slotWindow.end).padStart(2, '0')}:00`;
+      const startTime = formatSlotTime(slotWindow.start);
+      const endTime = formatSlotTime(slotWindow.end);
       const resourceId = `plan-${resolvedPlanId}-loc-${location.id}`;
 
       const scheduleResult = insertSchedule.run(

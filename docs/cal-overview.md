@@ -23,10 +23,9 @@
 ### 2) schedule -> activity (日历详情同步到行程设计器)
 
 - **触发点**: 日历详情保存（`POST /groups/:groupId/schedules/batch`）。
-- **时间段映射**: 以日历时间窗口为准，按 `schedule.startTime` 映射为 `timeSlot`（解析失败默认 MORNING）。
-  - 06:00-11:59 -> MORNING
-  - 12:00-17:59 -> AFTERNOON
-  - 18:00-20:45 -> EVENING
+- **时间段映射**: 以日历时间窗口为准，按 `schedule` 时间段与窗口的**重叠时长**确定 `timeSlot`。
+  - 若跨多个窗口，取重叠时长最大的窗口
+  - 若无有效重叠，退回按 `startTime` 推导（解析失败默认 MORNING）
 - **字段同步（覆盖）**:
   - schedule.id -> activity.schedule_id
   - schedule.group_id -> activity.group_id
@@ -49,7 +48,8 @@
   - AFTERNOON -> 12:00-18:00
   - EVENING -> 18:00-20:45
 - **冲突处理/排位规则**:
-  - 若当日已有 schedule，则把新日程放到**当日最后一个 end_time 之后**
+  - 优先将新日程放入对应 `timeSlot` 窗口内的**最早可用空档**
+  - 若窗口内无空档，则放在**窗口结束时间之后**（仍在当日内）
   - 新日程时长固定为 **1 小时**
   - 允许超过当天结束时间（不自动换天）
 - **重定位条件**:
@@ -384,4 +384,3 @@ CalendarDaysView.jsx
 文档版本：1.1.0
 最后更新：2026年1月24日
 作者：Education Connect 开发团队
-

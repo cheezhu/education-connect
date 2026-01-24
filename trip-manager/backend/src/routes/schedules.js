@@ -11,6 +11,12 @@ const toMinutes = (timeValue) => {
   return hour * 60 + minute;
 };
 
+const SLOT_WINDOWS = {
+  MORNING: { start: '06:00', end: '12:00' },
+  AFTERNOON: { start: '12:00', end: '18:00' },
+  EVENING: { start: '18:00', end: '20:45' }
+};
+
 const getTimeSlotFromStart = (startTime) => {
   const minutes = toMinutes(startTime);
   if (minutes === null) return 'MORNING';
@@ -19,9 +25,38 @@ const getTimeSlotFromStart = (startTime) => {
   return 'EVENING';
 };
 
+const getTimeSlotFromRange = (startTime, endTime) => {
+  const startMinutes = toMinutes(startTime);
+  const endMinutes = toMinutes(endTime);
+  if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) {
+    return getTimeSlotFromStart(startTime);
+  }
+
+  let bestSlot = null;
+  let bestOverlap = -1;
+  Object.entries(SLOT_WINDOWS).forEach(([slotKey, window]) => {
+    const windowStart = toMinutes(window.start);
+    const windowEnd = toMinutes(window.end);
+    if (!Number.isFinite(windowStart) || !Number.isFinite(windowEnd)) return;
+    const overlap = Math.max(
+      0,
+      Math.min(endMinutes, windowEnd) - Math.max(startMinutes, windowStart)
+    );
+    if (overlap > bestOverlap) {
+      bestOverlap = overlap;
+      bestSlot = slotKey;
+    }
+  });
+
+  if (bestSlot) {
+    return bestSlot;
+  }
+  return getTimeSlotFromStart(startTime);
+};
+
 const syncSchedulesToActivities = (db, groupId) => {
   const schedules = db.prepare(`
-    SELECT id, group_id, activity_date, start_time, location_id
+    SELECT id, group_id, activity_date, start_time, end_time, location_id
     FROM schedules
     WHERE group_id = ?
   `).all(groupId);
@@ -55,7 +90,7 @@ const syncSchedulesToActivities = (db, groupId) => {
   `);
 
   schedules.forEach((schedule) => {
-    const timeSlot = getTimeSlotFromStart(schedule.start_time);
+    const timeSlot = getTimeSlotFromRange(schedule.start_time, schedule.end_time);
     const existing = findActivityBySchedule.get(schedule.id);
     if (existing) {
       updateActivity.run(

@@ -30,18 +30,18 @@ const toTimeString = (totalMinutes) => {
 
 const getDefaultTimeRange = (timeSlot) => {
   if (timeSlot === 'AFTERNOON') {
-    return { startTime: '14:00', endTime: '17:00' };
+    return { startTime: '12:00', endTime: '18:00' };
   }
   if (timeSlot === 'EVENING') {
-    return { startTime: '19:00', endTime: '21:00' };
+    return { startTime: '18:00', endTime: '20:45' };
   }
-  return { startTime: '09:00', endTime: '11:30' };
+  return { startTime: '06:00', endTime: '12:00' };
 };
 
 const getSchedulePlacement = (db, groupId, date, timeSlot, excludeScheduleId) => {
   const params = [groupId, date];
   let query = `
-    SELECT end_time
+    SELECT start_time, end_time
     FROM schedules
     WHERE group_id = ?
       AND activity_date = ?
@@ -52,22 +52,56 @@ const getSchedulePlacement = (db, groupId, date, timeSlot, excludeScheduleId) =>
   }
 
   const rows = db.prepare(query).all(...params);
-  if (rows.length === 0) {
+  const slotWindow = getDefaultTimeRange(timeSlot);
+  const windowStart = toMinutes(slotWindow.startTime);
+  const windowEnd = toMinutes(slotWindow.endTime);
+  const defaultDuration = 60;
+
+  if (rows.length === 0 || !Number.isFinite(windowStart) || !Number.isFinite(windowEnd)) {
     return getDefaultTimeRange(timeSlot);
   }
 
-  const endTimes = rows
-    .map(row => toMinutes(row.end_time))
-    .filter(value => Number.isFinite(value));
+  const intervals = rows
+    .map(row => ({
+      start: toMinutes(row.start_time),
+      end: toMinutes(row.end_time)
+    }))
+    .filter(item => Number.isFinite(item.start) && Number.isFinite(item.end))
+    .sort((a, b) => a.start - b.start);
 
-  if (endTimes.length === 0) {
+  if (intervals.length === 0) {
     return getDefaultTimeRange(timeSlot);
   }
 
-  const lastEnd = Math.max(...endTimes);
+  let candidateStart = windowStart;
+  for (const interval of intervals) {
+    if (interval.end <= candidateStart) {
+      continue;
+    }
+    if (interval.start - candidateStart >= defaultDuration) {
+      return {
+        startTime: toTimeString(candidateStart),
+        endTime: toTimeString(candidateStart + defaultDuration)
+      };
+    }
+    candidateStart = Math.max(candidateStart, interval.end);
+    if (candidateStart >= windowEnd) {
+      break;
+    }
+  }
+
+  if (windowEnd - candidateStart >= defaultDuration) {
+    return {
+      startTime: toTimeString(candidateStart),
+      endTime: toTimeString(candidateStart + defaultDuration)
+    };
+  }
+
+  const lastEnd = Math.max(...intervals.map(item => item.end));
+  const fallbackStart = Math.max(lastEnd, windowEnd);
   return {
-    startTime: toTimeString(lastEnd),
-    endTime: toTimeString(lastEnd + 60)
+    startTime: toTimeString(fallbackStart),
+    endTime: toTimeString(fallbackStart + defaultDuration)
   };
 };
 
@@ -379,9 +413,9 @@ router.delete('/:id', requireEditLock, (req, res) => {
 // 辅助函数：获取时间段
 function getTimeFromSlot(slot) {
   const times = {
-    'MORNING': { start: '09:00:00', end: '12:00:00' },
-    'AFTERNOON': { start: '14:00:00', end: '17:00:00' },
-    'EVENING': { start: '19:00:00', end: '21:00:00' }
+    'MORNING': { start: '06:00:00', end: '12:00:00' },
+    'AFTERNOON': { start: '12:00:00', end: '18:00:00' },
+    'EVENING': { start: '18:00:00', end: '20:45:00' }
   };
   return times[slot];
 }
