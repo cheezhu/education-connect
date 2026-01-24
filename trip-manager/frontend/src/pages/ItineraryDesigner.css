@@ -623,6 +623,21 @@
   color: #333;
 }
 
+.group-calendar-name-link {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: #1677ff;
+  cursor: pointer;
+}
+
+.group-calendar-name-link:hover {
+  text-decoration: underline;
+}
+
 .group-calendar-dates {
   font-weight: 500;
   font-size: 11px;
@@ -634,6 +649,23 @@
   overflow: auto;
   padding: 12px;
   background: #fafafa;
+}
+
+.group-calendar-resize-handle {
+  height: 8px;
+  background: #f0f0f0;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.group-calendar-resize-handle::after {
+  content: '';
+  width: 36px;
+  height: 3px;
+  border-radius: 2px;
+  background: #c7c7c7;
 }
 
 .group-calendar-row {
@@ -726,4 +758,8 @@
 
 .group-calendar-drawer .ant-drawer-header {
   display: none;
+}
+
+.group-calendar-drawer.resizing .group-calendar-grid {
+  pointer-events: none;
 }

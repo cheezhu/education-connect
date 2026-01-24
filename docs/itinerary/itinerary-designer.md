@@ -1,4 +1,4 @@
-# 行程设计器（ItineraryDesigner）详解
+﻿# 行程设计器（ItineraryDesigner）详解
 
 ## 功能定位
 多团组 7 日时间轴排期中心：批量查看、编辑、拖拽、冲突检查、AI 自动排期。

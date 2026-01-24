@@ -1,4 +1,4 @@
-# Education Connect 实际可行集成方案
+﻿# Education Connect 实际可行集成方案
 
 ## 一、核心认知：关系驱动而非技术驱动
 

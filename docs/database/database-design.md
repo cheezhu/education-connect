@@ -1,4 +1,4 @@
-# Education Connect 数据库设计
+﻿# Education Connect 数据库设计
 
 ## 概述
 

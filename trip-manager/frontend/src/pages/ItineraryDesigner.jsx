@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { Card, Button, Modal, Form, Select, InputNumber, Input, message, Checkbox, Tooltip, Badge, DatePicker, Drawer, Upload } from 'antd';
 import {
   PlusOutlined,
@@ -24,6 +24,9 @@ import './ItineraryDesigner.css';
 const { Option } = Select;
 
 function ItineraryDesigner() {
+  const GROUP_CALENDAR_HEIGHT_DEFAULT = 30;
+  const GROUP_CALENDAR_HEIGHT_MIN = 20;
+  const GROUP_CALENDAR_HEIGHT_MAX = 70;
   const timeSlotKeys = ['MORNING', 'AFTERNOON', 'EVENING'];
   const getStoredWeekStartDate = () => {
     try {
@@ -76,6 +79,28 @@ function ItineraryDesigner() {
     return true;
   };
 
+  
+  const normalizeGroupCalendarHeight = (value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return null;
+    const clamped = Math.min(
+      GROUP_CALENDAR_HEIGHT_MAX,
+      Math.max(GROUP_CALENDAR_HEIGHT_MIN, parsed)
+    );
+    return Math.round(clamped * 10) / 10;
+  };
+
+  const getStoredGroupCalendarHeight = () => {
+    try {
+      const stored = localStorage.getItem('itinerary_group_calendar_height');
+      const normalized = normalizeGroupCalendarHeight(stored);
+      if (normalized !== null) return normalized;
+    } catch (error) {
+      // ignore
+    }
+    return GROUP_CALENDAR_HEIGHT_DEFAULT;
+  };
+
   const [groups, setGroups] = useState([]);
   const [activities, setActivities] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -103,6 +128,12 @@ function ItineraryDesigner() {
   const [planningImportResult, setPlanningImportResult] = useState(null);
   const [groupCalendarVisible, setGroupCalendarVisible] = useState(false);
   const [groupCalendarGroupId, setGroupCalendarGroupId] = useState(null);
+  
+  const [groupCalendarHeight, setGroupCalendarHeight] = useState(() => getStoredGroupCalendarHeight());
+  const [groupCalendarResizing, setGroupCalendarResizing] = useState(false);
+  const groupCalendarHeightRef = useRef(getStoredGroupCalendarHeight());
+  const groupCalendarResizeRef = useRef(null);
+  const groupCalendarSaveTimeoutRef = useRef(null);
   const [form] = Form.useForm();
   const [planningForm] = Form.useForm();
   const [planningImportForm] = Form.useForm();
@@ -247,6 +278,23 @@ function ItineraryDesigner() {
     }
   };
 
+  
+  const loadGroupCalendarHeightConfig = async () => {
+    try {
+      const response = await api.get('/config/itinerary-group-calendar-height');
+      const normalized = normalizeGroupCalendarHeight(response.data?.height);
+      if (normalized !== null && normalized !== groupCalendarHeightRef.current) {
+        setGroupCalendarHeight(normalized);
+        try {
+          localStorage.setItem('itinerary_group_calendar_height', String(normalized));
+        } catch (error) {
+          // ignore
+        }
+      }
+    } catch (error) {
+    }
+  };
+
   const persistTimeSlotConfig = async (slots) => {
     setEnabledTimeSlots(slots);
     try {
@@ -294,6 +342,24 @@ function ItineraryDesigner() {
     }
   };
 
+  
+  const persistGroupCalendarHeightConfig = async (heightValue) => {
+    const normalized = normalizeGroupCalendarHeight(heightValue);
+    if (normalized === null) return;
+    try {
+      localStorage.setItem('itinerary_group_calendar_height', String(normalized));
+    } catch (error) {
+      // ignore
+    }
+    try {
+      await api.put('/config/itinerary-group-calendar-height', {
+        height: normalized
+      });
+    } catch (error) {
+      // ignore
+    }
+  };
+
   const handleTimeSlotToggle = (slots) => {
     const normalized = timeSlotKeys.filter((key) => slots.includes(key));
     persistTimeSlotConfig(normalized);
@@ -324,11 +390,21 @@ function ItineraryDesigner() {
     loadTimeSlotConfig();
     loadDailyFocusConfig();
     loadGroupRowAlignConfig();
+    loadGroupCalendarHeightConfig();
     const unregister = registerRefreshCallback(refreshData);
     return unregister;
   }, [registerRefreshCallback]);
 
   useEffect(() => {
+    groupCalendarHeightRef.current = groupCalendarHeight;
+  }, [groupCalendarHeight]);
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(groupCalendarSaveTimeoutRef.current);
+    };
+  }, []);
+useEffect(() => {
     if (!planningDateRange || planningDateRange.length !== 2) {
       planningForm.setFieldsValue({ groupIds: [] });
       return;
@@ -418,6 +494,64 @@ function ItineraryDesigner() {
     setGroupCalendarVisible(true);
   };
 
+  const handleGroupCalendarResizeStart = (event) => {
+    if (event?.button !== undefined && event.button !== 0) return;
+    const point = event.touches ? event.touches[0] : event;
+    if (!point) return;
+    const clientY = point.clientY;
+    if (!Number.isFinite(clientY)) return;
+    groupCalendarResizeRef.current = {
+      startY: clientY,
+      startHeight: groupCalendarHeightRef.current
+    };
+    setGroupCalendarResizing(true);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'row-resize';
+    window.addEventListener('mousemove', handleGroupCalendarResizeMove);
+    window.addEventListener('mouseup', handleGroupCalendarResizeEnd);
+    window.addEventListener('touchmove', handleGroupCalendarResizeMove, { passive: false });
+    window.addEventListener('touchend', handleGroupCalendarResizeEnd);
+  };
+
+  const handleGroupCalendarResizeMove = (event) => {
+    if (!groupCalendarResizeRef.current) return;
+    const point = event.touches ? event.touches[0] : event;
+    if (!point) return;
+    const clientY = point.clientY;
+    if (!Number.isFinite(clientY)) return;
+    const deltaY = groupCalendarResizeRef.current.startY - clientY;
+    const viewportHeight = window.innerHeight || 1;
+    const deltaVh = (deltaY / viewportHeight) * 100;
+    const nextHeight = normalizeGroupCalendarHeight(groupCalendarResizeRef.current.startHeight + deltaVh);
+    if (nextHeight === null) return;
+    setGroupCalendarHeight(nextHeight);
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+  };
+
+  const handleGroupCalendarResizeEnd = () => {
+    if (!groupCalendarResizeRef.current) return;
+    groupCalendarResizeRef.current = null;
+    setGroupCalendarResizing(false);
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    window.removeEventListener('mousemove', handleGroupCalendarResizeMove);
+    window.removeEventListener('mouseup', handleGroupCalendarResizeEnd);
+    window.removeEventListener('touchmove', handleGroupCalendarResizeMove);
+    window.removeEventListener('touchend', handleGroupCalendarResizeEnd);
+    clearTimeout(groupCalendarSaveTimeoutRef.current);
+    groupCalendarSaveTimeoutRef.current = setTimeout(() => {
+      persistGroupCalendarHeightConfig(groupCalendarHeightRef.current);
+    }, 300);
+  };
+
+  const openGroupCalendarDetail = (groupId) => {
+    if (!groupId) return;
+    const baseUrl = window.location?.origin || '';
+    const targetUrl = `${baseUrl}/groups/v2/edit/${groupId}?tab=schedule`;
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+  };
 
   const openPlanningExportModal = () => {
     const defaultRange = [dayjs(dateRange[0]), dayjs(dateRange[6])];
@@ -1596,21 +1730,30 @@ function ItineraryDesigner() {
         placement="bottom"
         open={groupCalendarVisible}
         onClose={() => setGroupCalendarVisible(false)}
-        height="30vh"
+        height={`${groupCalendarHeight}vh`}
         mask={false}
         closable={false}
         bodyStyle={{ padding: 0, height: '100%' }}
-        getContainer={false}
-        style={{ position: 'absolute' }}
-        rootClassName="group-calendar-drawer"
+        rootClassName={`group-calendar-drawer${groupCalendarResizing ? ' resizing' : ''}`}
       >
+        <div
+          className="group-calendar-resize-handle"
+          onMouseDown={handleGroupCalendarResizeStart}
+          onTouchStart={handleGroupCalendarResizeStart}
+        />
         {groupCalendarGroup ? (
           <div className="group-calendar">
             <div className="group-calendar-header">
               <div className="group-calendar-title-row">
                 <div className="group-calendar-title">
                   <span className="group-color-dot" style={{ backgroundColor: groupCalendarGroup.color }} />
-                  <span>{groupCalendarGroup.name}</span>
+                  <button
+                    type="button"
+                    className="group-calendar-name-link"
+                    onClick={() => openGroupCalendarDetail(groupCalendarGroup.id)}
+                  >
+                    {groupCalendarGroup.name}
+                  </button>
                   <span className="group-calendar-dates">
                     {dayjs(groupCalendarGroup.start_date).format('YYYY-MM-DD')} ~ {dayjs(groupCalendarGroup.end_date).format('YYYY-MM-DD')}
                   </span>
@@ -2083,4 +2226,22 @@ function ItineraryDesigner() {
 }
 
 export default ItineraryDesigner;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

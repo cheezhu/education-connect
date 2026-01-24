@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "docs/overview/project-overview.md",
+                "file": "docs/calendar/schedule-activity-sync.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "project-overview"
+              "title": "schedule-activity-sync"
             }
           }
         ]
@@ -183,9 +183,29 @@
       "bases:Create new base": false
     }
   },
-  "active": "89dc3204ce9bc06a",
+  "active": "2411584888c4ede4",
   "lastOpenFiles": [
+    "docs/archive/strategy/vision-roadmap.md",
+    "docs/archive/strategy/studio-field-feature-design.md",
+    "docs/archive/strategy/README.md",
+    "docs/archive/strategy/studio-field-architecture-analysis.md",
+    "docs/archive/strategy/feasible-integration.md",
+    "docs/archive/strategy/hk-api-integration.md",
+    "docs/archive/strategy",
+    "docs/archive/history/readme-legacy.md",
+    "docs/archive/history/README.md",
+    "docs/archive/history/studio-field-index-legacy.md",
+    "docs/archive/history/claude-legacy.md",
+    "docs/archive/history/frontend-backend-interaction-legacy.md",
+    "docs/archive/history/architecture-legacy-v1-v2.md",
+    "docs/archive/history",
+    "docs/archive",
+    "docs/itinerary/row-alignment.md",
     "trip-manager/backend/db/trip.db-journal",
+    "docs/overview/project-overview.md",
+    "trip-manager/frontend/vite.config.js.timestamp-1769285861241-b38eec141f182.mjs",
+    "docs/account-admin/README.md",
+    "docs/account-admin",
     "docs/ai/ai-planner.md",
     "docs/frontend/frontend-ui.md",
     "group-management-update/group-management-optimization.md",
@@ -194,32 +214,13 @@
     "trip-manager/frontend/src/pages/Settings.jsx",
     "trip-manager/frontend/vite.config.js.timestamp-1769251394090-8f109a710b036.mjs",
     "trip-manager/backend/src/utils/aiConfig.js",
-    "trip-manager/backend/src/utils/configStore.js",
-    "trip-manager/backend/src/utils",
     "docs/runbook.md",
     "docs/itinerary/itinerary-designer.md",
     "AI for Planning/planning_result_import_implementation_spec.md",
     "docs/itinerary/ai-workflows/README.md",
     "docs/itinerary-grid-optimizations/README.md",
-    "docs/itinerary/ai-workflows",
-    "trip-manager/backend/node_modules/undici/lib/node/fixed-queue.js",
-    "trip-manager/backend/node_modules/undici/lib/node",
     "trip-manager/backend/node_modules/undici/docs/best-practices/writing-tests.md",
     "trip-manager/backend/node_modules/undici/docs/best-practices/mocking-request.md",
-    "trip-manager/backend/node_modules/undici/docs/best-practices/proxy.md",
-    "trip-manager/backend/node_modules/undici/docs/best-practices/client-certificate.md",
-    "trip-manager/backend/node_modules/undici/docs/assets/lifecycle-diagram.png",
-    "trip-manager/backend/node_modules/undici/docs/api/WebSocket.md",
-    "trip-manager/backend/node_modules/undici/docs/api/RetryHandler.md",
-    "trip-manager/backend/node_modules/undici/docs/api/PoolStats.md",
-    "trip-manager/backend/node_modules/undici/docs/api/ProxyAgent.md",
-    "trip-manager/backend/node_modules/undici/docs/api/MockPool.md",
-    "trip-manager/backend/node_modules/undici/docs/api/Pool.md",
-    "trip-manager/backend/node_modules/undici/docs/api/MockClient.md",
-    "trip-manager/backend/node_modules/undici/docs/api/MockErrors.md",
-    "trip-manager/backend/node_modules/undici/docs/api/Fetch.md",
-    "trip-manager/backend/node_modules/undici/docs/api/MockAgent.md",
-    "trip-manager/backend/node_modules/undici/docs/api/ContentType.md",
-    "trip-manager/backend/node_modules/undici/docs/api/Errors.md"
+    "trip-manager/backend/node_modules/undici/docs/assets/lifecycle-diagram.png"
   ]
 }

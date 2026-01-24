@@ -1,4 +1,4 @@
-# Education Connect（历史文档·已修订）
+﻿# Education Connect（历史文档·已修订）
 
 > 提示：本文档为历史版本整理，已按当前实现修订。权威入口请以 `README.md` 与 `docs/architecture/overview.md` 为准。
 

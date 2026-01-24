@@ -1,4 +1,4 @@
-# 数据库结构（SQLite）
+﻿# 数据库结构（SQLite）
 
 数据库文件：`trip-manager/backend/db/trip.db`
 初始化脚本：`trip-manager/backend/db/init.sql`

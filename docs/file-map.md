@@ -1,24 +1,29 @@
-﻿# 关键文件路径索引
+﻿# �ؼ��ļ�·������
 
-## 后端
-- `trip-manager/backend/server.js`：Express 入口
-- `trip-manager/backend/db/init.sql`：数据库初始化
-- `trip-manager/backend/db/trip.db`：SQLite 数据库
-- `trip-manager/backend/src/routes/*`：API 路由
-- `trip-manager/backend/src/routes/planning.js`：排程输入包导出
-- `trip-manager/backend/src/middleware/editLock.js`：编辑锁中间件
+## ���
+- `trip-manager/backend/server.js`��Express ���
+- `trip-manager/backend/db/init.sql`�����ݿ��ʼ��
+- `trip-manager/backend/db/trip.db`��SQLite ���ݿ�
+- `trip-manager/backend/src/routes/*`��API ·��
+- `trip-manager/backend/src/routes/planning.js`���ų����������
+- `trip-manager/backend/src/middleware/editLock.js`���༭���м��
 
-## 前端
-- `trip-manager/frontend/src/App.jsx`：路由入口
-- `trip-manager/frontend/src/services/api.js`：API 客户端
-- `trip-manager/frontend/src/pages/GroupManagementV2/`：团组管理
-- `trip-manager/frontend/src/pages/GroupEditV2/`：团组编辑 + 日历详情
-- `trip-manager/frontend/src/pages/ItineraryDesigner.jsx`：行程设计器
-- `trip-manager/frontend/src/pages/LocationManagement.jsx`：地点/方案
-- `trip-manager/frontend/src/pages/Statistics.jsx`：统计报表
+## ǰ��
+- `trip-manager/frontend/src/App.jsx`��·�����
+- `trip-manager/frontend/src/services/api.js`��API �ͻ���
+- `trip-manager/frontend/src/pages/GroupManagementV2/`���������
+- `trip-manager/frontend/src/pages/GroupEditV2/`������༭ + ��������
+- `trip-manager/frontend/src/pages/ItineraryDesigner.jsx`���г������
+- `trip-manager/frontend/src/pages/LocationManagement.jsx`���ص�/����
+- `trip-manager/frontend/src/pages/Statistics.jsx`��ͳ�Ʊ���
 
-## 文档
+## �ĵ�
+- `docs/README.md`
 - `docs/architecture/overview.md`
-- `docs/calendar/calendar-days-view.md`
-- `docs/calendar/schedule-activity-sync.md`
-- `docs/strategy/`（规划与市场方案）
+- `docs/calendar/README.md`
+- `docs/itinerary/itinerary-designer.md`
+- `docs/itinerary/row-alignment.md`
+- `docs/api/api-reference.md`
+- `docs/database/database-schema.md`
+- `docs/archive/strategy/`���鵵��������滮��
+- `docs/archive/history/`���鵵����ʷ�������

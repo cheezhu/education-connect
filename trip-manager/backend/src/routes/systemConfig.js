@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const { getConfigRow, upsertConfig } = require('../utils/configStore');
 const {
   AI_CONFIG_KEYS,
@@ -13,7 +13,11 @@ const WEEK_START_KEY = 'itinerary_week_start';
 const TIME_SLOTS_KEY = 'itinerary_time_slots';
 const DAILY_FOCUS_KEY = 'itinerary_daily_focus';
 const GROUP_ROW_ALIGN_KEY = 'itinerary_group_row_align';
+const GROUP_CALENDAR_HEIGHT_KEY = 'itinerary_group_calendar_height';
 const DEFAULT_TIME_SLOTS = ['MORNING', 'AFTERNOON', 'EVENING'];
+const DEFAULT_GROUP_CALENDAR_HEIGHT = 30;
+const GROUP_CALENDAR_HEIGHT_MIN = 20;
+const GROUP_CALENDAR_HEIGHT_MAX = 70;
 
 const isValidDate = (value) => {
   if (typeof value !== 'string') return false;
@@ -32,6 +36,13 @@ const normalizeBoolean = (value) => {
   if (value === 'true') return true;
   if (value === 'false') return false;
   return null;
+};
+
+const normalizeHeight = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  const clamped = Math.min(GROUP_CALENDAR_HEIGHT_MAX, Math.max(GROUP_CALENDAR_HEIGHT_MIN, parsed));
+  return Math.round(clamped * 10) / 10;
 };
 
 router.get('/itinerary-week-start', (req, res) => {
@@ -119,6 +130,29 @@ router.put('/itinerary-group-row-align', (req, res) => {
   res.json({ enabled: normalized });
 });
 
+
+router.get('/itinerary-group-calendar-height', (req, res) => {
+  const row = getConfigRow(req.db, GROUP_CALENDAR_HEIGHT_KEY);
+  const parsed = row ? normalizeHeight(row.value) : null;
+  res.json({ height: parsed ?? DEFAULT_GROUP_CALENDAR_HEIGHT });
+});
+
+router.put('/itinerary-group-calendar-height', (req, res) => {
+  const normalized = normalizeHeight(req.body?.height);
+  if (normalized === null) {
+    return res.status(400).json({ error: '\u65e0\u6548\u914d\u7f6e' });
+  }
+
+  upsertConfig(
+    req.db,
+    GROUP_CALENDAR_HEIGHT_KEY,
+    String(normalized),
+    '\u884c\u7a0b\u8bbe\u8ba1\u5668\u56e2\u7ec4\u65e5\u5386\u53ef\u8c03\u9ad8\u5ea6'
+  );
+
+  res.json({ height: normalized });
+});
+
 const buildAllConfig = (db) => {
   const weekRow = getConfigRow(db, WEEK_START_KEY);
   const weekStartDate = weekRow && isValidDate(weekRow.value) ? weekRow.value : null;
@@ -144,6 +178,10 @@ const buildAllConfig = (db) => {
   const alignRow = getConfigRow(db, GROUP_ROW_ALIGN_KEY);
   const alignNormalized = alignRow ? normalizeBoolean(alignRow.value) : null;
   const groupRowAlign = alignNormalized ?? true;
+  
+  const calendarHeightRow = getConfigRow(db, GROUP_CALENDAR_HEIGHT_KEY);
+  const calendarHeightNormalized = calendarHeightRow ? normalizeHeight(calendarHeightRow.value) : null;
+  const groupCalendarHeight = calendarHeightNormalized ?? DEFAULT_GROUP_CALENDAR_HEIGHT;
 
   const aiSettings = resolveAiSettings(db);
   const apiKeyMasked = aiSettings.apiKeyPresent ? maskApiKey(aiSettings.apiKey) : null;
@@ -153,7 +191,8 @@ const buildAllConfig = (db) => {
       weekStart: weekStartDate,
       timeSlots,
       dailyFocus,
-      groupRowAlign
+      groupRowAlign,
+      groupCalendarHeight
     },
     ai: {
       provider: aiSettings.provider,
@@ -211,6 +250,19 @@ router.put('/all', (req, res) => {
     upsertConfig(req.db, GROUP_ROW_ALIGN_KEY, normalized ? 'true' : 'false', '行程设计器团组行对齐');
   }
 
+  if (Object.prototype.hasOwnProperty.call(itinerary, 'groupCalendarHeight')) {
+    const normalized = normalizeHeight(itinerary.groupCalendarHeight);
+    if (normalized === null) {
+      return res.status(400).json({ error: '\u65e0\u6548\u914d\u7f6e' });
+    }
+    upsertConfig(
+      req.db,
+      GROUP_CALENDAR_HEIGHT_KEY,
+      String(normalized),
+      '\u884c\u7a0b\u8bbe\u8ba1\u5668\u56e2\u7ec4\u65e5\u5386\u53ef\u8c03\u9ad8\u5ea6'
+    );
+  }
+
   if (Object.prototype.hasOwnProperty.call(ai, 'provider')) {
     const provider = String(ai.provider || '').trim();
     if (!provider) {
@@ -244,3 +296,5 @@ router.put('/all', (req, res) => {
 });
 
 module.exports = router;
+
+

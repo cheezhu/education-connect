@@ -1,4 +1,4 @@
-## 日历详情与行程设计器互通规则
+﻿## 日历详情与行程设计器互通规则
 
 > 该规则基于后端 `schedules.js` 与 `activities.js` 的实际同步逻辑。
 
@@ -8,13 +8,23 @@
 - **activity**: 行程设计器活动，按时间段（MORNING/AFTERNOON/EVENING）。
 - **绑定键**: `activities.schedule_id` 关联对应的 schedule，用于避免重复生成与互相覆盖。
 
+### 0) 时间段窗口（统一口径）
+
+以日历详情的时间轴为准，统一 timeSlot 的时间窗口：
+
+- MORNING：06:00–12:00
+- AFTERNOON：12:00–18:00
+- EVENING：18:00–20:45
+
+> 说明：时间窗口边界建议按 `[start, end)` 处理，避免跨段重叠。
+
 ### 2) schedule -> activity (日历详情同步到行程设计器)
 
 - **触发点**: 日历详情保存（`POST /groups/:groupId/schedules/batch`）。
-- **时间段映射**: 按 `schedule.startTime` 映射为 `timeSlot`（解析失败默认 MORNING）。
+- **时间段映射**: 以日历时间窗口为准，按 `schedule.startTime` 映射为 `timeSlot`（解析失败默认 MORNING）。
   - 06:00-11:59 -> MORNING
   - 12:00-17:59 -> AFTERNOON
-  - 18:00-23:59 -> EVENING
+  - 18:00-20:45 -> EVENING
 - **字段同步（覆盖）**:
   - schedule.id -> activity.schedule_id
   - schedule.group_id -> activity.group_id
@@ -32,10 +42,10 @@
 ### 3) activity -> schedule (行程设计器同步到日历详情)
 
 - **触发点**: 行程设计器创建/更新/删除 activity（`POST/PUT/DELETE /activities`）。
-- **默认时间段**:
-  - MORNING -> 09:00-11:30
-  - AFTERNOON -> 14:00-17:00
-  - EVENING -> 19:00-21:00
+- **默认时间段**（统一日历切分口径）:
+  - MORNING -> 06:00-12:00
+  - AFTERNOON -> 12:00-18:00
+  - EVENING -> 18:00-20:45
 - **冲突处理/排位规则**:
   - 若当日已有 schedule，则把新日程放到**当日最后一个 end_time 之后**
   - 新日程时长固定为 **1 小时**
