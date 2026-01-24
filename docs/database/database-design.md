@@ -126,6 +126,7 @@
 | name | VARCHAR(200) | NOT NULL | - | 地点名称 |
 | address | VARCHAR(500) | - | - | 地址 |
 | capacity | INTEGER | - | 100 | 最大容量 |
+| color | VARCHAR(20) | - | '#1890ff' | 展示颜色 |
 | contact_person | VARCHAR(100) | - | - | 联系人 |
 | contact_phone | VARCHAR(20) | - | - | 联系电话 |
 | blocked_weekdays | VARCHAR(20) | - | - | 不可用星期，如 "3,4" |
@@ -274,6 +275,7 @@
 | auto_backup | true | 是否自动备份 |
 | backup_time | 02:00 | 自动备份时间 |
 | max_groups | 100 | 最大团组数量 |
+| itinerary_group_row_align | true | 行程设计器团组行对齐 |
 
 ---
 

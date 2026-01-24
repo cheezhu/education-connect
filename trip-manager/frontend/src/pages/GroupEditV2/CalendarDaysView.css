@@ -243,6 +243,7 @@
   background: transparent;
 }
 
+
 .calendar-grid.dragging-active .time-slot:hover {
   background: rgba(24, 144, 255, 0.05);
 }

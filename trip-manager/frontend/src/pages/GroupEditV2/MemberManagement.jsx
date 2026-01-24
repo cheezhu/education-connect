@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Table,
   Button,
@@ -27,47 +27,43 @@ import {
   ManOutlined,
   WomanOutlined
 } from '@ant-design/icons';
+import api from '../../services/api';
 
 const { Option } = Select;
 const { Search } = Input;
 
-const MemberManagement = ({ groupId, groupData, members, onUpdate }) => {
+const MemberManagement = ({ groupId }) => {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [filterRole, setFilterRole] = useState('all');
+  const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
 
-  // 模拟数据（实际应从API获取）
-  const [memberList, setMemberList] = useState([
-    {
-      id: 1,
-      name: '张小明',
-      gender: '男',
-      age: 12,
-      id_number: '440106201X****1234',
-      phone: '138****8001',
-      parent_phone: '138****8002',
-      role: '学生',
-      room_number: '301',
-      special_needs: '花生过敏',
-      emergency_contact: '张妈妈'
-    },
-    {
-      id: 2,
-      name: '李老师',
-      gender: '女',
-      age: 35,
-      id_number: '440106198X****5678',
-      phone: '139****9001',
-      parent_phone: '',
-      role: '老师',
-      room_number: '501',
-      special_needs: '',
-      emergency_contact: '李先生'
+  const [memberList, setMemberList] = useState([]);
+  const canManage = Boolean(groupId);
+
+  const loadMembers = async () => {
+    if (!groupId) return;
+    setLoading(true);
+    try {
+      const response = await api.get(`/groups/${groupId}/members`);
+      setMemberList(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      message.error('加载成员数据失败');
+      setMemberList([]);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    loadMembers();
+    setSelectedRowKeys([]);
+    setSearchText('');
+    setFilterRole('all');
+  }, [groupId]);
 
   // 表格列配置
   const columns = [
@@ -190,11 +186,12 @@ const MemberManagement = ({ groupId, groupData, members, onUpdate }) => {
     // 搜索筛选
     if (searchText) {
       const searchLower = searchText.toLowerCase();
-      filtered = filtered.filter(m =>
-        m.name.toLowerCase().includes(searchLower) ||
-        m.phone.includes(searchText) ||
-        m.id_number.includes(searchText)
-      );
+      filtered = filtered.filter(m => {
+        const name = (m.name || '').toLowerCase();
+        const phone = m.phone || '';
+        const idNumber = m.id_number || '';
+        return name.includes(searchLower) || phone.includes(searchText) || idNumber.includes(searchText);
+      });
     }
 
     return filtered;
@@ -216,47 +213,50 @@ const MemberManagement = ({ groupId, groupData, members, onUpdate }) => {
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
-
       if (editingMember) {
-        // 编辑现有成员
-        const updatedList = memberList.map(m =>
-          m.id === editingMember.id ? { ...m, ...values } : m
-        );
-        setMemberList(updatedList);
+        await api.put(`/groups/${groupId}/members/${editingMember.id}`, values);
         message.success('成员信息更新成功');
       } else {
-        // 添加新成员
-        const newMember = {
-          ...values,
-          id: Date.now()
-        };
-        setMemberList([...memberList, newMember]);
+        await api.post(`/groups/${groupId}/members`, values);
         message.success('成员添加成功');
       }
-
       setModalVisible(false);
       form.resetFields();
-      onUpdate(memberList); // 通知父组件更新
+      setEditingMember(null);
+      await loadMembers();
     } catch (error) {
-      console.error('表单验证失败:', error);
+      if (error?.errorFields) {
+        return;
+      }
+      message.error('保存失败');
     }
   };
 
   // 删除成员
-  const handleDelete = (id) => {
-    const updatedList = memberList.filter(m => m.id !== id);
-    setMemberList(updatedList);
-    message.success('删除成功');
-    onUpdate(updatedList);
+  const handleDelete = async (id) => {
+    try {
+      await api.delete(`/groups/${groupId}/members/${id}`);
+      message.success('删除成功');
+      await loadMembers();
+    } catch (error) {
+      message.error('删除失败');
+    }
   };
 
   // 批量删除
-  const handleBatchDelete = () => {
-    const updatedList = memberList.filter(m => !selectedRowKeys.includes(m.id));
-    setMemberList(updatedList);
-    setSelectedRowKeys([]);
-    message.success(`删除了 ${selectedRowKeys.length} 个成员`);
-    onUpdate(updatedList);
+  const handleBatchDelete = async () => {
+    if (!groupId) return;
+    const ids = [...selectedRowKeys];
+    try {
+      await Promise.all(
+        ids.map(id => api.delete(`/groups/${groupId}/members/${id}`))
+      );
+      setSelectedRowKeys([]);
+      message.success(`删除了 ${ids.length} 个成员`);
+      await loadMembers();
+    } catch (error) {
+      message.error('批量删除失败');
+    }
   };
 
   // 导入Excel
@@ -277,6 +277,14 @@ const MemberManagement = ({ groupId, groupData, members, onUpdate }) => {
     teachers: memberList.filter(m => m.role === '老师').length,
     parents: memberList.filter(m => m.role === '家长').length
   };
+
+  if (!canManage) {
+    return (
+      <div style={{ padding: '24px', color: '#8c8c8c' }}>
+        请先保存团组后再维护成员信息。
+      </div>
+    );
+  }
 
   return (
     <div className="member-management">
@@ -332,6 +340,7 @@ const MemberManagement = ({ groupId, groupData, members, onUpdate }) => {
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={() => handleEdit()}
+                disabled={!canManage}
               >
                 添加成员
               </Button>
@@ -340,11 +349,12 @@ const MemberManagement = ({ groupId, groupData, members, onUpdate }) => {
                 showUploadList={false}
                 beforeUpload={handleImport}
               >
-                <Button icon={<UploadOutlined />}>批量导入</Button>
+                <Button icon={<UploadOutlined />} disabled={!canManage}>批量导入</Button>
               </Upload>
               <Button
                 icon={<DownloadOutlined />}
                 onClick={handleExport}
+                disabled={!canManage}
               >
                 导出Excel
               </Button>
@@ -392,6 +402,7 @@ const MemberManagement = ({ groupId, groupData, members, onUpdate }) => {
         dataSource={getFilteredMembers()}
         rowKey="id"
         scroll={{ x: 1300 }}
+        loading={loading}
         pagination={{
           pageSize: 10,
           showSizeChanger: true,

@@ -125,6 +125,7 @@ function LocationManagement({ editMode }) {
         name: location.name,
         address: location.address,
         capacity: location.capacity,
+        color: location.color || '#1890ff',
         notes: location.notes,
         targetGroups: location.target_groups || 'all',
         contactPerson: location.contact_person || '',
@@ -135,6 +136,7 @@ function LocationManagement({ editMode }) {
       form.resetFields();
       form.setFieldsValue({
         capacity: 100,
+        color: '#1890ff',
         targetGroups: 'all',
         blockedWeekdays: []
       });
@@ -151,7 +153,8 @@ function LocationManagement({ editMode }) {
         blocked_weekdays: blockedValue,
         target_groups: values.targetGroups,
         contact_person: values.contactPerson,
-        contact_phone: values.contactPhone
+        contact_phone: values.contactPhone,
+        color: values.color || '#1890ff'
       };
 
       if (editingLocation) {
@@ -264,6 +267,18 @@ function LocationManagement({ editMode }) {
   };
 
   const columns = [
+    {
+      title: '',
+      dataIndex: 'color',
+      key: 'color',
+      width: 36,
+      render: (color) => (
+        <span
+          className="location-color-dot"
+          style={{ backgroundColor: color || '#1890ff' }}
+        />
+      )
+    },
     {
       title: '地点名称',
       dataIndex: 'name',
@@ -520,6 +535,7 @@ function LocationManagement({ editMode }) {
               name="capacity"
               label="最大容量"
               rules={[{ required: true, type: 'number', min: 1 }]}
+              style={{ flex: 1 }}
             >
               <InputNumber
                 min={1}
@@ -534,12 +550,21 @@ function LocationManagement({ editMode }) {
               name="targetGroups"
               label="适用团组"
               rules={[{ required: true, message: '请选择适用团组' }]}
+              style={{ flex: 1 }}
             >
               <Select placeholder="请选择适用团组">
                 <Option value="all">全部团组</Option>
                 <Option value="primary">仅小学团组</Option>
                 <Option value="secondary">仅中学团组</Option>
               </Select>
+            </Form.Item>
+
+            <Form.Item
+              name="color"
+              label="色块"
+              style={{ width: 120 }}
+            >
+              <Input type="color" />
             </Form.Item>
           </div>
 

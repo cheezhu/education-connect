@@ -1,4 +1,4 @@
-﻿# 配置、认证与编辑锁
+# 配置、认证与编辑锁
 
 ## 环境变量（后端）
 - PORT
@@ -20,8 +20,10 @@
 - itinerary_week_start（行程设计器周起始日期）
 - itinerary_time_slots（显示时间段）
 - itinerary_daily_focus（每日关注开关）
+- itinerary_group_row_align（团组行对齐开关）
 - ai_schedule_rules（AI 规则）
 - ai_itinerary_history（AI 历史记录）
+- ai_provider / ai_model / ai_timeout_ms / ai_api_key（AI 运行配置，优先于环境变量）
 - 其他默认项：lock_timeout/auto_backup/backup_time/max_groups
 
 ## 认证

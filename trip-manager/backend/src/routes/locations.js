@@ -25,6 +25,7 @@ router.post('/', requireEditLock, (req, res) => {
     name, 
     address,
     capacity = 100,
+    color = '#1890ff',
     contactPerson,
     contactPhone,
     blockedWeekdays = '',
@@ -41,11 +42,11 @@ router.post('/', requireEditLock, (req, res) => {
   try {
     const result = req.db.prepare(`
       INSERT INTO locations (
-        name, address, capacity, contact_person, 
+        name, address, capacity, color, contact_person,
         contact_phone, blocked_weekdays, open_hours, closed_dates, target_groups, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      name, address, capacity, contactPerson,
+      name, address, capacity, color, contactPerson,
       contactPhone, blockedWeekdays, openHours, closedDates, targetGroups, notes
     );
 
@@ -65,7 +66,7 @@ router.put('/:id', requireEditLock, (req, res) => {
 
   // 构建更新字段
   const allowedFields = [
-    'name', 'address', 'capacity', 'contact_person',
+    'name', 'address', 'capacity', 'color', 'contact_person',
     'contact_phone', 'blocked_weekdays', 'open_hours', 'closed_dates', 'target_groups', 
     'notes', 'is_active'
   ];

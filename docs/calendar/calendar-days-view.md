@@ -9,34 +9,36 @@ CalendarDaysView 是一个复杂的 React 组件，实现了类似 Google Calend
 ## 🎯 核心功能
 
 ### 1. 日历视图展示
-- **网格布局**：使用 CSS Grid 创建时间槽网格（6:00-20:00，每小时一格）
-- **7天视图**：显示团组行程期间的7天日程
-- **自适应高度**：日历自动适配屏幕高度，无需滚动条
-- **时间标记**：左侧显示时间刻度，顶部显示日期
+- **网格布局**：使用 CSS Grid 创建时间槽网格（06:00-20:45，每 15 分钟一格）
+- **按团组日期范围**：日期列由 `groupData.start_date ~ end_date` 生成（不固定 7 天）
+- **滚动与高度**：日历占满父容器，网格超出时由滚动容器垂直滚动
+- **时间标记**：左侧仅在整点显示时间标签，顶部显示日期（包含今天/周末样式）
 
 ### 2. 拖拽系统
 - **活动拖拽**：支持拖动已有活动到不同时间/日期
-- **资源卡片拖拽**：从底部资源区拖入日历创建新活动
-- **双向拖拽**：单一活动可从日历拖回资源区
-- **视觉反馈**：拖拽时显示蓝色标尺线和预览区域
+- **资源卡片拖拽**：从右侧资源区拖入日历创建新活动
+- **双向拖拽**：方案行程点可拖回资源区以“归还”并删除对应活动
+- **视觉反馈**：拖拽时显示虚线放置框（drop indicator），使用浏览器原生拖拽预览
 
 ### 3. 资源管理
-- **可重复活动**：如餐饮、交通等，可多次使用
-- **单一活动**：如景点参观等，使用后从资源池移除
-- **智能恢复**：单一活动拖回资源区时自动恢复到列表
+- **行程方案资源**：选择行程方案后，将方案项转为可拖拽“方案行程点”（唯一资源）
+- **可重复活动**：餐饮/交通/休息等固定资源，可无限次拖入
+- **AI 辅助**：支持 AI 行程生成、AI 规则配置、AI 使用记录
 
 ### 4. 活动编辑
 - **右键菜单**：右键点击活动打开编辑弹窗
-- **时间调整**：支持调整活动的开始和结束时间
+- **时间调整**：支持拖拽移动与拉伸调整时间
 - **类型管理**：不同类型活动显示不同颜色和图标
+- **点击行为**：左键点击仅阻止冒泡，不直接弹窗（通过右键菜单编辑）
 
 ## 🏗️ 技术架构
 
-### 状态管理
+### 状态管理（关键状态）
 ```javascript
-// 核心状态
-const [activities, setActivities] = useState(schedules);        // 活动列表
-const [availableResources, setAvailableResources] = useState(); // 可用资源
+const [activities, setActivities] = useState(schedules);        // 日程列表
+const [selectedPlanId, setSelectedPlanId] = useState(groupData?.itinerary_plan_id ?? null);
+const [planResources, setPlanResources] = useState([]);
+const [availablePlanResources, setAvailablePlanResources] = useState([]);
 const [draggedActivity, setDraggedActivity] = useState(null);   // 拖拽中的活动
 const [draggedResource, setDraggedResource] = useState(null);   // 拖拽中的资源
 const [dropIndicator, setDropIndicator] = useState(null);       // 放置指示器
@@ -46,12 +48,12 @@ const [isDragging, setIsDragging] = useState(false);           // 拖拽状态
 ### 坐标系统
 ```
 CSS Grid 布局：
-- 列：第1列为时间，第2-8列为星期日期
-- 行：第1行为头部，第2-15行为时间槽（6:00-20:00）
+- 列：第1列为时间列，第2..(N+1)列为日期列（N = 日期数）
+- 行：第1行为头部，后续为时间槽（06:00-20:45，15分钟/格）
 
 Grid定位公式：
 gridColumn = dayIndex + 2    // 日期列索引
-gridRow = timeSlotIndex + 2  // 时间行索引
+gridRow    = timeSlotIndex + 2  // 时间行索引
 ```
 
 ## 🎨 拖拽实现细节
@@ -80,7 +82,7 @@ const activityTopY = mouseY - dragOffsetRef.current.y;
 const adjustedY = activityTopY - headerHeight;
 const targetSlotIndex = Math.round(adjustedY / slotHeight);
 
-// 显示标尺线
+// 显示放置指示器
 setDropIndicator({
   dayIndex,
   slotIndex: constrainedIndex,
@@ -120,13 +122,10 @@ activity.endTime = newEndTime;
 
 ## 📐 布局系统
 
-### CSS Grid 设置
-```css
-.calendar-grid {
-  display: grid;
-  grid-template-columns: 60px repeat(7, 1fr);  /* 时间列 + 7天 */
-  grid-template-rows: 30px repeat(14, 40px);    /* 头部 + 14小时 */
-}
+### Grid 设置（运行时动态）
+```javascript
+gridTemplateColumns: `60px repeat(${days.length}, 1fr)`
+gridTemplateRows: `30px repeat(${timeSlots.length}, ${SLOT_HEIGHT}px)`
 ```
 
 ### 活动定位
@@ -138,31 +137,37 @@ activity.endTime = newEndTime;
 ```
 
 ### 响应式设计
-- 日历高度：`calc(100vh - 280px)` 自适应屏幕
-- 资源区域：`max-height: 280px` 固定高度，可滚动
+- 日历容器 `calendar-fully-maximized` 占满父容器高度
+- 网格溢出由 `.calendar-scroll-wrapper` 负责滚动
+- 右侧资源区固定宽度约 20%，独立滚动
 
 ## 🔧 资源卡片系统
 
-### 资源分类
+### 资源来源
+- **方案行程点**：行程方案项转为唯一资源（`plan-{planId}-loc-{locationId}`）
+- **可重复活动**：预置资源（餐饮/交通/休息/自由活动等）
+
+示例（可重复活动）：
 ```javascript
 const presetResourcesData = [
-  // 可重复活动
-  { id: 'meal', title: '早餐', isUnique: false },
-
-  // 单一活动
-  { id: 'science', title: '香港科学馆', isUnique: true }
+  { id: 'meal', type: 'meal', title: '早餐', isUnique: false },
+  { id: 'lunch', type: 'meal', title: '午餐', isUnique: false },
+  { id: 'dinner', type: 'meal', title: '晚餐', isUnique: false },
+  { id: 'transport', type: 'transport', title: '大巴交通', isUnique: false },
+  { id: 'rest', type: 'rest', title: '休息', isUnique: false },
+  { id: 'free', type: 'free', title: '自由活动', isUnique: false }
 ];
 ```
 
 ### 资源拖拽逻辑
-1. **创建活动**：资源拖入日历时创建新活动
-2. **移除单一资源**：`isUnique=true`的资源使用后从列表移除
-3. **恢复资源**：单一活动从日历拖回资源区时恢复到列表
+1. **方案行程点拖入**：创建活动 + 从资源区移除
+2. **可重复活动拖入**：创建活动（资源保留）
+3. **方案行程点拖回**：归还资源 + 删除活动
 
 ## 🐛 常见问题和解决方案
 
 ### 1. 标尺线与实际位置不一致
-**问题**：拖拽时显示的蓝色标尺线与实际放置位置不匹配
+**问题**：拖拽时显示的放置框与实际放置位置不匹配
 **原因**：`handleDragOver`和`handleDrop`使用了不同的舍入方法
 **解决**：统一使用`Math.round()`进行时间槽计算
 
@@ -181,8 +186,8 @@ const presetResourcesData = [
 
 ### 4. 日历高度适配问题
 **问题**：日历底部被截断或出现滚动条
-**原因**：固定高度设置不合理
-**解决**：使用`calc(100vh - 其他元素高度)`动态计算
+**原因**：父容器高度或滚动容器配置不一致
+**解决**：确保父容器与 `calendar-fully-maximized` 高度一致，滚动由 `.calendar-scroll-wrapper` 承担
 
 ## 📊 性能优化
 
@@ -192,14 +197,13 @@ const presetResourcesData = [
 - 使用`pointer-events: none`避免拖拽时的事件冲突
 
 ### 2. 渲染优化
-- 使用`React.memo`缓存静态组件
 - 条件渲染拖拽指示器，减少DOM操作
 - 使用CSS Grid而非绝对定位，提高布局性能
 
 ### 3. 状态管理
 - 批量更新活动列表，减少重渲染
-- 使用函数式状态更新，确保状态一致性
-- 自动保存使用防抖（800ms），减少API调用
+- 自动保存由父组件 `ScheduleManagement` 进行 500ms 防抖提交
+- `CalendarDaysView` 内部 `saveStatus` 仅作 UI 提示
 
 ## 🎨 样式系统
 
@@ -209,32 +213,32 @@ const activityTypes = {
   meal: { color: '#52c41a' },      // 绿色 - 餐饮
   visit: { color: '#1890ff' },     // 蓝色 - 参观
   transport: { color: '#fa8c16' }, // 橙色 - 交通
-  rest: { color: '#722ed1' },      // 紫色 - 休息
-  activity: { color: '#eb2f96' },  // 粉色 - 活动
-  free: { color: '#8c8c8c' }       // 灰色 - 自由活动
+  rest: { color: '#8c8c8c' },      // 灰色 - 休息
+  activity: { color: '#722ed1' },  // 紫色 - 活动
+  free: { color: '#13c2c2' }       // 青色 - 自由活动
 };
 ```
 
 ### 视觉层次
-- **拖拽中活动**：`opacity: 0.5, z-index: 1`
-- **标尺线**：`z-index: 15, 蓝色半透明`
-- **拖拽预览**：`z-index: 9999, pointer-events: none`
+- **拖拽中活动**：`opacity: 0.5`
+- **放置指示器**：`z-index: 15`，虚线框
+- **拖拽预览**：使用浏览器原生预览（自定义预览组件目前未启用）
 
 ## 🔄 数据流
 
 ### 活动更新流程
-1. 用户拖拽活动到新位置
+1. 用户拖拽/编辑活动
 2. 计算新的开始/结束时间
 3. 更新本地`activities`状态
 4. 触发`onUpdate`回调
-5. 父组件处理自动保存
+5. 父组件批量保存（`POST /groups/:id/schedules/batch`）
 
 ### 资源管理流程
 1. 资源卡片拖入日历
 2. 创建新活动对象
-3. 单一资源从列表移除
+3. 方案资源从列表移除（可重复资源保留）
 4. 活动拖回资源区
-5. 恢复单一资源到列表
+5. 恢复方案资源到列表
 
 ## 📝 代码结构
 
@@ -250,6 +254,10 @@ CalendarDaysView.jsx
 │   ├── handleDragOver()   // 拖拽悬停
 │   ├── handleDrop()       // 拖拽放置
 │   └── handleDragEnd()    // 拖拽结束
+├── 资源/AI
+│   ├── 行程方案资源加载
+│   ├── AI规则/冲突/历史
+│   └── AI行程生成
 ├── 活动管理
 │   ├── handleActivityClick()     // 活动点击
 │   ├── handleActivityContextMenu() // 右键菜单
@@ -266,10 +274,10 @@ CalendarDaysView.jsx
 ## ⚠️ 注意事项
 
 1. **坐标系统**：CSS Grid索引从1开始，JavaScript数组从0开始
-2. **时区问题**：所有时间使用本地时区，确保一致性
-3. **拖拽兼容性**：依赖HTML5 Drag and Drop API，需现代浏览器
-4. **状态同步**：拖拽状态使用`useRef`避免异步问题
-5. **边界处理**：始终检查索引范围，防止越界
+2. **时间槽范围**：视图固定 06:00-20:45，结束时间会被网格约束
+3. **拖拽兼容性**：依赖 HTML5 Drag and Drop API，需现代浏览器
+4. **保存机制**：日历详情保存为批量替换（batch），失败需提示用户重新保存
+5. **方案资源恢复**：仅 `resourceId` 为 `plan-*` 且 `isFromResource=true` 的活动可拖回恢复
 
 ## 🚀 未来优化建议
 
@@ -289,6 +297,6 @@ CalendarDaysView.jsx
 
 ---
 
-文档版本：1.0.0
-最后更新：2025年1月
+文档版本：1.1.0
+最后更新：2026年1月24日
 作者：Education Connect 开发团队

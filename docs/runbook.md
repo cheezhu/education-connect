@@ -40,4 +40,4 @@ npm run dev
 ## 注意事项
 - 前端 `api.js` 固定使用 `admin/admin123` Basic Auth
 - 后端认证来自 `users` 表（bcrypt 校验）
-- AI 功能依赖环境变量（见 `10-config-auth.md`）
+- AI 功能可由环境变量或 system_config 配置（见 `docs/config/auth.md`）

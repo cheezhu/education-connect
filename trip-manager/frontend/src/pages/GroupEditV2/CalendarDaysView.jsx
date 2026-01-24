@@ -58,6 +58,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
     requireAllPlanItems: false
   }), []);
   const [itineraryPlans, setItineraryPlans] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [planResources, setPlanResources] = useState([]);
   const [availablePlanResources, setAvailablePlanResources] = useState([]);
   const [activePlan, setActivePlan] = useState(null);
@@ -118,8 +119,20 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
       }
     };
 
+    const loadLocations = async () => {
+      try {
+        const response = await api.get('/locations');
+        if (!isMounted) return;
+        setLocations(Array.isArray(response.data) ? response.data : []);
+      } catch (error) {
+        if (!isMounted) return;
+        setLocations([]);
+      }
+    };
+
     loadPlans();
     loadAiRules();
+    loadLocations();
     return () => {
       isMounted = false;
     };
@@ -169,6 +182,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
           : `容量${item.capacity || 0}人`,
         isUnique: true,
         locationId: item.location_id,
+        locationColor: item.location_color || null,
         planId: selectedPlan.id
       }));
 
@@ -176,16 +190,33 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
   }, [selectedPlanId, itineraryPlans]);
 
   useEffect(() => {
-    const usedResourceIds = new Set(
-      (schedules || [])
-        .map((activity) => activity.resourceId)
-        .filter(Boolean)
-    );
+    const sourceActivities = (activities && activities.length > 0)
+      ? activities
+      : (schedules || []);
+    const usedResourceIds = new Set();
+    const usedLocationIds = new Set();
+
+    sourceActivities.forEach((activity) => {
+      if (activity?.resourceId) {
+        usedResourceIds.add(activity.resourceId);
+      }
+      const locationId = Number(activity?.locationId);
+      if (Number.isFinite(locationId)) {
+        usedLocationIds.add(locationId);
+      }
+    });
 
     setAvailablePlanResources(
-      planResources.filter((resource) => !usedResourceIds.has(resource.id))
+      planResources.filter((resource) => {
+        if (usedResourceIds.has(resource.id)) return false;
+        const resourceLocationId = Number(resource.locationId);
+        if (Number.isFinite(resourceLocationId) && usedLocationIds.has(resourceLocationId)) {
+          return false;
+        }
+        return true;
+      })
     );
-  }, [planResources, schedules]);
+  }, [planResources, schedules, activities]);
 
   const handleResetSchedules = () => {
     Modal.confirm({
@@ -306,6 +337,33 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
     rest: { label: '休息', color: '#8c8c8c', icon: '🏨' },
     activity: { label: '活动', color: '#722ed1', icon: '🎯' },
     free: { label: '自由活动', color: '#13c2c2', icon: '🚶' }
+  };
+
+  const locationColorMap = useMemo(() => {
+    const entries = Array.isArray(locations)
+      ? locations
+          .map((loc) => [Number(loc.id), loc.color])
+          .filter(([id, color]) => Number.isFinite(id) && color)
+      : [];
+    return new Map(entries);
+  }, [locations]);
+
+  const resolveLocationColor = (locationId, fallbackColor) => {
+    const id = Number(locationId);
+    if (Number.isFinite(id)) {
+      const color = locationColorMap.get(id);
+      if (color) return color;
+    }
+    return fallbackColor || null;
+  };
+
+  const resolveActivityColor = ({ type, locationId, locationColor }) => {
+    if (type === 'visit') {
+      return resolveLocationColor(locationId, locationColor)
+        || activityTypes.visit?.color
+        || '#1890ff';
+    }
+    return activityTypes[type]?.color || '#1890ff';
   };
 
   // 生成时间槽（6:00-20:45，每15分钟）
@@ -451,6 +509,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
       endTime: endTime,
       type: 'visit',
       title: '',
+      locationId: null,
       location: '',
       description: ''
     });
@@ -482,7 +541,8 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
       endTime: dayjs(`2025-01-01 ${activity.endTime}`, 'YYYY-MM-DD HH:mm'),
       type: activity.type,
       title: activity.title,
-      location: activity.location,
+      locationId: activity.locationId ?? null,
+      location: activity.location || locationMap.get(Number(activity.locationId))?.name || '',
       description: activity.description
     });
 
@@ -544,6 +604,45 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
     e.dataTransfer.clearData();
   };
 
+  const updateDropIndicatorForDate = (e, dateStr) => {
+    if (draggedResource) return;
+    if (!draggedActivity || !dateStr) return;
+
+    const calendarGrid = calendarRef.current?.querySelector('.calendar-grid');
+    const scrollWrapper = calendarRef.current?.querySelector('.calendar-scroll-wrapper');
+    if (!calendarGrid || !scrollWrapper) return;
+
+    const wrapperRect = scrollWrapper.getBoundingClientRect();
+    const scrollTop = scrollWrapper.scrollTop;
+    const mouseY = e.clientY - wrapperRect.top + scrollTop;
+    const activityTopY = mouseY - dragOffsetRef.current.y;
+
+    const adjustedY = activityTopY - HEADER_HEIGHT;
+    let targetSlotIndex;
+    if (adjustedY < 0) {
+      targetSlotIndex = 0;
+    } else {
+      targetSlotIndex = Math.round(adjustedY / SLOT_HEIGHT);
+    }
+
+    const originalStart = timeToGridRow(draggedActivity.startTime);
+    const originalEnd = timeToGridRow(draggedActivity.endTime);
+    const duration = originalEnd - originalStart;
+
+    const maxStartIndex = Math.max(0, timeSlots.length - duration - 1);
+    const constrainedIndex = Math.max(0, Math.min(maxStartIndex, targetSlotIndex));
+
+    const dayIndex = days.findIndex(d => d.dateStr === dateStr);
+    if (dayIndex === -1) return;
+
+    setDropIndicator({
+      dayIndex,
+      slotIndex: constrainedIndex,
+      duration,
+      time: timeSlots[constrainedIndex]
+    });
+  };
+
   // 拖拽悬停
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -556,68 +655,11 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
 
     if (!draggedActivity) return;
 
-    // 计算并显示放置指示器
-    const calendarGrid = calendarRef.current?.querySelector('.calendar-grid');
-    const scrollWrapper = calendarRef.current?.querySelector('.calendar-scroll-wrapper');
-
-    if (!calendarGrid || !scrollWrapper) return;
-
-    const wrapperRect = scrollWrapper.getBoundingClientRect();
-    const scrollTop = scrollWrapper.scrollTop;
-
-    // 使用滚动容器作为参考点
-    const mouseY = e.clientY - wrapperRect.top + scrollTop;
-
-    // 使用拖拽偏移计算活动上沿位置
-    const activityTopY = mouseY - dragOffsetRef.current.y;
-
-    // 计算目标时间槽
-    const headerHeight = HEADER_HEIGHT;
-    const slotHeight = SLOT_HEIGHT;
-    const adjustedY = activityTopY - headerHeight;
-
-    // 使用与handleDrop相同的逻辑
-    let targetSlotIndex;
-    if (adjustedY < 0) {
-      targetSlotIndex = 0;
-    } else {
-      targetSlotIndex = Math.round(adjustedY / slotHeight);
-    }
-
-    // 计算持续时间
-    const originalStart = timeToGridRow(draggedActivity.startTime);
-    const originalEnd = timeToGridRow(draggedActivity.endTime);
-    const duration = originalEnd - originalStart;
-
-    // 限制索引范围（与handleDrop保持一致）
-    const maxStartIndex = Math.max(0, timeSlots.length - duration - 1);
-    const constrainedIndex = Math.max(0, Math.min(maxStartIndex, targetSlotIndex));
-
     // 获取当前悬停的列（日期）
     const targetElement = e.target.closest('.time-slot');
     if (targetElement) {
       const dateStr = targetElement.dataset.date;
-      const dayIndex = days.findIndex(d => d.dateStr === dateStr);
-
-      if (dayIndex !== -1) {
-        // 设置指示器位置
-        setDropIndicator({
-          dayIndex,
-          slotIndex: constrainedIndex,
-          duration,
-          time: timeSlots[constrainedIndex]
-        });
-
-        // 调试：确保标尺线位置正确
-        console.log('📏 标尺线位置:', {
-          '活动上沿Y': activityTopY,
-          '调整后Y': adjustedY,
-          '目标索引': targetSlotIndex,
-          '约束后索引': constrainedIndex,
-          '对应时间': timeSlots[constrainedIndex],
-          'Grid行': constrainedIndex + 2
-        });
-      }
+      updateDropIndicatorForDate(e, dateStr);
     }
   };
 
@@ -666,8 +708,13 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
         title: draggedResource.title,
         location: draggedResource.locationName || draggedResource.title || '',
         locationId: draggedResource.locationId || null,
+        locationColor: draggedResource.locationColor || null,
         description: draggedResource.description,
-        color: activityTypes[draggedResource.type].color,
+        color: resolveActivityColor({
+          type: draggedResource.type,
+          locationId: draggedResource.locationId,
+          locationColor: draggedResource.locationColor
+        }),
         resourceId: draggedResource.id,  // 记录资源ID
         isFromResource: true  // 标记来自资源
       };
@@ -922,7 +969,19 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
   const handleSaveActivity = async () => {
     try {
       const values = await form.validateFields();
+      const baseActivity = editingActivity || {};
+      const selectedLocationId = values.locationId ?? null;
+      const locationRecord = Number.isFinite(Number(selectedLocationId))
+        ? locationMap.get(Number(selectedLocationId))
+        : null;
+      const resolvedLocationName = values.location?.trim()
+        || locationRecord?.name
+        || '';
+      const resolvedLocationColor = locationRecord?.color
+        || baseActivity.locationColor
+        || null;
       const activityData = {
+        ...baseActivity,
         id: editingActivity?.id || Date.now(),
         groupId: groupData.id,
         date: values.date.format('YYYY-MM-DD'),
@@ -930,9 +989,15 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
         endTime: values.endTime.format('HH:mm'),
         type: values.type,
         title: values.title || '', // 允许为空
-        location: values.location || '',
+        location: resolvedLocationName,
         description: values.description || '',
-        color: activityTypes[values.type].color
+        locationId: selectedLocationId ? Number(selectedLocationId) : null,
+        locationColor: resolvedLocationColor,
+        color: resolveActivityColor({
+          type: values.type,
+          locationId: selectedLocationId,
+          locationColor: resolvedLocationColor
+        })
       };
 
       let updatedActivities;
@@ -980,6 +1045,11 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
   // 渲染活动卡片
   const renderActivity = (activity, dayIndex) => {
     const isDragged = draggedActivity?.id === activity.id;
+    const activityColor = activity.color || resolveActivityColor({
+      type: activity.type,
+      locationId: activity.locationId,
+      locationColor: activity.locationColor
+    });
 
     // 计算活动的网格位置和大小
     const startRow = timeToGridRow(activity.startTime);
@@ -990,7 +1060,8 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
       gridColumn: dayIndex + 2, // +2 因为第一列是时间标签
       gridRow: `${startRow} / ${endRow}`,
       zIndex: isDragged ? 1 : 20,
-      '--activity-height': `${durationRows * SLOT_HEIGHT}px`
+      '--activity-height': `${durationRows * SLOT_HEIGHT}px`,
+      backgroundColor: activityColor
     };
 
     const displayLocation = activity.location || activity.title || '未命名';
@@ -1003,6 +1074,18 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
         draggable={true}
         onDragStart={(e) => handleDragStart(e, activity)}
         onDragEnd={handleDragEnd}
+        onDragOver={(e) => {
+          if (!draggedActivity && !draggedResource) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = draggedResource ? 'copy' : 'move';
+          updateDropIndicatorForDate(e, activity.date);
+        }}
+        onDrop={(e) => {
+          if (!draggedActivity && !draggedResource) return;
+          e.preventDefault();
+          e.stopPropagation();
+          handleDrop(e, activity.date, activity.startTime);
+        }}
         onClick={(e) => handleActivityClick(e, activity)}
         onContextMenu={(e) => handleActivityContextMenu(e, activity)}
         title="右键编辑活动"
@@ -1147,7 +1230,11 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
           height: dragPreview.height,
           pointerEvents: 'none',
           zIndex: 1000,
-          background: activityTypes[dragPreview.activity.type].color
+          background: dragPreview.activity.color || resolveActivityColor({
+            type: dragPreview.activity.type,
+            locationId: dragPreview.activity.locationId,
+            locationColor: dragPreview.activity.locationColor
+          })
         }}
         ref={dragPreviewRef}
       >
@@ -1213,30 +1300,40 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
           }}
           onDrop={(e) => {
             e.preventDefault();
-            // 处理从日历拖回的活动
-    if (draggedActivity && draggedActivity.isFromResource) {
-      const resourceId = draggedActivity.resourceId || '';
-      const isPlanResource = typeof resourceId === 'string' && resourceId.startsWith('plan-');
-      if (isPlanResource) {
-        setAvailablePlanResources(prev => {
-          if (prev.find(r => r.id === resourceId)) {
-            return prev;
-          }
-          const resource = planResources.find(r => r.id === resourceId);
-          if (!resource) return prev;
-          return [...prev, resource].sort((a, b) => {
-            const aIndex = planResources.findIndex(r => r.id === a.id);
-            const bIndex = planResources.findIndex(r => r.id === b.id);
-            return aIndex - bIndex;
-          });
-        });
+            // 处理从日历拖回的活动（方案行程点）
+            if (draggedActivity) {
+              const resourceId = draggedActivity.resourceId || '';
+              let planResource = null;
 
-        const updatedActivities = activities.filter(a => a.id !== draggedActivity.id);
-        setActivities(updatedActivities);
-        onUpdate(updatedActivities);
-        message.success(`已将 ${draggedActivity.title} 返回方案`, 1);
-      }
-    }
+              if (typeof resourceId === 'string' && resourceId.startsWith('plan-')) {
+                planResource = planResources.find(r => r.id === resourceId) || null;
+              }
+
+              if (!planResource) {
+                const activityLocationId = Number(draggedActivity.locationId);
+                if (Number.isFinite(activityLocationId)) {
+                  planResource = planResources.find(r => Number(r.locationId) === activityLocationId) || null;
+                }
+              }
+
+              if (planResource) {
+                setAvailablePlanResources(prev => {
+                  if (prev.find(r => r.id === planResource.id)) {
+                    return prev;
+                  }
+                  return [...prev, planResource].sort((a, b) => {
+                    const aIndex = planResources.findIndex(r => r.id === a.id);
+                    const bIndex = planResources.findIndex(r => r.id === b.id);
+                    return aIndex - bIndex;
+                  });
+                });
+
+                const updatedActivities = activities.filter(a => a.id !== draggedActivity.id);
+                setActivities(updatedActivities);
+                onUpdate(updatedActivities);
+                message.success(`已将 ${draggedActivity.title} 返回方案`, 1);
+              }
+            }
 
             // 清除所有拖拽状态
             setDraggedActivity(null);
@@ -1441,6 +1538,43 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
             <Input placeholder="例如：香港科学馆参观（可选）" />
           </Form.Item>
 
+          <Form.Item name="locationId" label="关联地点">
+            <Select
+              allowClear
+              placeholder="选择地点（用于色块显示）"
+              showSearch
+              optionFilterProp="label"
+              onChange={(value) => {
+                if (!value) return;
+                const location = locationMap.get(Number(value));
+                if (location?.name) {
+                  form.setFieldsValue({ location: location.name });
+                }
+              }}
+            >
+              {locations.map((location) => (
+                <Option
+                  key={location.id}
+                  value={location.id}
+                  label={location.name}
+                >
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 2,
+                        border: '1px solid rgba(0,0,0,0.15)',
+                        backgroundColor: location.color || '#1890ff'
+                      }}
+                    />
+                    {location.name}
+                  </span>
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+
           <Form.Item name="location" label="地点">
             <Input placeholder="例如：尖沙咀东部" />
           </Form.Item>
@@ -1601,6 +1735,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
             {aiHistory.map((item) => {
               const summary = item.summary || {};
               const conflicts = Array.isArray(item.conflicts) ? item.conflicts : [];
+              const modelLabel = item.model || item.aiModel || item.ai_model || item.provider || '未知模型';
               return (
                 <div key={item.id} className="ai-history-item">
                   <div className="ai-history-header">
@@ -1610,7 +1745,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
                     </span>
                   </div>
                   <div className="ai-history-meta">
-                    方案：{item.planName || '-'} · 需安排{summary.total || 0}个 · 已安排{summary.planned || 0}个 · 未安排{summary.conflicts || 0}个
+                    模型：{modelLabel} · 方案：{item.planName || '-'} · 需安排{summary.total || 0}个 · 已安排{summary.planned || 0}个 · 未安排{summary.conflicts || 0}个
                   </div>
                   {conflicts.length > 0 ? (
                     <div className="ai-history-issues">

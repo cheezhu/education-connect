@@ -5,15 +5,33 @@ import {
   TeamOutlined,
   CalendarOutlined,
   UnorderedListOutlined,
-  SaveOutlined
+  UserOutlined
 } from '@ant-design/icons';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import GroupInfoSimple from './GroupInfoSimple';
 import ScheduleManagement from './ScheduleManagement';
 import ScheduleDetail from './ScheduleDetail';
+import MemberManagement from './MemberManagement';
 import api from '../../services/api';
 import dayjs from 'dayjs';
 import './GroupEditV2.css';
+
+const GROUP_COLOR_PALETTE = [
+  '#1890ff',
+  '#52c41a',
+  '#faad14',
+  '#eb2f96',
+  '#13c2c2',
+  '#722ed1',
+  '#f5222d',
+  '#fa541c',
+  '#2f54eb',
+  '#a0d911'
+];
+
+const getRandomGroupColor = () => (
+  GROUP_COLOR_PALETTE[Math.floor(Math.random() * GROUP_COLOR_PALETTE.length)] || '#1890ff'
+);
 
 const GroupEditV2 = () => {
   const { id } = useParams();
@@ -22,7 +40,7 @@ const GroupEditV2 = () => {
 
   const getInitialTab = () => {
     const tab = new URLSearchParams(location.search).get('tab');
-    if (tab === 'schedule' || tab === 'schedule-detail' || tab === 'info') {
+    if (tab === 'schedule' || tab === 'schedule-detail' || tab === 'info' || tab === 'members') {
       return tab;
     }
     return 'info';
@@ -37,6 +55,7 @@ const GroupEditV2 = () => {
   const [hasChanges, setHasChanges] = useState(false);
   const autoSaveTimeoutRef = useRef(null);
   const groupDataRef = useRef(null);
+  const creatingRef = useRef(false);
 
   // 是否为新建模式
   const isNew = id === 'new' || !id;
@@ -91,7 +110,7 @@ const GroupEditV2 = () => {
         start_date: dayjs().format('YYYY-MM-DD'),
         end_date: dayjs().add(4, 'day').format('YYYY-MM-DD'),
         duration: 5,
-        color: '#1890ff',
+        color: getRandomGroupColor(),
         itinerary_plan_id: null,
         status: '准备中',
         contact_person: '',
@@ -149,7 +168,7 @@ const GroupEditV2 = () => {
     if (isNew) {
       return;
     }
-    if (tab === 'schedule' || tab === 'schedule-detail' || tab === 'info') {
+    if (tab === 'schedule' || tab === 'schedule-detail' || tab === 'info' || tab === 'members') {
       setActiveTab(tab);
     }
   }, [id, isNew, location.search]);
@@ -187,96 +206,72 @@ const GroupEditV2 = () => {
   }, [id, isNew]);
 
   // 自动保存
+  const buildSavePayload = (data) => ({
+    name: data.name,
+    type: data.type,
+    student_count: data.student_count,
+    teacher_count: data.teacher_count,
+    start_date: data.start_date,
+    end_date: data.end_date,
+    duration: data.duration,
+    color: data.color,
+    itinerary_plan_id: data.itinerary_plan_id,
+    status: data.status,
+    contact_person: data.contact_person,
+    contact_phone: data.contact_phone,
+    emergency_contact: data.emergency_contact,
+    emergency_phone: data.emergency_phone,
+    tags: data.tags,
+    notes: data.notes
+  });
+
   const handleAutoSave = async (overrides = {}) => {
-    // 清除之前的定时器
+    // Clear previous timer
     clearTimeout(autoSaveTimeoutRef.current);
 
-    // 延迟800ms后执行保存
+    // Save after 800ms
     autoSaveTimeoutRef.current = setTimeout(async () => {
       const baseData = groupDataRef.current;
-      if (!baseData?.name || isNew) return;
+      if (!baseData?.name) return;
       const nextData = { ...baseData, ...overrides };
+      const dataToSave = buildSavePayload(nextData);
 
+      if (isNew) {
+        if (creatingRef.current) return;
+        creatingRef.current = true;
+        setSaving(true);
+        try {
+          const response = await api.post('/groups', dataToSave);
+          setHasChanges(false);
+          message.success('\u56e2\u7ec4\u521b\u5efa\u6210\u529f');
+          const createdId = response.data?.group?.id ?? response.data?.id;
+          if (createdId) {
+            navigate(`/groups/v2/edit/${createdId}`);
+          } else {
+            navigate('/groups/v2');
+          }
+        } catch (error) {
+          message.error('\u521b\u5efa\u56e2\u7ec4\u5931\u8d25');
+          console.error('\u521b\u5efa\u56e2\u7ec4\u5931\u8d25:', error);
+        } finally {
+          setSaving(false);
+          creatingRef.current = false;
+        }
+        return;
+      }
+
+      setSaving(true);
       try {
-        const dataToSave = {
-          name: nextData.name,
-          type: nextData.type,
-          student_count: nextData.student_count,
-          teacher_count: nextData.teacher_count,
-          start_date: nextData.start_date,
-          end_date: nextData.end_date,
-          duration: nextData.duration,
-          color: nextData.color,
-          itinerary_plan_id: nextData.itinerary_plan_id,
-          status: nextData.status,
-          contact_person: nextData.contact_person,
-          contact_phone: nextData.contact_phone,
-          emergency_contact: nextData.emergency_contact,
-          emergency_phone: nextData.emergency_phone,
-          tags: nextData.tags,
-          notes: nextData.notes
-        };
-
         await api.put(`/groups/${id}`, dataToSave);
         setHasChanges(false);
       } catch (error) {
-        console.error('自动保存失败:', error);
+        console.error('\u81ea\u52a8\u4fdd\u5b58\u5931\u8d25:', error);
+      } finally {
+        setSaving(false);
       }
     }, 800);
   };
 
-  // 保存团组数据
-  const handleSave = async () => {
-    if (!groupData.name) {
-      message.error('请填写团组名称');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const dataToSave = {
-        name: groupData.name,
-        type: groupData.type,
-        student_count: groupData.student_count,
-        teacher_count: groupData.teacher_count,
-        start_date: groupData.start_date,
-        end_date: groupData.end_date,
-        duration: groupData.duration,
-        color: groupData.color,
-        itinerary_plan_id: groupData.itinerary_plan_id,
-        status: groupData.status,
-        contact_person: groupData.contact_person,
-        contact_phone: groupData.contact_phone,
-        emergency_contact: groupData.emergency_contact,
-        emergency_phone: groupData.emergency_phone,
-        tags: groupData.tags,
-        notes: groupData.notes
-      };
-
-      if (isNew) {
-        const response = await api.post('/groups', dataToSave);
-        message.success('团组创建成功');
-        const createdId = response.data?.group?.id ?? response.data?.id;
-        if (createdId) {
-          navigate(`/groups/v2/edit/${createdId}`);
-        } else {
-          navigate('/groups/v2');
-        }
-      } else {
-        await api.put(`/groups/${id}`, dataToSave);
-        message.success('保存成功');
-      }
-
-      setHasChanges(false);
-    } catch (error) {
-      message.error('保存失败');
-      console.error('Error saving group:', error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // 更新团组数据
   const updateGroupData = (field, value) => {
     setGroupData(prev => {
       const updated = {
@@ -324,116 +319,113 @@ const GroupEditV2 = () => {
     return null;
   }
 
+  const saveStatusClass = saving
+    ? 'saving'
+    : (hasChanges ? 'dirty' : 'saved');
+  const saveStatusText = saving
+    ? '保存中...'
+    : (hasChanges ? '未保存' : '已保存');
+
   return (
     <div className="group-edit-v2">
-      {/* 左右布局容器 - 无顶部导航 */}
-      <div className="edit-content-layout-full">
-        {/* 左侧导航栏 */}
-        <div className="sidebar-nav">
-          {/* 顶部返回和标题区域 */}
-          <div className="sidebar-header">
+      <div className="group-edit-header">
+        <div className="group-edit-header-top">
+          <div className="group-edit-header-left">
             <Button
               icon={<ArrowLeftOutlined />}
               onClick={() => navigate('/groups/v2')}
               type="text"
               size="small"
-              block
             >
               返回列表
             </Button>
-            <div className="group-name">
-              {isNew ? '创建团组' : groupData.name || '编辑团组'}
-            </div>
-          </div>
-
-          {/* 导航标签 */}
-          <div className="nav-tabs">
-            <div
-              className={`tab-item ${activeTab === 'info' ? 'active' : ''}`}
-              onClick={() => setActiveTab('info')}
-              title="团组信息"
-            >
-              <TeamOutlined className="tab-icon" />
-              <span className="tab-text">团组信息</span>
-            </div>
-            <div
-              className={`tab-item ${activeTab === 'schedule' ? 'active' : ''} ${isNew ? 'disabled' : ''}`}
-              onClick={() => !isNew && setActiveTab('schedule')}
-              title={isNew ? '保存团组后可编辑' : '日程安排'}
-            >
-              <CalendarOutlined className="tab-icon" />
-              <span className="tab-text">日历详情</span>
-            </div>
-            <div
-              className={`tab-item ${activeTab === 'schedule-detail' ? 'active' : ''} ${isNew ? 'disabled' : ''}`}
-              onClick={() => !isNew && setActiveTab('schedule-detail')}
-              title={isNew ? '保存团组后可查看' : '详细日程'}
-            >
-              <UnorderedListOutlined className="tab-icon" />
-              <span className="tab-text">详细日程</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 右侧内容区 */}
-        <div className="main-content">
-          {activeTab === 'info' && (
-            <div
-              style={{
-                background: '#fff',
-                borderBottom: '1px solid #e8e8e8',
-                padding: '12px 16px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-            >
-              <div style={{ fontSize: '13px', color: '#595959' }}>
-                {isNew ? '新建团组' : '团组信息编辑'}
+            <div className="group-edit-header-title">
+              <div className="group-edit-title-row">
+                {groupData.status ? (
+                  <span className={`status-badge status-${groupData.status}`}>
+                    {groupData.status}
+                  </span>
+                ) : null}
+                <span className="group-edit-title">
+                  {isNew ? '创建团组' : groupData.name || '未命名团组'}
+                </span>
               </div>
-              <Button
-                type="primary"
-                icon={<SaveOutlined />}
-                loading={saving}
-                onClick={handleSave}
-              >
-                {isNew ? '创建团组' : '保存'}
-              </Button>
             </div>
-          )}
-          {activeTab === 'info' && (
-            <GroupInfoSimple
-              groupData={groupData}
-              schedules={groupSchedules}
-              itineraryPlans={itineraryPlans}
-              onUpdate={updateGroupData}
-              handleAutoSave={handleAutoSave}
-              isNew={isNew}
-            />
-          )}
-
-          {activeTab === 'schedule' && !isNew && (
-            <ScheduleManagement
-              groupId={id}
-              groupData={groupData}
-              schedules={groupSchedules}
-              onUpdate={(schedules) => {
-                setGroupSchedules(schedules);
-              }}
-              onPlanChange={(planId) => {
-                updateGroupData('itinerary_plan_id', planId);
-                handleAutoSave({ itinerary_plan_id: planId });
-              }}
-            />
-          )}
-
-          {activeTab === 'schedule-detail' && !isNew && (
-            <ScheduleDetail
-              groupData={groupData}
-              schedules={groupSchedules}
-            />
-          )}
+          </div>
+          <div className="group-edit-actions">
+            <span className={`save-indicator ${saveStatusClass}`}>{saveStatusText}</span>
+          </div>
         </div>
+
+        <div className="group-edit-tabs">
+          <button
+            className={`group-edit-tab ${activeTab === 'info' ? 'active' : ''}`}
+            onClick={() => setActiveTab('info')}
+            type="button"
+          >
+            <TeamOutlined /> 团组信息
+          </button>
+          <button
+            className={`group-edit-tab ${activeTab === 'schedule' ? 'active' : ''} ${isNew ? 'disabled' : ''}`}
+            onClick={() => !isNew && setActiveTab('schedule')}
+            type="button"
+          >
+            <CalendarOutlined /> 日历详情
+          </button>
+          <button
+            className={`group-edit-tab ${activeTab === 'schedule-detail' ? 'active' : ''} ${isNew ? 'disabled' : ''}`}
+            onClick={() => !isNew && setActiveTab('schedule-detail')}
+            type="button"
+          >
+            <UnorderedListOutlined /> 详细日程
+          </button>
+          <button
+            className={`group-edit-tab ${activeTab === 'members' ? 'active' : ''} ${isNew ? 'disabled' : ''}`}
+            onClick={() => !isNew && setActiveTab('members')}
+            type="button"
+          >
+            <UserOutlined /> 人员信息
+          </button>
+        </div>
+      </div>
+
+      <div className="group-edit-body">
+        {activeTab === 'info' && (
+          <GroupInfoSimple
+            groupData={groupData}
+            schedules={groupSchedules}
+            itineraryPlans={itineraryPlans}
+            onUpdate={updateGroupData}
+            handleAutoSave={handleAutoSave}
+            isNew={isNew}
+          />
+        )}
+
+        {activeTab === 'schedule' && !isNew && (
+          <ScheduleManagement
+            groupId={id}
+            groupData={groupData}
+            schedules={groupSchedules}
+            onUpdate={(schedules) => {
+              setGroupSchedules(schedules);
+            }}
+            onPlanChange={(planId) => {
+              updateGroupData('itinerary_plan_id', planId);
+              handleAutoSave({ itinerary_plan_id: planId });
+            }}
+          />
+        )}
+
+        {activeTab === 'schedule-detail' && !isNew && (
+          <ScheduleDetail
+            groupData={groupData}
+            schedules={groupSchedules}
+          />
+        )}
+
+        {activeTab === 'members' && !isNew && (
+          <MemberManagement groupId={id} />
+        )}
       </div>
     </div>
   );

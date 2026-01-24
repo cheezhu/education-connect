@@ -27,6 +27,7 @@
 - id (PK)
 - name, address
 - capacity
+- color
 - contact_person, contact_phone
 - blocked_weekdays (如 "3,4")
 - open_hours (JSON 字符串)

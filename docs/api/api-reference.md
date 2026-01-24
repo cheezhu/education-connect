@@ -56,6 +56,10 @@
 - PUT `/config/itinerary-time-slots`
 - GET `/config/itinerary-daily-focus`
 - PUT `/config/itinerary-daily-focus`
+- GET `/config/itinerary-group-row-align`
+- PUT `/config/itinerary-group-row-align`
+- GET `/config/all`：获取全量系统配置（含 AI 配置与规则）
+- PUT `/config/all`：批量更新系统配置（行程设置 + AI 基础配置）
 
 ## AI 排期 /ai
 - GET `/ai/rules`
@@ -64,7 +68,7 @@
 - POST `/ai/plan/global`（多团组排期）
 - POST `/ai/plan/itinerary`（单团组方案排期）
 
-详见：`09-ai-planner.md`
+详见：`docs/ai/ai-planner.md`
 
 ## 排程输入包导出 /planning
 - POST `/planning/export`：导出 planning_input.json（附件下载）

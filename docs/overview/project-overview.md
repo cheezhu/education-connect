@@ -10,6 +10,7 @@ Education Connect 是面向研学团组的行程排期与日历管理系统，�
 - 行程设计器（多团组 7 日时间轴 + AI 多团组排期）
 - 统计报表与导出（CSV/JSON）
 - 基础认证与编辑锁
+- 系统设置（行程设计器与 AI 配置）
 
 ## 技术栈
 - 前端：React 18 + Vite + Ant Design + FullCalendar + Day.js

@@ -1,4 +1,4 @@
-﻿# trip-manager
+# trip-manager
 
 主应用目录（前端 + 后端）。
 

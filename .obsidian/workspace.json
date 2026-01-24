@@ -8,63 +8,20 @@
         "type": "tabs",
         "children": [
           {
-            "id": "dbdeb634687538fb",
+            "id": "2411584888c4ede4",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "README.md",
+                "file": "docs/overview/project-overview.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "README"
-            }
-          },
-          {
-            "id": "a33929ee3595068f",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "debug/fix.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "fix"
-            }
-          },
-          {
-            "id": "0c08f1d3e992b438",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "AI for Planning/导出 planning_input.json.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "导出 planning_input.json"
-            }
-          },
-          {
-            "id": "1f0cd0899f514c1d",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "AI for Planning/Ai Prompt for group planing.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Ai Prompt for group planing"
+              "title": "project-overview"
             }
           }
-        ],
-        "currentTab": 3
+        ]
       }
     ],
     "direction": "vertical"
@@ -226,42 +183,43 @@
       "bases:Create new base": false
     }
   },
-  "active": "1f0cd0899f514c1d",
+  "active": "89dc3204ce9bc06a",
   "lastOpenFiles": [
-    "AI for Planning/导出 planning_input.json.md",
+    "trip-manager/backend/db/trip.db-journal",
+    "docs/ai/ai-planner.md",
+    "docs/frontend/frontend-ui.md",
+    "group-management-update/group-management-optimization.md",
     "README.md",
-    "CLAUDE.md",
-    "AI for Planning/Ai Prompt for group planing.md",
-    "AI for Planning",
-    "debug/group-management-issues.md",
-    "design/04-1-database-design.md",
-    "design/04-database-schema.md",
-    "trip-manager/frontend/vite.config.js.timestamp-1769223793374-c094c035bbc6.mjs",
-    "trip-manager/backend/node_modules/@fastify/busboy/lib/utils/parseParams.js",
-    "trip-manager/backend/node_modules/@fastify/busboy/lib/utils/getLimit.js",
-    "trip-manager/backend/node_modules/@fastify/busboy/lib/utils/decodeText.js",
-    "trip-manager/backend/node_modules/@fastify/busboy/lib/types/multipart.js",
-    "trip-manager/backend/node_modules/@fastify/busboy/lib/types/urlencoded.js",
-    "trip-manager/backend/node_modules/@fastify/busboy/lib/utils/Decoder.js",
-    "trip-manager/backend/node_modules/@fastify/busboy/lib/utils/basename.js",
-    "trip-manager/backend/node_modules/@fastify/busboy/lib/main.js",
-    "trip-manager/backend/node_modules/undici/types/README.md",
-    "debug/fix.md",
-    "design/11-known-issues.md",
-    "docs/calendar/schedule-activity-sync.md",
-    "docs/strategy/vision-roadmap.md",
-    "docs/strategy/README.md",
-    "docs/strategy/feasible-integration.md",
-    "docs/history/frontend-backend-interaction-legacy.md",
-    "docs/history/README.md",
-    "docs/architecture/overview.md",
-    "design/13-sample-payloads.md",
-    "design/README.md",
-    "design/12-file-map.md",
-    "design/10-config-auth.md",
-    "design/08-calendar-days-view.md",
-    "design/09-ai-planner.md",
-    "design/07-itinerary-designer.md",
-    "design/06-frontend-ui.md"
+    "trip-manager/frontend/src/pages/Settings.css",
+    "trip-manager/frontend/src/pages/Settings.jsx",
+    "trip-manager/frontend/vite.config.js.timestamp-1769251394090-8f109a710b036.mjs",
+    "trip-manager/backend/src/utils/aiConfig.js",
+    "trip-manager/backend/src/utils/configStore.js",
+    "trip-manager/backend/src/utils",
+    "docs/runbook.md",
+    "docs/itinerary/itinerary-designer.md",
+    "AI for Planning/planning_result_import_implementation_spec.md",
+    "docs/itinerary/ai-workflows/README.md",
+    "docs/itinerary-grid-optimizations/README.md",
+    "docs/itinerary/ai-workflows",
+    "trip-manager/backend/node_modules/undici/lib/node/fixed-queue.js",
+    "trip-manager/backend/node_modules/undici/lib/node",
+    "trip-manager/backend/node_modules/undici/docs/best-practices/writing-tests.md",
+    "trip-manager/backend/node_modules/undici/docs/best-practices/mocking-request.md",
+    "trip-manager/backend/node_modules/undici/docs/best-practices/proxy.md",
+    "trip-manager/backend/node_modules/undici/docs/best-practices/client-certificate.md",
+    "trip-manager/backend/node_modules/undici/docs/assets/lifecycle-diagram.png",
+    "trip-manager/backend/node_modules/undici/docs/api/WebSocket.md",
+    "trip-manager/backend/node_modules/undici/docs/api/RetryHandler.md",
+    "trip-manager/backend/node_modules/undici/docs/api/PoolStats.md",
+    "trip-manager/backend/node_modules/undici/docs/api/ProxyAgent.md",
+    "trip-manager/backend/node_modules/undici/docs/api/MockPool.md",
+    "trip-manager/backend/node_modules/undici/docs/api/Pool.md",
+    "trip-manager/backend/node_modules/undici/docs/api/MockClient.md",
+    "trip-manager/backend/node_modules/undici/docs/api/MockErrors.md",
+    "trip-manager/backend/node_modules/undici/docs/api/Fetch.md",
+    "trip-manager/backend/node_modules/undici/docs/api/MockAgent.md",
+    "trip-manager/backend/node_modules/undici/docs/api/ContentType.md",
+    "trip-manager/backend/node_modules/undici/docs/api/Errors.md"
   ]
 }

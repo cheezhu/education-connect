@@ -1,4 +1,4 @@
-﻿# 行程设计器（ItineraryDesigner）详解
+# 行程设计器（ItineraryDesigner）详解
 
 ## 功能定位
 多团组 7 日时间轴排期中心：批量查看、编辑、拖拽、冲突检查、AI 自动排期。
@@ -11,6 +11,7 @@
   - `/config/itinerary-week-start`
   - `/config/itinerary-time-slots`
   - `/config/itinerary-daily-focus`
+  - `/config/itinerary-group-row-align`
 - 本地缓存：localStorage
 
 ## 网格结构
@@ -30,7 +31,7 @@
 - 地点不可用日期
 - 团组类型限制
 
-> 注意：前端冲突检查字段与后端并非完全一致（见 `11-known-issues.md`）。
+> 注意：前端冲突检查字段与后端并非完全一致（见 `docs/issues/known-issues.md`）。
 
 ## AI 多团组生成
 - 打开弹窗，选择团组与日期范围

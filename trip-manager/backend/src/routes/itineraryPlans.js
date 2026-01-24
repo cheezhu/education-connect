@@ -18,7 +18,8 @@ const getPlanItems = (db, planId) => db.prepare(`
     i.sort_order,
     l.name as location_name,
     l.address,
-    l.capacity
+    l.capacity,
+    l.color as location_color
   FROM itinerary_plan_items i
   JOIN locations l ON l.id = i.location_id
   WHERE i.plan_id = ?

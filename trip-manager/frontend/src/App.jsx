@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Layout, Dropdown, Badge, Avatar } from 'antd';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import GroupManagementV2 from './pages/GroupManagementV2';
 import GroupEditV2 from './pages/GroupEditV2';
 import LocationManagement from './pages/LocationManagement';
 import Statistics from './pages/Statistics';
 import ItineraryDesigner from './pages/ItineraryDesigner';
+import Settings from './pages/Settings';
 import './App.css';
 
 const { Header, Content } = Layout;
@@ -45,6 +46,10 @@ function App() {
               element={<ItineraryDesigner />}
             />
             <Route
+              path="/settings"
+              element={<Settings />}
+            />
+            <Route
               path="/groups/v2/edit/:id"
               element={<GroupEditV2 />}
             />
@@ -70,6 +75,7 @@ function App() {
 // 紧凑型顶部导航栏组件
 function CompactHeader() {
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname;
 
   const isActivePath = (path) => {
@@ -94,6 +100,15 @@ function CompactHeader() {
     { type: 'divider' },
     { key: 'logout', label: '退出登录' }
   ];
+
+  const userMenuProps = {
+    items: userMenuItems,
+    onClick: ({ key }) => {
+      if (key === 'settings') {
+        navigate('/settings');
+      }
+    }
+  };
 
   return (
     <Header
@@ -188,23 +203,25 @@ function CompactHeader() {
       <div style={{ flex: 1 }} />
 
       {/* 设置 */}
-      <span
+      <Link
+        to="/settings"
         style={{
           color: 'rgba(255,255,255,0.65)',
           fontSize: '12px',
           cursor: 'pointer',
           transition: 'color 0.2s',
-          marginRight: '16px'
+          marginRight: '16px',
+          textDecoration: 'none'
         }}
         onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.9)'}
         onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.65)'}
       >
         设置
-      </span>
+      </Link>
 
       {/* 用户信息 */}
       <Dropdown
-        menu={{ items: userMenuItems }}
+        menu={userMenuProps}
         placement="bottomRight"
       >
         <div style={{

@@ -212,3 +212,68 @@
 .group-management-v2::-webkit-scrollbar-thumb:hover {
   background: #8c8c8c;
 }
+
+/* 批量创建弹窗 */
+.bulk-create-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bulk-row-header {
+  display: grid;
+  grid-template-columns: 36px 1.4fr 1.3fr 0.8fr 1fr 0.7fr 64px;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: #6b7078;
+  padding: 0 4px;
+}
+
+.bulk-row-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bulk-row {
+  display: grid;
+  grid-template-columns: 36px 1.4fr 1.3fr 0.8fr 1fr 0.7fr 64px;
+  gap: 8px;
+  align-items: center;
+  background: #fafbfc;
+  border: 1px solid #eef0f2;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.bulk-row.has-error {
+  border-color: #ffccc7;
+  background: #fff1f0;
+}
+
+.bulk-row-index {
+  font-size: 12px;
+  color: #8c8c8c;
+  text-align: center;
+}
+
+.bulk-row .ant-input,
+.bulk-row .ant-picker,
+.bulk-row .ant-select,
+.bulk-row .ant-input-number {
+  width: 100%;
+}
+
+.bulk-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 4px;
+}
+
+.bulk-count {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+

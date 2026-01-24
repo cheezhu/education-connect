@@ -23,4 +23,5 @@
 
 ## AI 配置
 - 变量：`AI_api_key`、`AI_PROVIDER`、`AI_MODEL`、`AI_TIMEOUT_MS`
+- system_config：`ai_api_key`、`ai_provider`、`ai_model`、`ai_timeout_ms`（优先于环境变量）
 - 默认逻辑：未设置 `AI_PROVIDER` 时使用 `openai`；未设置 `AI_api_key` 时不调用外部 AI

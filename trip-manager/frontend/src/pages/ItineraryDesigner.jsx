@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Button, Modal, Form, Select, InputNumber, Input, message, Checkbox, Tooltip, Badge, DatePicker, Drawer } from 'antd';
+﻿import React, { useState, useEffect } from 'react';
+import { Card, Button, Modal, Form, Select, InputNumber, Input, message, Checkbox, Tooltip, Badge, DatePicker, Drawer, Upload } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
@@ -9,9 +9,12 @@ import {
   StepBackwardOutlined,
   StepForwardOutlined,
   SettingOutlined,
+  CloseOutlined,
   ExportOutlined,
   DragOutlined,
-  CalendarOutlined
+  CalendarOutlined,
+  UploadOutlined,
+  InboxOutlined
 } from '@ant-design/icons';
 import api from '../services/api';
 import dayjs from 'dayjs';
@@ -62,6 +65,17 @@ function ItineraryDesigner() {
     return true;
   };
 
+  const getStoredGroupRowAlign = () => {
+    try {
+      const stored = localStorage.getItem('itinerary_group_row_align');
+      if (stored === 'true') return true;
+      if (stored === 'false') return false;
+    } catch (error) {
+      // ignore
+    }
+    return true;
+  };
+
   const [groups, setGroups] = useState([]);
   const [activities, setActivities] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -72,21 +86,29 @@ function ItineraryDesigner() {
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [enabledTimeSlots, setEnabledTimeSlots] = useState(() => getStoredTimeSlots());
   const [showDailyFocus, setShowDailyFocus] = useState(() => getStoredDailyFocus());
+  const [alignGroupRows, setAlignGroupRows] = useState(() => getStoredGroupRowAlign());
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
   const [draggedActivity, setDraggedActivity] = useState(null);
   const cardStyle = 'minimal';
   const [batchMode, setBatchMode] = useState(false); // 批量选择模式
   const [selectedActivities, setSelectedActivities] = useState([]); // 选中的活动
-  const [aiModalVisible, setAiModalVisible] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiPreview, setAiPreview] = useState(null);
   const [planningExportVisible, setPlanningExportVisible] = useState(false);
   const [planningExportLoading, setPlanningExportLoading] = useState(false);
+  const [planningImportVisible, setPlanningImportVisible] = useState(false);
+  const [planningImportLoading, setPlanningImportLoading] = useState(false);
+  const [planningImportValidating, setPlanningImportValidating] = useState(false);
+  const [planningImportPayload, setPlanningImportPayload] = useState(null);
+  const [planningImportFileList, setPlanningImportFileList] = useState([]);
+  const [planningImportResult, setPlanningImportResult] = useState(null);
+  const [groupCalendarVisible, setGroupCalendarVisible] = useState(false);
+  const [groupCalendarGroupId, setGroupCalendarGroupId] = useState(null);
   const [form] = Form.useForm();
-  const [aiForm] = Form.useForm();
   const [planningForm] = Form.useForm();
+  const [planningImportForm] = Form.useForm();
   const planningDateRange = Form.useWatch('dateRange', planningForm);
+  const planningImportOnlySelected = Form.useWatch('onlySelectedGroups', planningImportForm);
+  const planningImportGroupIds = Form.useWatch('groupIds', planningImportForm);
   const { registerRefreshCallback } = useDataSync();
 
   // 时间段定义
@@ -207,6 +229,24 @@ function ItineraryDesigner() {
     }
   };
 
+  const loadGroupRowAlignConfig = async () => {
+    try {
+      const response = await api.get('/config/itinerary-group-row-align');
+      if (typeof response.data?.enabled === 'boolean') {
+        const nextValue = response.data.enabled;
+        if (nextValue !== alignGroupRows) {
+          setAlignGroupRows(nextValue);
+        }
+        try {
+          localStorage.setItem('itinerary_group_row_align', nextValue ? 'true' : 'false');
+        } catch (error) {
+          // ignore
+        }
+      }
+    } catch (error) {
+    }
+  };
+
   const persistTimeSlotConfig = async (slots) => {
     setEnabledTimeSlots(slots);
     try {
@@ -238,6 +278,22 @@ function ItineraryDesigner() {
     }
   };
 
+  const persistGroupRowAlignConfig = async (enabled) => {
+    setAlignGroupRows(enabled);
+    try {
+      localStorage.setItem('itinerary_group_row_align', enabled ? 'true' : 'false');
+    } catch (error) {
+      // ignore
+    }
+    try {
+      await api.put('/config/itinerary-group-row-align', {
+        enabled
+      });
+    } catch (error) {
+      message.error('保存团组行对齐设置失败');
+    }
+  };
+
   const handleTimeSlotToggle = (slots) => {
     const normalized = timeSlotKeys.filter((key) => slots.includes(key));
     persistTimeSlotConfig(normalized);
@@ -245,6 +301,10 @@ function ItineraryDesigner() {
 
   const handleDailyFocusToggle = (event) => {
     persistDailyFocusConfig(event.target.checked);
+  };
+
+  const handleGroupRowAlignToggle = (event) => {
+    persistGroupRowAlignConfig(event.target.checked);
   };
 
   const handleWeekStartChange = (value) => {
@@ -263,6 +323,7 @@ function ItineraryDesigner() {
     loadWeekStartDate();
     loadTimeSlotConfig();
     loadDailyFocusConfig();
+    loadGroupRowAlignConfig();
     const unregister = registerRefreshCallback(refreshData);
     return unregister;
   }, [registerRefreshCallback]);
@@ -297,6 +358,20 @@ function ItineraryDesigner() {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  const getGroupDateRange = (group) => {
+    if (!group?.start_date || !group?.end_date) return [];
+    const start = dayjs(group.start_date);
+    const end = dayjs(group.end_date);
+    if (!start.isValid() || !end.isValid()) return [];
+    const dates = [];
+    let cursor = start.startOf('day');
+    while (cursor.isBefore(end, 'day') || cursor.isSame(end, 'day')) {
+      dates.push(cursor.toDate());
+      cursor = cursor.add(1, 'day');
+    }
+    return dates;
   };
 
   const getTimeSlotLabel = (slotKey) => {
@@ -337,60 +412,10 @@ function ItineraryDesigner() {
       .sort((a, b) => b.total - a.total);
   };
 
-  const openAiModal = () => {
-    setAiPreview(null);
-    setAiModalVisible(true);
-    aiForm.setFieldsValue({
-      groupIds: selectedGroups.length ? selectedGroups : groups.map(group => group.id),
-      planNamePrefix: 'AI方案',
-      replaceExisting: true,
-      useAI: true,
-      dateRange: [dayjs(dateRange[0]), dayjs(dateRange[6])]
-    });
-  };
-
-  const buildAiPayload = (values, dryRun) => {
-    const slotKeys = visibleTimeSlots.map(slot => slot.key);
-    const [start, end] = values.dateRange || [];
-    return {
-      groupIds: values.groupIds,
-      startDate: start ? start.format('YYYY-MM-DD') : formatDateString(dateRange[0]),
-      endDate: end ? end.format('YYYY-MM-DD') : formatDateString(dateRange[6]),
-      timeSlots: slotKeys,
-      planNamePrefix: values.planNamePrefix || 'AI方案',
-      replaceExisting: values.replaceExisting !== false,
-      useAI: values.useAI !== false,
-      dryRun
-    };
-  };
-
-  const handleAiPreview = async () => {
-    try {
-      const values = await aiForm.validateFields();
-      setAiLoading(true);
-      const response = await api.post('/ai/plan/global', buildAiPayload(values, true));
-      setAiPreview(response.data);
-    } catch (error) {
-      message.error('AI 预览失败');
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  const handleAiApply = async () => {
-    try {
-      const values = await aiForm.validateFields();
-      setAiLoading(true);
-      const response = await api.post('/ai/plan/global', buildAiPayload(values, false));
-      message.success(`AI 生成完成：${response.data?.summary?.assignments || 0} 条安排`);
-      setAiModalVisible(false);
-      setAiPreview(null);
-      refreshData();
-    } catch (error) {
-      message.error('AI 生成失败');
-    } finally {
-      setAiLoading(false);
-    }
+  const openGroupCalendar = (groupId) => {
+    if (!groupId) return;
+    setGroupCalendarGroupId(groupId);
+    setGroupCalendarVisible(true);
   };
 
 
@@ -460,6 +485,160 @@ function ItineraryDesigner() {
       setPlanningExportLoading(false);
     }
   };
+
+  const extractPlanningAssignments = (payload) => (
+    payload && Array.isArray(payload.assignments) ? payload.assignments : []
+  );
+
+  const extractPlanningGroupIds = (payload) => {
+    const ids = extractPlanningAssignments(payload)
+      .map(item => Number(item?.groupId ?? item?.group_id))
+      .filter(Number.isFinite);
+    return Array.from(new Set(ids));
+  };
+
+  const extractPlanningRange = (payload) => {
+    if (!payload) return null;
+    const range = payload.range || {};
+    const start = range.startDate || range.start_date;
+    const end = range.endDate || range.end_date;
+    if (start && end) {
+      return { start, end };
+    }
+    const dates = extractPlanningAssignments(payload)
+      .map(item => item?.date)
+      .filter(Boolean)
+      .sort();
+    if (!dates.length) return null;
+    return { start: dates[0], end: dates[dates.length - 1] };
+  };
+
+  const resetPlanningImportState = () => {
+    setPlanningImportPayload(null);
+    setPlanningImportFileList([]);
+    setPlanningImportResult(null);
+    planningImportForm.resetFields();
+    planningImportForm.setFieldsValue({
+      replaceExisting: false,
+      skipConflicts: true,
+      onlySelectedGroups: true,
+      groupIds: []
+    });
+  };
+
+  const openPlanningImportModal = () => {
+    resetPlanningImportState();
+    setPlanningImportVisible(true);
+  };
+
+  const handlePlanningImportFile = (file) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result || '');
+        const payload = parsed?.payload && parsed.payload.schema ? parsed.payload : parsed;
+        if (!payload || payload.schema !== 'ec-planning-result@1') {
+          message.error('文件格式不正确（schema不匹配）');
+          setPlanningImportPayload(null);
+          setPlanningImportResult(null);
+          setPlanningImportFileList([]);
+          return;
+        }
+        setPlanningImportPayload(payload);
+        setPlanningImportResult(null);
+        const payloadGroupIds = extractPlanningGroupIds(payload);
+        planningImportForm.setFieldsValue({
+          replaceExisting: payload.mode === 'replaceExisting',
+          skipConflicts: true,
+          onlySelectedGroups: true,
+          groupIds: payloadGroupIds
+        });
+      } catch (error) {
+        message.error('文件解析失败');
+        setPlanningImportPayload(null);
+        setPlanningImportResult(null);
+        setPlanningImportFileList([]);
+      }
+    };
+    reader.readAsText(file);
+    setPlanningImportFileList([file]);
+    return false;
+  };
+
+  const handlePlanningImportRemove = () => {
+    setPlanningImportPayload(null);
+    setPlanningImportFileList([]);
+    setPlanningImportResult(null);
+  };
+
+  const resolvePlanningImportGroupIds = (values) => {
+    const payloadGroupIds = extractPlanningGroupIds(planningImportPayload);
+    let targetGroupIds = values.onlySelectedGroups
+      ? selectedGroups
+      : (values.groupIds || []);
+    targetGroupIds = targetGroupIds
+      .map(id => Number(id))
+      .filter(Number.isFinite);
+    if (payloadGroupIds.length > 0) {
+      const payloadSet = new Set(payloadGroupIds);
+      targetGroupIds = targetGroupIds.filter(id => payloadSet.has(id));
+    }
+    return Array.from(new Set(targetGroupIds));
+  };
+
+  const runPlanningImport = async (dryRun) => {
+    if (!planningImportPayload) {
+      message.error('请先上传 planning_result.json');
+      return;
+    }
+
+    try {
+      const values = await planningImportForm.validateFields();
+      const groupIds = resolvePlanningImportGroupIds(values);
+      if (groupIds.length === 0) {
+        message.error('未选择可导入的团组');
+        return;
+      }
+
+      const request = {
+        payload: planningImportPayload,
+        options: {
+          groupIds,
+          replaceExisting: values.replaceExisting !== false,
+          skipConflicts: values.skipConflicts !== false,
+          dryRun
+        }
+      };
+
+      if (dryRun) {
+        setPlanningImportValidating(true);
+      } else {
+        setPlanningImportLoading(true);
+      }
+
+      const response = await api.post('/planning/import', request);
+      setPlanningImportResult(response.data);
+      if (dryRun) {
+        message.success('校验完成');
+      } else {
+        message.success(`导入完成，成功 ${response.data?.summary?.inserted || 0} 条`);
+        setPlanningImportVisible(false);
+        refreshData();
+      }
+    } catch (error) {
+      const data = error.response?.data;
+      if (data?.conflicts) {
+        setPlanningImportResult(data);
+      }
+      message.error(data?.error || (dryRun ? '校验失败' : '导入失败'));
+    } finally {
+      setPlanningImportValidating(false);
+      setPlanningImportLoading(false);
+    }
+  };
+
+  const handlePlanningImportValidate = () => runPlanningImport(true);
+  const handlePlanningImportApply = () => runPlanningImport(false);
 
   function filterGroupsByRange(range) {
     if (!Array.isArray(range) || range.length !== 2 || !range[0] || !range[1]) {
@@ -645,6 +824,14 @@ function ItineraryDesigner() {
             >
               每日关注
             </Checkbox>
+            <Tooltip title="同名团组跨天固定在同一行（可能出现空行）">
+              <Checkbox
+                checked={alignGroupRows}
+                onChange={handleGroupRowAlignToggle}
+              >
+                对齐团组行
+              </Checkbox>
+            </Tooltip>
             <Checkbox.Group
               value={enabledTimeSlots}
               onChange={handleTimeSlotToggle}
@@ -656,11 +843,11 @@ function ItineraryDesigner() {
 
       <div style={{ display: 'flex', gap: '8px' }}>
         <Button
-          icon={<SettingOutlined />}
+          icon={<UploadOutlined />}
           size="small"
-          onClick={openAiModal}
+          onClick={openPlanningImportModal}
         >
-          AI 多团组生成
+          导入排程结果(JSON)
         </Button>
         <Button
           icon={<ExportOutlined />}
@@ -718,32 +905,38 @@ function ItineraryDesigner() {
 
           {(() => {
             const groupNamesForSlot = new Set();
-            dateRange.forEach((date) => {
-              const slotActivities = getActivitiesForSlot(date, timeSlot.key);
-              slotActivities.forEach((activity) => {
-                const group = groups.find(g => g.id === activity.groupId);
-                const groupName = group?.name || '未命名团组';
-                groupNamesForSlot.add(groupName);
+            if (alignGroupRows) {
+              dateRange.forEach((date) => {
+                const slotActivities = getActivitiesForSlot(date, timeSlot.key);
+                slotActivities.forEach((activity) => {
+                  const group = groups.find(g => g.id === activity.groupId);
+                  const groupName = group?.name || '\u672a\u547d\u540d\u56e2\u7ec4';
+                  groupNamesForSlot.add(groupName);
+                });
               });
-            });
-            const orderedGroupNames = Array.from(groupNamesForSlot).sort((a, b) => a.localeCompare(b, 'zh'));
-
+            }
+            const orderedGroupNames = alignGroupRows
+              ? Array.from(groupNamesForSlot).sort((a, b) => a.localeCompare(b, 'zh'))
+              : [];
             return dateRange.map((date, dateIndex) => {
               const slotActivities = getActivitiesForSlot(date, timeSlot.key);
               const groupedByName = slotActivities.reduce((acc, activity) => {
                 const group = groups.find(g => g.id === activity.groupId);
-                const groupName = group?.name || '未命名团组';
+                const groupName = group?.name || '\u672a\u547d\u540d\u56e2\u7ec4';
                 if (!acc.has(groupName)) {
                   acc.set(groupName, []);
                 }
                 acc.get(groupName).push({ activity, group });
                 return acc;
               }, new Map());
+              const rowGroupNames = alignGroupRows
+                ? orderedGroupNames
+                : Array.from(groupedByName.keys()).sort((a, b) => a.localeCompare(b, 'zh'));
 
               return (
                 <div
                   key={`${timeSlot.key}-${dateIndex}`}
-                  className="timeline-cell"
+                  className={`timeline-cell ${alignGroupRows ? 'aligned-rows' : ''}`}
                   style={{ backgroundColor: timeSlot.color }}
                   onClick={() => handleCellClick(date, timeSlot.key, slotActivities)}
                   onDragOver={handleDragOver}
@@ -751,14 +944,14 @@ function ItineraryDesigner() {
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, date, timeSlot.key)}
                 >
-                  {orderedGroupNames.length === 0 ? (
+                  {rowGroupNames.length === 0 ? (
                     <div className="empty-cell">
                       <PlusOutlined style={{ color: '#999' }} />
                       <div style={{ fontSize: '10px', color: '#999' }}>点击添加</div>
                     </div>
                   ) : (
-                    <div className="activity-summary grouped">
-                      {orderedGroupNames.map((groupName) => {
+                    <div className={`activity-summary grouped ${alignGroupRows ? "aligned" : "compact"}`}>
+                      {rowGroupNames.map((groupName) => {
                         const items = groupedByName.get(groupName) || [];
                         return (
                           <div
@@ -785,7 +978,7 @@ function ItineraryDesigner() {
                                         setSelectedActivities(prev => [...prev, activity.id]);
                                       }
                                     } else {
-                                      handleCellClick(date, timeSlot.key, [activity]);
+                                      openGroupCalendar(activity.groupId);
                                     }
                                   }}
                                   style={{
@@ -1331,6 +1524,45 @@ function ItineraryDesigner() {
     }
   };
 
+  const planningImportPayloadGroupIds = planningImportPayload
+    ? extractPlanningGroupIds(planningImportPayload)
+    : [];
+  const planningImportRange = planningImportPayload
+    ? extractPlanningRange(planningImportPayload)
+    : null;
+  const planningImportAssignmentsCount = planningImportPayload
+    ? extractPlanningAssignments(planningImportPayload).length
+    : 0;
+  const planningImportOnlySelectedValue = planningImportOnlySelected !== false;
+  const planningImportSelectedGroupIds = planningImportOnlySelectedValue
+    ? selectedGroups.filter(id => planningImportPayloadGroupIds.includes(id))
+    : (planningImportGroupIds || []).filter(id => planningImportPayloadGroupIds.includes(id));
+  const planningImportSummary = planningImportResult?.summary || null;
+  const planningImportConflicts = planningImportResult?.conflicts || [];
+  const planningImportFile = planningImportFileList[0];
+  const groupCalendarSlotKeys = ['MORNING', 'AFTERNOON'];
+  const groupCalendarGroup = groups.find(group => group.id === groupCalendarGroupId);
+  const groupCalendarDates = groupCalendarGroup ? getGroupDateRange(groupCalendarGroup) : [];
+  const groupCalendarSlots = timeSlots.filter(slot => groupCalendarSlotKeys.includes(slot.key));
+  const groupCalendarActivities = groupCalendarGroup
+    ? activities.filter(activity => activity.groupId === groupCalendarGroup.id)
+    : [];
+  const groupCalendarIndex = new Map();
+  if (groupCalendarGroup) {
+    groupCalendarActivities.forEach((activity) => {
+      if (!groupCalendarSlotKeys.includes(activity.timeSlot)) return;
+      const key = `${activity.date}|${activity.timeSlot}`;
+      if (!groupCalendarIndex.has(key)) {
+        groupCalendarIndex.set(key, []);
+      }
+      groupCalendarIndex.get(key).push(activity);
+    });
+  }
+  const groupCalendarLocationMap = new Map(locations.map(location => [location.id, location]));
+  const groupCalendarColumns = groupCalendarDates.length
+    ? `72px repeat(${groupCalendarDates.length}, 140px)`
+    : '72px 140px';
+
   return (
     <div className="itinerary-designer">
       {renderTimelineHeader()}
@@ -1357,6 +1589,98 @@ function ItineraryDesigner() {
         style={{ position: 'absolute' }}
       >
         {renderGroupPanel(false)}
+      </Drawer>
+
+      <Drawer
+        title={null}
+        placement="bottom"
+        open={groupCalendarVisible}
+        onClose={() => setGroupCalendarVisible(false)}
+        height="30vh"
+        mask={false}
+        closable={false}
+        bodyStyle={{ padding: 0, height: '100%' }}
+        getContainer={false}
+        style={{ position: 'absolute' }}
+        rootClassName="group-calendar-drawer"
+      >
+        {groupCalendarGroup ? (
+          <div className="group-calendar">
+            <div className="group-calendar-header">
+              <div className="group-calendar-title-row">
+                <div className="group-calendar-title">
+                  <span className="group-color-dot" style={{ backgroundColor: groupCalendarGroup.color }} />
+                  <span>{groupCalendarGroup.name}</span>
+                  <span className="group-calendar-dates">
+                    {dayjs(groupCalendarGroup.start_date).format('YYYY-MM-DD')} ~ {dayjs(groupCalendarGroup.end_date).format('YYYY-MM-DD')}
+                  </span>
+                </div>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CloseOutlined />}
+                  onClick={() => setGroupCalendarVisible(false)}
+                />
+              </div>
+            </div>
+            <div className="group-calendar-grid">
+              <div className="group-calendar-row group-calendar-header-row" style={{ gridTemplateColumns: groupCalendarColumns }}>
+                <div className="group-calendar-time-cell">{'\u65f6\u6bb5'}</div>
+                {groupCalendarDates.map((date) => (
+                  <div key={formatDateString(date)} className="group-calendar-date-cell">
+                    <div>{dayjs(date).format('MM-DD')}</div>
+                    <div>{dayjs(date).format('ddd')}</div>
+                  </div>
+                ))}
+              </div>
+              {groupCalendarSlots.map((slot) => (
+                <div key={slot.key} className="group-calendar-row" style={{ gridTemplateColumns: groupCalendarColumns }}>
+                  <div className="group-calendar-time-cell">{slot.label}</div>
+                  {groupCalendarDates.map((date) => {
+                    const dateString = formatDateString(date);
+                    const items = groupCalendarIndex.get(`${dateString}|${slot.key}`) || [];
+                    const visibleItems = items.slice(0, 2);
+                    return (
+                      <div key={`${slot.key}-${dateString}`} className="group-calendar-cell">
+                        {visibleItems.length === 0 ? (
+                          <div className="group-calendar-empty">—</div>
+                        ) : (
+                          visibleItems.map((activity) => {
+                            const location = groupCalendarLocationMap.get(activity.locationId);
+                            const title = location?.name || '\u672a\u8bbe\u7f6e\u5730\u70b9';
+                            return (
+                              <div
+                                key={activity.id}
+                                className="group-calendar-item"
+                                style={{ borderLeftColor: groupCalendarGroup.color }}
+                                title={title}
+                              >
+                                {title}
+                              </div>
+                            );
+                          })
+                        )}
+                        {items.length > visibleItems.length && (
+                          <div className="group-calendar-more">+{items.length - visibleItems.length}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="group-calendar-empty-state">
+            <div>{'\u8bf7\u9009\u62e9\u884c\u7a0b\u5361\u7247'}</div>
+            <Button
+              type="text"
+              size="small"
+              icon={<CloseOutlined />}
+              onClick={() => setGroupCalendarVisible(false)}
+            />
+          </div>
+        )}
       </Drawer>
 
       {/* 详情编辑弹窗 */}
@@ -1510,6 +1834,174 @@ function ItineraryDesigner() {
         </div>
       </Modal>
 
+      
+      
+      <Modal
+        title="导入排程结果(JSON)"
+        open={planningImportVisible}
+        onCancel={() => setPlanningImportVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setPlanningImportVisible(false)}>
+            取消
+          </Button>,
+          <Button
+            key="validate"
+            onClick={handlePlanningImportValidate}
+            loading={planningImportValidating}
+            disabled={!planningImportPayload}
+          >
+            校验
+          </Button>,
+          <Button
+            key="import"
+            type="primary"
+            onClick={handlePlanningImportApply}
+            loading={planningImportLoading}
+            disabled={!planningImportPayload}
+          >
+            导入
+          </Button>
+        ]}
+        destroyOnClose
+      >
+        <Upload.Dragger
+          accept=".json,application/json"
+          multiple={false}
+          fileList={planningImportFileList}
+          beforeUpload={handlePlanningImportFile}
+          onRemove={handlePlanningImportRemove}
+        >
+          <p className="ant-upload-drag-icon">
+            <InboxOutlined />
+          </p>
+          <p className="ant-upload-text">点击或拖拽上传 planning_result.json</p>
+          <p className="ant-upload-hint">仅支持 JSON 文件</p>
+        </Upload.Dragger>
+
+        {planningImportPayload ? (
+          <div style={{ marginTop: 12, fontSize: 12, color: '#666' }}>
+            {planningImportFile ? (
+              <div>
+                {`文件: ${planningImportFile.name} (${(planningImportFile.size / 1024).toFixed(1)} KB)`}
+              </div>
+            ) : null}
+            <div>{`schema: ${planningImportPayload.schema}`}</div>
+            <div>{`mode: ${planningImportPayload.mode || '-'}`}</div>
+            <div>
+              {`range: ${planningImportRange ? `${planningImportRange.start} ~ ${planningImportRange.end}` : '-'}`}
+            </div>
+            <div>{`assignments: ${planningImportAssignmentsCount}`}</div>
+            <div>{`groups in file: ${planningImportPayloadGroupIds.length}`}</div>
+          </div>
+        ) : null}
+
+        <Form
+          form={planningImportForm}
+          layout="vertical"
+          initialValues={{
+            replaceExisting: false,
+            skipConflicts: true,
+            onlySelectedGroups: true,
+            groupIds: []
+          }}
+          style={{ marginTop: 12 }}
+        >
+          <Form.Item name="replaceExisting" valuePropName="checked">
+            <Checkbox>覆盖日期范围内已有安排</Checkbox>
+          </Form.Item>
+          <Form.Item name="skipConflicts" valuePropName="checked">
+            <Checkbox>跳过冲突继续导入</Checkbox>
+          </Form.Item>
+          <Form.Item name="onlySelectedGroups" valuePropName="checked">
+            <Checkbox>仅导入已选团组</Checkbox>
+          </Form.Item>
+
+          {!planningImportOnlySelectedValue ? (
+            <Form.Item
+              name="groupIds"
+              label="选择团组"
+              rules={[{ required: true, message: '请选择团组' }]}
+            >
+              <Select
+                mode="multiple"
+                placeholder={planningImportPayloadGroupIds.length ? '选择需要导入的团组' : '请先上传文件'}
+                disabled={!planningImportPayload}
+                dropdownRender={(menu) => (
+                  <>
+                    <div style={{ padding: '8px', display: 'flex', gap: '8px' }}>
+                      <Button
+                        size="small"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          planningImportForm.setFieldsValue({
+                            groupIds: planningImportPayloadGroupIds
+                          });
+                        }}
+                        disabled={planningImportPayloadGroupIds.length === 0}
+                      >
+                        全选
+                      </Button>
+                      <Button
+                        size="small"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          planningImportForm.setFieldsValue({ groupIds: [] });
+                        }}
+                      >
+                        全不选
+                      </Button>
+                    </div>
+                    {menu}
+                  </>
+                )}
+              >
+                {planningImportPayloadGroupIds.map(groupId => {
+                  const group = groups.find(g => g.id === groupId);
+                  return (
+                    <Option key={groupId} value={groupId}>
+                      {group?.name || `#${groupId}`}
+                    </Option>
+                  );
+                })}
+              </Select>
+            </Form.Item>
+          ) : (
+            <div style={{ fontSize: 12, color: '#666', marginBottom: 12 }}>
+              导入团组数: {planningImportSelectedGroupIds.length}
+            </div>
+          )}
+        </Form>
+
+        {planningImportResult ? (
+          <div style={{ marginTop: 12, background: '#fafafa', padding: 12, borderRadius: 6 }}>
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: 8 }}>
+              <span>团组: {planningImportSummary?.groups || 0}</span>
+              <span>分配: {planningImportSummary?.assignments || 0}</span>
+              <span>导入: {planningImportSummary?.inserted || 0}</span>
+              <span>跳过: {planningImportSummary?.skipped || 0}</span>
+              <span>冲突: {planningImportSummary?.conflicts || 0}</span>
+            </div>
+            {planningImportConflicts.length ? (
+              <div style={{ maxHeight: 160, overflow: 'auto', fontSize: 12, color: '#d4380d' }}>
+                {planningImportConflicts.slice(0, 20).map((item, index) => {
+                  const groupLabel = item.groupName || (groups.find(g => g.id === item.groupId)?.name || `#${item.groupId}`);
+                  const locationLabel = item.locationName || (item.locationId ? `#${item.locationId}` : '');
+                  const slotLabel = item.timeSlot ? getTimeSlotLabel(item.timeSlot) : '';
+                  return (
+                    <div key={`${item.groupId || 'g'}-${item.date || 'd'}-${index}`}>
+                      {groupLabel} ? {item.date} ? {slotLabel} ? {locationLabel} ? {item.reason}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: '#52c41a' }}>未发现冲突</div>
+            )}
+          </div>
+        ) : null}
+      </Modal>
+
+
       <Modal
         title="导出排程输入包(JSON)"
         open={planningExportVisible}
@@ -1586,84 +2078,9 @@ function ItineraryDesigner() {
         </Form>
       </Modal>
 
-      <Modal
-        title="AI 多团组生成"
-        open={aiModalVisible}
-        onCancel={() => {
-          setAiModalVisible(false);
-          setAiPreview(null);
-        }}
-        width={720}
-        footer={[
-          <Button key="preview" onClick={handleAiPreview} loading={aiLoading}>
-            预览
-          </Button>,
-          <Button key="apply" type="primary" onClick={handleAiApply} loading={aiLoading}>
-            生成并保存
-          </Button>
-        ]}
-        destroyOnClose
-      >
-        <Form form={aiForm} layout="vertical">
-          <Form.Item
-            name="groupIds"
-            label="选择团组"
-            rules={[{ required: true, message: '请选择团组' }]}
-          >
-            <Select mode="multiple" placeholder="选择需要生成的团组">
-              {groups.map(group => (
-                <Option key={group.id} value={group.id}>
-                  {group.name}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            name="dateRange"
-            label="日期范围"
-            rules={[{ required: true, message: '请选择日期范围' }]}
-          >
-            <DatePicker.RangePicker />
-          </Form.Item>
-
-          <Form.Item name="planNamePrefix" label="方案前缀">
-            <Input placeholder="例如：AI方案" />
-          </Form.Item>
-
-          <Form.Item name="replaceExisting" valuePropName="checked">
-            <Checkbox>覆盖该日期范围内已有安排</Checkbox>
-          </Form.Item>
-
-          <Form.Item name="useAI" valuePropName="checked">
-            <Checkbox>使用AI排序偏好（需联网）</Checkbox>
-          </Form.Item>
-        </Form>
-
-        {aiPreview ? (
-          <div style={{ marginTop: 12, background: '#fafafa', padding: 12, borderRadius: 6 }}>
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '8px' }}>
-              <span>团组数：{aiPreview.summary?.groups || 0}</span>
-              <span>天数：{aiPreview.summary?.days || 0}</span>
-              <span>安排数：{aiPreview.summary?.assignments || 0}</span>
-              <span>冲突：{aiPreview.summary?.conflicts || 0}</span>
-            </div>
-            {aiPreview.conflicts?.length ? (
-              <div style={{ maxHeight: 160, overflow: 'auto', fontSize: 12, color: '#d4380d' }}>
-                {aiPreview.conflicts.slice(0, 20).map((item, index) => (
-                  <div key={`${item.groupId}-${index}`}>
-                    {item.groupName} · {item.date} · {getTimeSlotLabel(item.timeSlot)} · {item.reason}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ fontSize: 12, color: '#52c41a' }}>未发现冲突</div>
-            )}
-          </div>
-        ) : null}
-      </Modal>
     </div>
   );
 }
 
 export default ItineraryDesigner;
+

@@ -36,6 +36,7 @@ CREATE TABLE locations (
     name VARCHAR(200) NOT NULL,
     address VARCHAR(500),
     capacity INTEGER DEFAULT 100,
+    color VARCHAR(20) DEFAULT '#1890ff',
     contact_person VARCHAR(100),
     contact_phone VARCHAR(20),
     blocked_weekdays VARCHAR(20), -- '3,4' 表示周三周四不可用
@@ -96,6 +97,24 @@ CREATE TABLE itinerary_plan_items (
     sort_order INTEGER NOT NULL DEFAULT 0
 );
 
+-- 4.7 团组成员表
+CREATE TABLE group_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    gender VARCHAR(10),
+    age INTEGER,
+    id_number VARCHAR(50),
+    phone VARCHAR(30),
+    parent_phone VARCHAR(30),
+    role VARCHAR(20),
+    room_number VARCHAR(30),
+    special_needs TEXT,
+    emergency_contact VARCHAR(100),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 5. 编辑锁表
 CREATE TABLE edit_lock (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -123,6 +142,7 @@ CREATE INDEX idx_groups_date_range ON groups(start_date, end_date);
 CREATE INDEX idx_groups_itinerary_plan ON groups(itinerary_plan_id);
 CREATE INDEX idx_itinerary_plan_items_plan ON itinerary_plan_items(plan_id);
 CREATE INDEX idx_itinerary_plan_items_location ON itinerary_plan_items(location_id);
+CREATE INDEX idx_group_members_group ON group_members(group_id);
 
 -- 创建视图简化查询
 CREATE VIEW calendar_view AS
@@ -168,4 +188,5 @@ INSERT INTO system_config (key, value, description) VALUES
 ('lock_timeout', '300', '编辑锁超时时间（秒）'),
 ('auto_backup', 'true', '是否自动备份'),
 ('backup_time', '02:00', '自动备份时间'),
-('max_groups', '100', '最大团组数量');
+('max_groups', '100', '最大团组数量'),
+('itinerary_group_row_align', 'true', '行程设计器团组行对齐');

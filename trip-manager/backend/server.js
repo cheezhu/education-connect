@@ -53,6 +53,26 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_itinerary_plan_items_location ON itinerary_plan_items(location_id);
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS group_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    gender VARCHAR(10),
+    age INTEGER,
+    id_number VARCHAR(50),
+    phone VARCHAR(30),
+    parent_phone VARCHAR(30),
+    role VARCHAR(20),
+    room_number VARCHAR(30),
+    special_needs TEXT,
+    emergency_contact VARCHAR(100),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
+`);
+
 const activityColumns = db.prepare("PRAGMA table_info(activities)").all().map(col => col.name);
 if (!activityColumns.includes('schedule_id')) {
   db.exec('ALTER TABLE activities ADD COLUMN schedule_id INTEGER');
@@ -71,6 +91,10 @@ if (!locationColumns.includes('open_hours')) {
 }
 if (!locationColumns.includes('closed_dates')) {
   db.exec('ALTER TABLE locations ADD COLUMN closed_dates TEXT');
+}
+if (!locationColumns.includes('color')) {
+  db.exec('ALTER TABLE locations ADD COLUMN color TEXT');
+  db.exec("UPDATE locations SET color = '#1890ff' WHERE color IS NULL OR color = ''");
 }
 
 // 中间件
@@ -114,6 +138,7 @@ app.use('/api/locations', require('./src/routes/locations'));
 app.use('/api/activities', require('./src/routes/activities'));
 app.use('/api/statistics', require('./src/routes/statistics'));
 app.use('/api/itinerary-plans', require('./src/routes/itineraryPlans'));
+app.use('/api', require('./src/routes/members'));
 app.use('/api/ai', require('./src/routes/aiPlanner'));
 app.use('/api/config', require('./src/routes/systemConfig'));
 app.use('/api/planning', require('./src/routes/planning'));

@@ -1,0 +1,34 @@
+.settings-page .ant-card {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.settings-page .ant-card-head {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.settings-page .ant-card-head-title {
+  font-size: 13px;
+}
+
+.settings-page .ant-card-body {
+  padding: 12px;
+}
+
+.settings-page .ant-form-item {
+  margin-bottom: 8px;
+}
+
+.settings-page .ant-form-item-label > label {
+  font-size: 12px;
+}
+
+.settings-page .ant-alert {
+  padding: 6px 8px;
+}
+
+@media (max-width: 768px) {
+  .settings-page .page-header {
+    padding: 10px 12px;
+  }
+}

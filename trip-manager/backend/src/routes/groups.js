@@ -25,7 +25,111 @@ const calculateDuration = (startDate, endDate) => {
   return Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
 };
 
-// 创建团组（需要编辑锁）
+const GROUP_COLOR_PALETTE = [
+  '#1890ff',
+  '#52c41a',
+  '#faad14',
+  '#eb2f96',
+  '#13c2c2',
+  '#722ed1',
+  '#f5222d',
+  '#fa541c',
+  '#2f54eb',
+  '#a0d911'
+];
+
+const getRandomGroupColor = () => (
+  GROUP_COLOR_PALETTE[Math.floor(Math.random() * GROUP_COLOR_PALETTE.length)] || '#1890ff'
+);
+
+
+const normalizeGroupPayload = (payload = {}) => {
+  const name = payload.name?.trim();
+  const type = payload.type;
+  const startDate = payload.startDate ?? payload.start_date;
+  const endDate = payload.endDate ?? payload.end_date;
+  const studentCount = payload.studentCount ?? payload.student_count ?? 40;
+  const teacherCount = payload.teacherCount ?? payload.teacher_count ?? 4;
+  const duration = payload.duration ?? calculateDuration(startDate, endDate);
+  const color = payload.color ?? getRandomGroupColor();
+  const itineraryPlanId = payload.itineraryPlanId ?? payload.itinerary_plan_id ?? null;
+  const contactPerson = payload.contactPerson ?? payload.contact_person;
+  const contactPhone = payload.contactPhone ?? payload.contact_phone;
+  const notes = payload.notes ?? '';
+
+  return {
+    name,
+    type,
+    startDate,
+    endDate,
+    studentCount,
+    teacherCount,
+    duration,
+    color,
+    itineraryPlanId,
+    contactPerson,
+    contactPhone,
+    notes
+  };
+};
+
+// Batch create groups (requires edit lock)
+router.post('/batch', requireEditLock, (req, res) => {
+  const { groups } = req.body;
+
+  if (!Array.isArray(groups) || groups.length === 0) {
+    return res.status(400).json({ error: '缺少团组列表' });
+  }
+
+  const insertStmt = req.db.prepare(`
+    INSERT INTO groups (
+      name, type, student_count, teacher_count,
+      start_date, end_date, duration, color, itinerary_plan_id, contact_person,
+      contact_phone, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const selectStmt = req.db.prepare('SELECT * FROM groups WHERE id = ?');
+
+  const createBatch = req.db.transaction((items) => {
+    const created = [];
+
+    items.forEach((item, index) => {
+      const normalized = normalizeGroupPayload(item);
+
+      if (!normalized.name || !normalized.type || !normalized.startDate || !normalized.endDate) {
+        throw new Error(`第 ${index + 1} 行缺少必要字段`);
+      }
+
+      const result = insertStmt.run(
+        normalized.name,
+        normalized.type,
+        normalized.studentCount,
+        normalized.teacherCount,
+        normalized.startDate,
+        normalized.endDate,
+        normalized.duration,
+        normalized.color,
+        normalized.itineraryPlanId,
+        normalized.contactPerson,
+        normalized.contactPhone,
+        normalized.notes
+      );
+
+      created.push(selectStmt.get(result.lastInsertRowid));
+    });
+
+    return created;
+  });
+
+  try {
+    const createdGroups = createBatch(groups);
+    res.json({ success: true, count: createdGroups.length, groups: createdGroups });
+  } catch (error) {
+    console.error('批量创建团组失败:', error);
+    res.status(400).json({ error: '批量创建团组失败', message: error.message });
+  }
+});
+
 router.post('/', requireEditLock, (req, res) => {
   const { 
     name, 
@@ -35,7 +139,7 @@ router.post('/', requireEditLock, (req, res) => {
     startDate,
     endDate,
     duration, 
-    color = '#1890ff',
+    color,
     itineraryPlanId,
     contactPerson,
     contactPhone,
@@ -54,6 +158,7 @@ router.post('/', requireEditLock, (req, res) => {
   const resolvedStudentCount = studentCount ?? student_count ?? 40;
   const resolvedTeacherCount = teacherCount ?? teacher_count ?? 4;
   const resolvedDuration = duration ?? calculateDuration(resolvedStartDate, resolvedEndDate);
+  const resolvedColor = color ?? getRandomGroupColor();
   const resolvedContactPerson = contactPerson ?? contact_person;
   const resolvedContactPhone = contactPhone ?? contact_phone;
   const resolvedItineraryPlanId = itineraryPlanId ?? itinerary_plan_id ?? null;
@@ -73,7 +178,7 @@ router.post('/', requireEditLock, (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name, type, resolvedStudentCount, resolvedTeacherCount,
-      resolvedStartDate, resolvedEndDate, resolvedDuration, color, resolvedItineraryPlanId,
+      resolvedStartDate, resolvedEndDate, resolvedDuration, resolvedColor, resolvedItineraryPlanId,
       resolvedContactPerson, resolvedContactPhone, notes
     );
 

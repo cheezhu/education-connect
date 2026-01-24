@@ -1,5 +1,12 @@
 const express = require('express');
 const requireEditLock = require('../middleware/editLock');
+const {
+  DEFAULT_TIME_SLOTS,
+  DEFAULT_AI_RULES,
+  getAiRules,
+  saveAiRules,
+  resolveAiSettings
+} = require('../utils/aiConfig');
 
 const router = express.Router();
 let fetchFn = global.fetch;
@@ -10,22 +17,10 @@ if (!fetchFn) {
     fetchFn = () => Promise.reject(new Error('fetch is not available'));
   }
 }
-const AI_REQUEST_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS) || 25000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 25000;
 
-const DEFAULT_TIME_SLOTS = {
-  MORNING: { start: 9, end: 12 },
-  AFTERNOON: { start: 14, end: 17 },
-  EVENING: { start: 19, end: 21 }
-};
-
-const AI_RULES_KEY = 'ai_schedule_rules';
 const AI_HISTORY_KEY = 'ai_itinerary_history';
 const AI_HISTORY_LIMIT = 50;
-const DEFAULT_AI_RULES = {
-  timeSlots: ['MORNING', 'AFTERNOON'],
-  slotWindows: DEFAULT_TIME_SLOTS,
-  requireAllPlanItems: false
-};
 
 const parseJsonSafe = (value, fallback) => {
   if (!value) return fallback;
@@ -45,63 +40,6 @@ const parseBlockedWeekdays = (value) => {
       .filter(Boolean)
       .map(item => Number(item))
   );
-};
-
-const normalizeAiRules = (input = {}) => {
-  const timeSlots = Array.isArray(input.timeSlots)
-    ? input.timeSlots.filter(slot => DEFAULT_TIME_SLOTS[slot])
-    : [];
-  const normalizedSlots = timeSlots.length > 0
-    ? timeSlots
-    : DEFAULT_AI_RULES.timeSlots;
-
-  const inputWindows = input.slotWindows && typeof input.slotWindows === 'object'
-    ? input.slotWindows
-    : {};
-  const normalizedWindows = {};
-
-  Object.entries(DEFAULT_TIME_SLOTS).forEach(([key, window]) => {
-    const candidate = inputWindows[key] || {};
-    const start = Number(candidate.start);
-    const end = Number(candidate.end);
-    normalizedWindows[key] = {
-      start: Number.isFinite(start) ? start : window.start,
-      end: Number.isFinite(end) ? end : window.end
-    };
-  });
-
-  return {
-    timeSlots: normalizedSlots,
-    slotWindows: normalizedWindows,
-    requireAllPlanItems: input.requireAllPlanItems !== undefined
-      ? Boolean(input.requireAllPlanItems)
-      : DEFAULT_AI_RULES.requireAllPlanItems
-  };
-};
-
-const getAiRules = (db) => {
-  const row = db.prepare('SELECT value FROM system_config WHERE key = ?').get(AI_RULES_KEY);
-  if (!row || !row.value) return DEFAULT_AI_RULES;
-  try {
-    const parsed = JSON.parse(row.value);
-    return normalizeAiRules(parsed);
-  } catch (error) {
-    return DEFAULT_AI_RULES;
-  }
-};
-
-const saveAiRules = (db, rules) => {
-  const normalized = normalizeAiRules(rules);
-  const value = JSON.stringify(normalized);
-  const existing = db.prepare('SELECT key FROM system_config WHERE key = ?').get(AI_RULES_KEY);
-  if (existing) {
-    db.prepare('UPDATE system_config SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?')
-      .run(value, AI_RULES_KEY);
-  } else {
-    db.prepare('INSERT INTO system_config (key, value, description) VALUES (?, ?, ?)')
-      .run(AI_RULES_KEY, value, 'AI行程规则配置');
-  }
-  return normalized;
 };
 
 const getAiHistory = (db) => {
@@ -338,7 +276,7 @@ const extractJson = (text) => {
   }
 };
 
-const fetchWithTimeout = async (url, options, timeoutMs = AI_REQUEST_TIMEOUT_MS) => {
+const fetchWithTimeout = async (url, options, timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -348,12 +286,14 @@ const fetchWithTimeout = async (url, options, timeoutMs = AI_REQUEST_TIMEOUT_MS)
   }
 };
 
-const fetchItineraryHintsFromAI = async ({ group, planItems, dateRange, timeSlots, apiKey }) => {
-  if (!apiKey) return null;
+const fetchItineraryHintsFromAI = async ({ group, planItems, dateRange, timeSlots, aiConfig }) => {
+  const apiKey = aiConfig?.apiKey || '';
+  if (!apiKey || !apiKey.trim()) return null;
 
-  const provider = (process.env.AI_PROVIDER || 'openai').toLowerCase();
+  const provider = aiConfig?.provider || 'openai';
   const defaultModel = provider === 'gemini' ? 'gemini-1.5-pro-latest' : 'gpt-4.1';
-  const model = process.env.AI_MODEL || defaultModel;
+  const model = aiConfig?.model || defaultModel;
+  const timeoutMs = aiConfig?.timeoutMs || DEFAULT_REQUEST_TIMEOUT_MS;
   const promptPayload = {
     task: 'Generate itinerary hints. Return JSON only.',
     rules: {
@@ -406,7 +346,8 @@ const fetchItineraryHintsFromAI = async ({ group, planItems, dateRange, timeSlot
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: { temperature: 0.2 }
         })
-      }
+      },
+      timeoutMs
     );
 
     if (!response.ok) {
@@ -437,14 +378,18 @@ const fetchItineraryHintsFromAI = async ({ group, planItems, dateRange, timeSlot
     ]
   };
 
-    const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
+  const response = await fetchWithTimeout(
+    'https://api.openai.com/v1/chat/completions',
+    {
       method: 'POST',
       headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
     },
-    body: JSON.stringify(payload)
-  });
+    timeoutMs
+  );
 
   if (!response.ok) {
     const text = await response.text();
@@ -470,12 +415,14 @@ router.get('/history', (req, res) => {
   res.json({ items: getAiHistory(req.db) });
 });
 
-const fetchPreferencesFromAI = async ({ groups, locations, timeSlots, apiKey }) => {
-  if (!apiKey) return null;
+const fetchPreferencesFromAI = async ({ groups, locations, timeSlots, aiConfig }) => {
+  const apiKey = aiConfig?.apiKey || '';
+  if (!apiKey || !apiKey.trim()) return null;
 
-  const provider = (process.env.AI_PROVIDER || 'openai').toLowerCase();
+  const provider = aiConfig?.provider || 'openai';
   const defaultModel = provider === 'gemini' ? 'gemini-1.5-pro-latest' : 'gpt-4.1';
-  const model = process.env.AI_MODEL || defaultModel;
+  const model = aiConfig?.model || defaultModel;
+  const timeoutMs = aiConfig?.timeoutMs || DEFAULT_REQUEST_TIMEOUT_MS;
 
   const promptPayload = {
     task: 'Provide location preference ranking for each group.',
@@ -521,7 +468,8 @@ const fetchPreferencesFromAI = async ({ groups, locations, timeSlots, apiKey }) 
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: { temperature: 0.2 }
         })
-      }
+      },
+      timeoutMs
     );
 
     if (!response.ok) {
@@ -552,14 +500,18 @@ const fetchPreferencesFromAI = async ({ groups, locations, timeSlots, apiKey }) 
     ]
   };
 
-  const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
+  const response = await fetchWithTimeout(
+    'https://api.openai.com/v1/chat/completions',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
     },
-    body: JSON.stringify(payload)
-  });
+    timeoutMs
+  );
 
   if (!response.ok) {
     const text = await response.text();
@@ -624,13 +576,14 @@ router.post('/plan/global', async (req, res) => {
   });
 
   let aiPreferences = null;
-  if (useAI && process.env.AI_api_key) {
+  const aiConfig = resolveAiSettings(req.db);
+  if (useAI && aiConfig.apiKeyPresent) {
     try {
       aiPreferences = await fetchPreferencesFromAI({
         groups,
         locations,
         timeSlots,
-        apiKey: process.env.AI_api_key
+        aiConfig
       });
     } catch (error) {
       console.error('AI preference fetch failed:', error.message);
@@ -807,6 +760,7 @@ router.post('/plan/itinerary', async (req, res) => {
   if (!group) {
     return res.status(404).json({ error: '团组不存在' });
   }
+  const aiConfig = resolveAiSettings(req.db);
 
   const resolvedPlanId = Number.isFinite(Number(planId))
     ? Number(planId)
@@ -921,19 +875,23 @@ router.post('/plan/itinerary', async (req, res) => {
   };
 
   let aiHints = null;
-  if (process.env.AI_api_key) {
+  if (aiConfig.apiKeyPresent) {
     try {
       aiHints = await fetchItineraryHintsFromAI({
         group,
         planItems: pendingItems,
         dateRange,
         timeSlots,
-        apiKey: process.env.AI_api_key
+        aiConfig
       });
     } catch (error) {
       console.error('AI itinerary hints failed:', error.message);
     }
   }
+
+  const aiUsed = Boolean(aiHints);
+  const historyProvider = aiUsed ? aiConfig.provider : 'rules';
+  const historyModel = aiUsed ? aiConfig.model : 'rules';
 
   const aiOrder = new Map();
   const aiSlotPrefs = new Map();
@@ -1044,6 +1002,8 @@ router.post('/plan/itinerary', async (req, res) => {
     appendAiHistory(req.db, {
       id: Date.now(),
       created_at: new Date().toISOString(),
+      provider: historyProvider,
+      model: historyModel,
       groupId: group.id,
       groupName: group.name,
       planId: resolvedPlanId,
@@ -1136,6 +1096,8 @@ router.post('/plan/itinerary', async (req, res) => {
   appendAiHistory(req.db, {
     id: Date.now(),
     created_at: new Date().toISOString(),
+    provider: historyProvider,
+    model: historyModel,
     groupId: group.id,
     groupName: group.name,
     planId: resolvedPlanId,

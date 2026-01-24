@@ -1,18 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Card, Select, Input, Tag, Button, Space, Table, Modal, message } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Card, Select, Input, Tag, Button, Space, Table, message, Modal, DatePicker, InputNumber } from 'antd';
 import {
   PlusOutlined,
-  FileTextOutlined
+  FileTextOutlined,
+  UnorderedListOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import dayjs from 'dayjs';
-import GroupInfoSimple from '../GroupEditV2/GroupInfoSimple';
-import ScheduleDetail from '../GroupEditV2/ScheduleDetail';
 import './GroupManagementV2.css';
 
 const { Option } = Select;
 const { Search } = Input;
+const { RangePicker } = DatePicker;
 
 const GroupManagementV2 = () => {
   const navigate = useNavigate();
@@ -20,17 +20,24 @@ const GroupManagementV2 = () => {
   const [filteredGroups, setFilteredGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [itineraryPlans, setItineraryPlans] = useState([]);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [modalView, setModalView] = useState(null);
-  const [modalGroup, setModalGroup] = useState(null);
-  const [modalSchedules, setModalSchedules] = useState([]);
-  const [modalLoading, setModalLoading] = useState(false);
   const [filters, setFilters] = useState({
     status: 'all',
     type: 'all',
     searchText: ''
   });
-  const autoSaveTimeoutRef = useRef(null);
+  const createBulkRow = () => ({
+    id: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: '',
+    type: undefined,
+    dateRange: null,
+    itinerary_plan_id: undefined,
+    participant_count: 44
+  });
+
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkRows, setBulkRows] = useState(() => [createBulkRow()]);
+  const [bulkErrors, setBulkErrors] = useState({});
 
   // 状态颜色映射
   const statusColors = {
@@ -103,6 +110,94 @@ const GroupManagementV2 = () => {
     return Math.round((passedDays / totalDays) * 100);
   };
 
+  const addBulkRow = () => {
+    setBulkRows(prev => [...prev, createBulkRow()]);
+  };
+
+  const removeBulkRow = (id) => {
+    setBulkRows(prev => prev.filter(row => row.id !== id));
+  };
+
+  const updateBulkRow = (id, updates) => {
+    setBulkRows(prev => prev.map(row => (row.id === id ? { ...row, ...updates } : row)));
+    setBulkErrors(prev => {
+      if (!prev[id]) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  const resetBulkForm = () => {
+    setBulkRows([createBulkRow()]);
+    setBulkErrors({});
+  };
+
+  const validateBulkRows = () => {
+    const errors = {};
+    let firstInvalid = null;
+
+    bulkRows.forEach((row, index) => {
+      const rowErrors = {};
+      if (!row.name || !row.name.trim()) rowErrors.name = true;
+      if (!row.dateRange || row.dateRange.length !== 2) rowErrors.dateRange = true;
+      if (!row.type) rowErrors.type = true;
+      if (!row.itinerary_plan_id) rowErrors.itinerary_plan_id = true;
+      const count = Number(row.participant_count);
+      if (!Number.isFinite(count) || count <= 0) rowErrors.participant_count = true;
+
+      if (Object.keys(rowErrors).length) {
+        errors[row.id] = rowErrors;
+        if (firstInvalid === null) {
+          firstInvalid = index + 1;
+        }
+      }
+    });
+
+    return { errors, firstInvalid };
+  };
+
+  const handleBulkCreate = async () => {
+    if (bulkRows.length === 0) {
+      message.error('请先添加团组');
+      return;
+    }
+
+    const { errors, firstInvalid } = validateBulkRows();
+    if (firstInvalid) {
+      setBulkErrors(errors);
+      message.error(`请完善第 ${firstInvalid} 行信息`);
+      return;
+    }
+
+    const groupsToCreate = bulkRows.map(row => ({
+      name: row.name.trim(),
+      type: row.type,
+      student_count: Number(row.participant_count),
+      teacher_count: 0,
+      start_date: row.dateRange?.[0]?.format('YYYY-MM-DD'),
+      end_date: row.dateRange?.[1]?.format('YYYY-MM-DD'),
+      itinerary_plan_id: row.itinerary_plan_id ?? null
+    }));
+
+    setBulkSubmitting(true);
+    try {
+      const response = await api.post('/groups/batch', { groups: groupsToCreate });
+      const createdCount = response.data?.count ?? groupsToCreate.length;
+      message.success(`已创建 ${createdCount} 个团组`);
+      setBulkOpen(false);
+      resetBulkForm();
+      fetchGroups();
+    } catch (error) {
+      const errorMessage = error?.response?.data?.message
+        || error?.response?.data?.error
+        || '批量创建失败';
+      message.error(errorMessage);
+    } finally {
+      setBulkSubmitting(false);
+    }
+  };
+
   // 应用筛选
   useEffect(() => {
     let filtered = [...groups];
@@ -147,10 +242,6 @@ const GroupManagementV2 = () => {
     fetchItineraryPlans();
   }, []);
 
-  useEffect(() => () => {
-    clearTimeout(autoSaveTimeoutRef.current);
-  }, []);
-
   const handlePlanChange = async (group, planId) => {
     const nextPlanId = planId ?? null;
     const prevPlanId = group.itinerary_plan_id ?? null;
@@ -184,76 +275,9 @@ const GroupManagementV2 = () => {
     }
   };
 
-  const loadSchedules = async (groupId) => {
-    setModalLoading(true);
-    try {
-      const response = await api.get(`/groups/${groupId}/schedules`);
-      setModalSchedules(Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-      message.error('加载日程失败');
-      setModalSchedules([]);
-    } finally {
-      setModalLoading(false);
-    }
-  };
-
-  const openModal = async (view, group) => {
-    if (view === 'calendar' && group?.id) {
-      navigate(`/groups/v2/edit/${group.id}?tab=schedule`);
-      return;
-    }
-    setModalView(view);
-    setModalGroup(group);
-    setModalVisible(true);
-    if (view === 'detail' && group?.id) {
-      await loadSchedules(group.id);
-    }
-  };
-
-  const closeModal = () => {
-    setModalVisible(false);
-    setModalView(null);
-    setModalGroup(null);
-    setModalSchedules([]);
-  };
-
-  const updateModalGroup = (field, value) => {
-    setModalGroup(prev => {
-      if (!prev) return prev;
-      const updated = { ...prev, [field]: value };
-      if (field === 'start_date' || field === 'end_date') {
-        if (updated.start_date && updated.end_date) {
-          updated.duration = dayjs(updated.end_date).diff(dayjs(updated.start_date), 'day') + 1;
-        }
-      }
-      return updated;
-    });
-  };
-
-  const handleAutoSave = () => {
-    clearTimeout(autoSaveTimeoutRef.current);
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      if (!modalGroup?.id) return;
-      try {
-        await api.put(`/groups/${modalGroup.id}`, {
-          name: modalGroup.name,
-          type: modalGroup.type,
-          student_count: modalGroup.student_count,
-          teacher_count: modalGroup.teacher_count,
-          start_date: modalGroup.start_date,
-          end_date: modalGroup.end_date,
-          duration: modalGroup.duration,
-          color: modalGroup.color,
-          itinerary_plan_id: modalGroup.itinerary_plan_id,
-          contact_person: modalGroup.contact_person,
-          contact_phone: modalGroup.contact_phone,
-          notes: modalGroup.notes
-        });
-        fetchGroups();
-      } catch (error) {
-        message.error('保存团组信息失败');
-      }
-    }, 800);
+  const openGroupTab = (groupId, tab) => {
+    if (!groupId) return;
+    navigate(`/groups/v2/edit/${groupId}?tab=${tab}`);
   };
 
   const columns = [
@@ -342,20 +366,20 @@ const GroupManagementV2 = () => {
           <Button
             icon={<FileTextOutlined />}
             size="small"
-            onClick={() => openModal('info', record)}
+            onClick={() => openGroupTab(record.id, 'info')}
           >
             团组信息
           </Button>
           <Button
             icon={<PlusOutlined />}
             size="small"
-            onClick={() => openModal('calendar', record)}
+            onClick={() => openGroupTab(record.id, 'schedule')}
           >
             日历详情
           </Button>
           <Button
             size="small"
-            onClick={() => openModal('detail', record)}
+            onClick={() => openGroupTab(record.id, 'schedule-detail')}
           >
             详细日程
           </Button>
@@ -409,6 +433,14 @@ const GroupManagementV2 = () => {
               共 {filteredGroups.length} 个团组
             </span>
             <Button
+              icon={<UnorderedListOutlined />}
+              size="small"
+              onClick={() => setBulkOpen(true)}
+            >
+              {'\u6279\u91cf\u521b\u5efa'}
+            </Button>
+
+            <Button
               type="primary"
               icon={<PlusOutlined />}
               size="small"
@@ -430,44 +462,102 @@ const GroupManagementV2 = () => {
         pagination={{ pageSize: 10, size: 'small' }}
       />
 
+
       <Modal
-        open={modalVisible}
-        onCancel={closeModal}
-        footer={null}
-        width={720}
-        bodyStyle={{
-          maxHeight: '70vh',
-          overflow: 'auto',
-          padding: '16px'
-        }}
-        title={
-          modalGroup
-            ? `${modalGroup.name || '团组'} · ${
-                modalView === 'info' ? '团组信息' : '详细日程'
-              }`
-            : ''
-        }
-        destroyOnClose
+        title={'批量创建团组'}
+        open={bulkOpen}
+        onCancel={() => setBulkOpen(false)}
+        onOk={handleBulkCreate}
+        okText={'开始创建'}
+        cancelText={'取消'}
+        confirmLoading={bulkSubmitting}
+        width={980}
+        afterClose={resetBulkForm}
       >
-        {modalLoading ? (
-          <div style={{ padding: '24px', textAlign: 'center' }}>加载中...</div>
-        ) : null}
-        {!modalLoading && modalView === 'info' && modalGroup ? (
-          <GroupInfoSimple
-            groupData={modalGroup}
-            itineraryPlans={itineraryPlans}
-            onUpdate={updateModalGroup}
-            handleAutoSave={handleAutoSave}
-            isNew={false}
-          />
-        ) : null}
-        {!modalLoading && modalView === 'detail' && modalGroup ? (
-          <ScheduleDetail
-            groupData={modalGroup}
-            schedules={modalSchedules}
-          />
-        ) : null}
+        <div className="bulk-create-modal">
+          <div className="bulk-row-header">
+            <span className="bulk-col-index">#</span>
+            <span className="bulk-col-name">{'团组名称'}</span>
+            <span className="bulk-col-date">{'日期'}</span>
+            <span className="bulk-col-type">{'类型'}</span>
+            <span className="bulk-col-plan">{'方案'}</span>
+            <span className="bulk-col-count">{'人数'}</span>
+            <span className="bulk-col-actions">{'操作'}</span>
+          </div>
+
+          <div className="bulk-row-list">
+            {bulkRows.map((row, index) => {
+              const rowError = bulkErrors[row.id] || {};
+              const rowHasError = Object.keys(rowError).length > 0;
+
+              return (
+                <div className={`bulk-row ${rowHasError ? 'has-error' : ''}`} key={row.id}>
+                  <div className="bulk-row-index">{index + 1}</div>
+                  <Input
+                    size="small"
+                    value={row.name}
+                    status={rowError.name ? 'error' : ''}
+                    placeholder={'输入团组名称'}
+                    onChange={(e) => updateBulkRow(row.id, { name: e.target.value })}
+                  />
+                  <RangePicker
+                    size="small"
+                    value={row.dateRange}
+                    status={rowError.dateRange ? 'error' : ''}
+                    onChange={(value) => updateBulkRow(row.id, { dateRange: value })}
+                  />
+                  <Select
+                    size="small"
+                    value={row.type ?? undefined}
+                    status={rowError.type ? 'error' : ''}
+                    placeholder={'选择类型'}
+                    onChange={(value) => updateBulkRow(row.id, { type: value })}
+                  >
+                    <Option value="primary">{'小学'}</Option>
+                    <Option value="secondary">{'中学'}</Option>
+                  </Select>
+                  <Select
+                    size="small"
+                    value={row.itinerary_plan_id ?? undefined}
+                    status={rowError.itinerary_plan_id ? 'error' : ''}
+                    placeholder={'选择方案'}
+                    onChange={(value) => updateBulkRow(row.id, { itinerary_plan_id: value })}
+                  >
+                    {(itineraryPlans || []).map(plan => (
+                      <Option key={plan.id} value={plan.id}>
+                        {plan.name}
+                      </Option>
+                    ))}
+                  </Select>
+                  <InputNumber
+                    size="small"
+                    min={1}
+                    value={row.participant_count}
+                    status={rowError.participant_count ? 'error' : ''}
+                    onChange={(value) => updateBulkRow(row.id, { participant_count: value })}
+                  />
+                  <Button
+                    size="small"
+                    danger
+                    disabled={bulkRows.length === 1}
+                    onClick={() => removeBulkRow(row.id)}
+                  >
+                    {'删除'}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="bulk-row-actions">
+            <Button size="small" onClick={addBulkRow}>
+              {'新增一行'}
+            </Button>
+            <span className="bulk-count">{`共 ${bulkRows.length} 行`}</span>
+          </div>
+        </div>
       </Modal>
+
     </div>
   );
 };

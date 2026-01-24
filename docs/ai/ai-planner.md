@@ -8,6 +8,8 @@ AI 路由文件：`trip-manager/backend/src/routes/aiPlanner.js`
 - `AI_MODEL`：默认 gpt-4.1 或 gemini-1.5-pro-latest
 - `AI_TIMEOUT_MS`：默认 25000ms
 
+> 若 system_config 中存在 `ai_api_key` / `ai_provider` / `ai_model` / `ai_timeout_ms`，将优先生效。
+
 ## AI 规则配置
 - GET `/ai/rules`：读取
 - PUT `/ai/rules`：保存
@@ -17,6 +19,7 @@ AI 路由文件：`trip-manager/backend/src/routes/aiPlanner.js`
 - timeSlots: MORNING / AFTERNOON
 - slotWindows: MORNING(9-12), AFTERNOON(14-17), EVENING(19-21)
 - requireAllPlanItems: false
+- maxItemsPerGroup: 8
 
 ## 多团组全局排期（/ai/plan/global）
 输入：groupIds, startDate, endDate, timeSlots, planNamePrefix, replaceExisting, useAI, dryRun
