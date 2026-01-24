@@ -186,6 +186,7 @@
   "active": "2411584888c4ede4",
   "lastOpenFiles": [
     "trip-manager/backend/db/trip.db-journal",
+    "docs/design/design-architecture.md",
     "docs/design/design-workstation-concept.html",
     "docs/design",
     "trip-manager/frontend/src/design-workstation-concept.html",
@@ -213,14 +214,12 @@
     "docs/archive/strategy-vision-roadmap.md",
     "docs/archive/strategy-studio-field-feature-design.md",
     "docs/archive/strategy-studio-field-architecture-analysis.md",
-    "docs/archive/strategy-index.md",
     "docs/archive/strategy",
     "docs/archive/history",
     "docs/archive",
     "trip-manager/frontend/vite.config.js.timestamp-1769285861241-b38eec141f182.mjs",
     "docs/account-admin",
     "trip-manager/frontend/src/pages/Settings.css",
-    "trip-manager/frontend/src/pages/Settings.jsx",
     "trip-manager/backend/node_modules/undici/docs/assets/lifecycle-diagram.png"
   ]
 }

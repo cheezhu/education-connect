@@ -3,33 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EC Pro Workstation - Itinerary Designer</title>
+    <title>EC Pro Workstation - Interactive Prototype</title>
     <style>
         :root {
-            /* 专业工坊配色 - Dark/Neutral */
-            --bg-app: #1e1e1e;       /* 应用背景 */
-            --bg-activity: #333333;  /* 最左侧活动栏 */
-            --bg-sidebar: #252526;   /* 侧边栏/面板 */
-            --bg-editor: #1e1e1e;    /* 编辑区/时间轴背景 */
-            --bg-header: #2d2d2d;    /* 顶部命令栏 */
-            --bg-status: #007acc;    /* 底部状态栏 */
-            --bg-modal: #252526;     /* 弹窗背景 */
+            --bg-app: #1e1e1e;
+            --bg-activity: #333333;
+            --bg-sidebar: #252526;
+            --bg-editor: #1e1e1e;
+            --bg-header: #2d2d2d;
+            --bg-status: #007acc;
+            --bg-panel: #1e1e1e;
+            --bg-menu: #252526;
             
-            --border-color: #454545; /* 分割线 */
-            --text-main: #cccccc;    /* 主文字 */
-            --text-muted: #858585;   /* 次要文字 */
-            --accent: #0e639c;       /* 强调色/选中色 */
-            --focus-border: #007fd4; /* 焦点边框 */
+            --border-color: #454545;
+            --text-main: #cccccc;
+            --text-muted: #858585;
+            --accent: #0e639c;
+            --selection: rgba(14, 99, 156, 0.4);
             
-            /* 功能色 */
             --color-conflict: #f14c4c;
             --color-warning: #cca700;
             --color-success: #89d185;
-            
-            /* 时间段背景 */
-            --slot-morning: rgba(24, 144, 255, 0.05);
-            --slot-afternoon: rgba(82, 196, 26, 0.05);
-            --slot-evening: rgba(250, 140, 22, 0.05);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -44,821 +38,376 @@
             user-select: none;
         }
 
-        /* 整体布局 */
-        .app-shell {
-            display: flex;
-            height: 100vh;
-            width: 100vw;
-            position: relative; /* 为弹窗定位 */
-        }
+        /* 布局 */
+        .app-shell { display: flex; height: 100vh; width: 100vw; }
+        .vertical-split { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+        .horizontal-split { display: flex; flex: 1; min-height: 0; }
 
-        /* 1. 最左侧活动栏 */
-        .activity-bar {
-            width: 48px;
-            background: var(--bg-activity);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding-top: 10px;
-            flex-shrink: 0;
-            z-index: 100;
-        }
+        /* 1. Activity Bar */
+        .activity-bar { width: 48px; background: var(--bg-activity); display: flex; flex-direction: column; align-items: center; padding-top: 10px; z-index: 100; }
+        .activity-item { width: 48px; height: 48px; display: flex; justify-content: center; align-items: center; color: var(--text-muted); font-size: 20px; border-left: 2px solid transparent; cursor: pointer; position: relative; }
+        .activity-item:hover, .activity-item.active { color: white; opacity: 1; }
+        .activity-item.active { border-left-color: white; }
+        .badge { position: absolute; bottom: 10px; right: 10px; width: 8px; height: 8px; background: var(--color-conflict); border-radius: 50%; border: 1px solid var(--bg-activity); }
 
-        .activity-item {
-            width: 48px;
-            height: 48px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            color: var(--text-muted);
-            font-size: 20px;
-            border-left: 2px solid transparent;
-            opacity: 0.7;
-            transition: all 0.1s;
-            position: relative;
-        }
-
-        .activity-item:hover { color: white; opacity: 1; }
-        .activity-item.active { color: white; border-left-color: white; opacity: 1; }
+        /* 2. Sidebar */
+        .sidebar { width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; transition: width 0.1s; }
+        .sidebar-header { height: 35px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: bold; color: var(--text-muted); text-transform: uppercase; }
+        .sidebar-search { padding: 8px 12px; border-bottom: 1px solid var(--border-color); }
+        .search-input { width: 100%; background: #3c3c3c; border: 1px solid transparent; color: white; padding: 4px 8px; border-radius: 2px; font-size: 12px; }
+        .search-input:focus { border-color: var(--accent); outline: none; }
         
-        .badge {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            width: 8px;
-            height: 8px;
-            background: var(--color-conflict);
-            border-radius: 50%;
-            border: 1px solid var(--bg-activity);
-        }
-
-        .activity-spacer { flex: 1; }
-
-        /* 2. 侧边栏 (Explorer) */
-        .sidebar {
-            width: 260px;
-            background: var(--bg-sidebar);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-        }
-
-        .sidebar-header {
-            height: 35px;
-            padding: 0 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 11px;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--text-muted);
-            background: rgba(0,0,0,0.1);
-        }
-
-        .sidebar-content {
-            flex: 1;
-            overflow-y: auto;
-        }
-
-        /* 面板折叠块 */
-        .panel-section {
-            border-bottom: 1px solid var(--border-color);
-        }
-        .panel-header {
-            padding: 6px 10px;
-            cursor: pointer;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            color: #e0e0e0;
-            background: rgba(255,255,255,0.03);
-        }
+        .panel-section { border-bottom: 1px solid var(--border-color); }
+        .panel-header { padding: 6px 10px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: space-between; color: #e0e0e0; background: rgba(255,255,255,0.03); }
         .panel-header:hover { background: #2a2d2e; }
-        .panel-header::before {
-            content: '⌄';
-            display: inline-block;
-            width: 16px;
-            font-size: 14px;
-            transform: translateY(-2px);
-        }
         
-        /* 团组列表项 */
-        .group-item {
-            padding: 4px 10px 4px 16px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border-left: 2px solid transparent;
-        }
+        .group-item { padding: 4px 10px 4px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; position: relative; }
         .group-item:hover { background: #2a2d2e; }
-        .group-item.selected { background: #37373d; border-left-color: var(--focus-border); }
+        .group-item.hidden { opacity: 0.5; }
+        .eye-icon { margin-left: auto; color: #666; font-size: 12px; opacity: 0; }
+        .group-item:hover .eye-icon { opacity: 1; }
+        .group-color { width: 8px; height: 8px; border-radius: 50%; }
 
-        .checkbox {
-            width: 14px;
-            height: 14px;
-            border: 1px solid #666;
-            border-radius: 3px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-        }
-        .checkbox.checked { background: var(--accent); border-color: var(--accent); color: white; }
+        /* 3. Main Stage */
+        .main-stage { flex: 1; display: flex; flex-direction: column; background: var(--bg-editor); min-width: 0; position: relative; }
+        .top-bar { height: 40px; background: var(--bg-header); display: flex; align-items: center; padding: 0 16px; gap: 16px; }
+        .breadcrumbs { display: flex; gap: 8px; font-size: 13px; color: var(--text-muted); }
+        .crumb.active { color: white; }
 
-        .group-color { width: 8px; height: 8px; border-radius: 2px; }
-        .group-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .group-meta { font-size: 10px; color: #666; }
+        /* 4. Canvas */
+        .timeline-container { flex: 1; overflow: auto; position: relative; display: flex; flex-direction: column; scroll-behavior: smooth; }
+        .grid-header { display: grid; grid-template-columns: 80px repeat(7, 1fr); position: sticky; top: 0; z-index: 10; background: var(--bg-editor); border-bottom: 1px solid var(--border-color); }
+        .grid-cell-header { padding: 8px; text-align: center; border-right: 1px solid #333; display: flex; flex-direction: column; }
+        .grid-cell-header.today { background: rgba(14, 99, 156, 0.1); border-bottom: 2px solid var(--accent); }
 
-        /* 3. 主工作区 */
-        .main-stage {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: var(--bg-editor);
-            min-width: 0;
-            position: relative; /* 为内部浮层定位 */
-        }
-
-        /* 顶部栏 */
-        .top-bar {
-            height: 40px;
-            background: var(--bg-header);
-            display: flex;
-            align-items: center;
-            padding: 0 16px;
-            gap: 16px;
-        }
-
-        .breadcrumbs {
-            display: flex;
-            align-items: center;
-            font-size: 13px;
-            color: var(--text-muted);
-        }
-        .crumb.active { color: white; font-weight: 500; }
-        .sep { margin: 0 8px; color: #555; }
-
-        /* 周切换器 */
-        .week-navigator {
-            display: flex;
-            align-items: center;
-            background: #3c3c3c;
-            border-radius: 4px;
-            padding: 2px;
-        }
-        .nav-btn {
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: #ccc;
-        }
-        .nav-btn:hover { background: #555; border-radius: 2px; }
-        .current-week {
-            padding: 0 12px;
-            font-family: Consolas, monospace;
-            font-weight: bold;
-            font-size: 12px;
-        }
-
-        /* 工具栏 */
-        .editor-toolbar {
-            height: 36px;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            padding: 0 16px;
-            background: var(--bg-editor);
-            justify-content: space-between;
-        }
-
-        .tool-group {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .tool-toggle {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 11px;
-            cursor: pointer;
-            color: var(--text-muted);
-            padding: 4px 8px;
-            border-radius: 4px;
-        }
-        .tool-toggle:hover { background: #2a2d2e; color: var(--text-main); }
-        .tool-toggle.active { color: var(--accent); background: rgba(14, 99, 156, 0.1); }
-        .tool-toggle.active::before { content: '✓'; }
-
-        /* 4. 时间轴画布 */
-        .timeline-canvas {
-            flex: 1;
-            overflow: auto;
-            position: relative;
-            background: var(--bg-editor);
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* 网格头 */
-        .grid-header {
-            display: grid;
-            grid-template-columns: 80px repeat(7, 1fr);
-            border-bottom: 1px solid var(--border-color);
-            position: sticky;
-            top: 0;
-            background: var(--bg-editor);
-            z-index: 10;
-        }
-        .grid-cell-header {
-            padding: 10px;
-            text-align: center;
-            border-right: 1px solid #333;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-        .day-name { font-size: 11px; color: var(--text-muted); }
-        .day-date { font-size: 14px; font-weight: bold; color: var(--text-main); }
-        .day-date.today { color: var(--accent); }
-
-        /* 时间段行 */
-        .grid-row {
-            display: grid;
-            grid-template-columns: 80px repeat(7, 1fr);
-            border-bottom: 1px solid #333;
-            min-height: 140px;
-        }
-
-        .time-label {
-            padding: 12px;
-            color: var(--text-muted);
-            font-size: 12px;
-            border-right: 1px solid #333;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            text-align: center;
-            border-left: 4px solid transparent;
-        }
-
-        .time-label.morning { border-left-color: #1890ff; background: linear-gradient(90deg, rgba(24,144,255,0.05), transparent); }
-        .time-label.afternoon { border-left-color: #52c41a; background: linear-gradient(90deg, rgba(82,196,26,0.05), transparent); }
-        .time-label.evening { border-left-color: #fa8c16; background: linear-gradient(90deg, rgba(250,140,22,0.05), transparent); }
-
-        .grid-cell {
-            border-right: 1px solid #333;
-            padding: 6px;
-            position: relative;
-            transition: background 0.2s;
-        }
-        .grid-cell:hover { background: #252526; }
-        .grid-cell.drag-over { background: rgba(14, 99, 156, 0.2); outline: 2px dashed var(--accent); }
-
-        /* 行程卡片 */
-        .task-card {
-            background: #2d2d2d;
-            border-left: 3px solid #666;
-            padding: 6px 8px;
-            margin-bottom: 6px;
-            font-size: 11px;
-            border-radius: 2px;
-            cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            position: relative;
-            transition: transform 0.1s;
-        }
-        .task-card:hover { transform: translateY(-1px); background: #333; z-index: 5; }
+        .grid-row { display: grid; grid-template-columns: 80px repeat(7, 1fr); border-bottom: 1px solid #333; min-height: 120px; }
+        .time-label { padding: 10px; color: var(--text-muted); font-size: 12px; border-right: 1px solid #333; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; background: #252526; }
         
-        .card-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
-        .card-title { font-weight: 600; color: #e0e0e0; }
-        .card-loc { color: #8ec3eb; font-family: Consolas; }
-        .card-footer { display: flex; justify-content: space-between; color: #666; font-size: 10px; }
+        .grid-cell { border-right: 1px solid #333; padding: 6px; position: relative; transition: background 0.1s; }
+        .grid-cell:hover { background: #222; }
+        .grid-cell.highlight-flash { animation: flash 1s ease; }
         
-        .task-card.conflict { 
-            border-left-color: var(--color-conflict); 
-            background: rgba(241, 76, 76, 0.1); 
-            border: 1px solid rgba(241, 76, 76, 0.3);
+        @keyframes flash {
+            0% { background: rgba(14, 99, 156, 0.5); }
+            100% { background: transparent; }
         }
 
-        /* 每日关注行 */
-        .daily-focus-row {
-            display: grid;
-            grid-template-columns: 80px repeat(7, 1fr);
-            background: #252526;
-            border-top: 2px solid #333;
-            min-height: 80px;
-        }
-        .focus-label {
-            padding: 10px;
-            font-size: 11px;
-            font-weight: bold;
-            color: #fff;
-            border-right: 1px solid #333;
-        }
-        .focus-cell {
-            padding: 8px;
-            border-right: 1px solid #333;
-            font-size: 10px;
-            color: #aaa;
-        }
-        .stat-tag {
-            display: inline-block;
-            background: #333;
-            padding: 2px 6px;
-            border-radius: 10px;
-            margin-right: 4px;
-            margin-bottom: 4px;
-            color: #ccc;
-        }
-        .stat-tag.highlight { color: var(--accent); background: rgba(14,99,156,0.1); }
+        /* Task Card */
+        .task-card { background: #2d2d2d; border-left: 3px solid #666; padding: 6px; margin-bottom: 6px; border-radius: 2px; cursor: pointer; transition: all 0.1s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .task-card:hover { background: #383838; transform: translateY(-1px); z-index: 5; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .task-card.selected { border: 1px solid var(--accent); background: #303035; box-shadow: 0 0 0 1px var(--accent); }
+        .task-card.hidden { display: none; }
+        
+        .card-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+        .card-title { font-weight: 600; color: #ddd; font-size: 11px; }
+        .card-loc { font-family: Consolas, monospace; color: #8ec3eb; font-size: 10px; }
+        .card-icons { display: flex; gap: 4px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 2px; }
+        .icon-tag { font-size: 9px; padding: 1px 3px; border-radius: 2px; background: #444; color: #aaa; }
+        
+        .task-card.conflict { border-left-color: var(--color-conflict); background: rgba(241, 76, 76, 0.05); }
+        .task-card.conflict.selected { border: 1px solid var(--color-conflict); box-shadow: 0 0 0 1px var(--color-conflict); }
 
-        /* 5. 属性面板 */
-        .inspector {
-            width: 300px;
-            background: var(--bg-sidebar);
-            border-left: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-        }
+        /* 5. Bottom Panel */
+        .bottom-panel { height: 150px; background: var(--bg-panel); border-top: 1px solid var(--border-color); display: flex; flex-direction: column; transition: height 0.2s; }
+        .panel-tabs { display: flex; background: #252526; height: 30px; align-items: center; padding-left: 10px; }
+        .panel-tab { padding: 0 12px; height: 100%; display: flex; align-items: center; font-size: 11px; color: #888; cursor: pointer; }
+        .panel-tab.active { color: white; border-bottom: 1px solid var(--accent); background: #1e1e1e; }
+        .panel-body { flex: 1; overflow: auto; padding: 0; font-family: Consolas, monospace; font-size: 12px; color: #ccc; }
         
-        .prop-group { margin-bottom: 16px; }
-        .prop-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: flex; justify-content: space-between; }
-        
-        .prop-input { 
-            background: #3c3c3c; 
-            border: 1px solid #444; 
-            color: white; 
-            padding: 6px 8px; 
-            width: 100%; 
-            font-size: 12px;
-            border-radius: 2px;
-        }
-        .prop-input:focus { border-color: var(--focus-border); outline: none; }
-        
-        /* 容量条 */
-        .capacity-bar {
-            height: 4px;
-            background: #333;
-            border-radius: 2px;
-            margin-top: 6px;
-            overflow: hidden;
-        }
-        .capacity-fill { height: 100%; background: var(--color-success); width: 60%; }
-        .capacity-fill.warning { background: var(--color-warning); }
-        .capacity-fill.error { background: var(--color-conflict); }
+        .problem-item { padding: 4px 12px; border-bottom: 1px solid #2a2a2a; display: flex; cursor: pointer; }
+        .problem-item:hover { background: #2a2a2a; }
+        .problem-icon { margin-right: 8px; color: var(--color-conflict); }
+        .problem-loc { color: #8ec3eb; margin-left: auto; font-size: 11px; }
 
-        /* 6. 状态栏 */
-        .status-bar {
-            height: 22px;
-            background: var(--bg-status);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 12px;
-            font-size: 11px;
-            z-index: 200;
-        }
-        .status-section { display: flex; gap: 16px; }
-        .status-item { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+        /* 6. Inspector */
+        .inspector { width: 280px; background: var(--bg-sidebar); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; }
+        .inspector-content { padding: 16px; }
+        .prop-row { margin-bottom: 12px; }
+        .prop-key { color: #888; font-size: 11px; margin-bottom: 4px; display: block; }
+        .input-dark { width: 100%; background: #3c3c3c; border: 1px solid #444; color: white; padding: 6px; font-size: 12px; border-radius: 2px; }
+        .input-dark:focus { border-color: var(--accent); outline: none; }
         
-        /* ========================================= */
-        /* 新增弹窗交互设计 */
-        /* ========================================= */
+        .empty-state { text-align: center; color: #666; margin-top: 50px; font-style: italic; }
 
-        /* 1. 上下文浮层 (Contextual Popover) - 用于快速编辑 */
-        .popover {
-            position: absolute;
-            background: var(--bg-modal);
-            border: 1px solid #454545;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-            border-radius: 4px;
-            width: 320px;
-            z-index: 500;
-            display: none; /* 默认隐藏 */
-            padding: 12px;
-            left: 200px;
-            top: 200px;
-        }
-        
-        .popover.visible { display: block; animation: fadeIn 0.1s ease-out; }
-        
-        .popover-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            font-weight: 600;
-            color: white;
-        }
-
-        .popover-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 8px;
-            margin-top: 12px;
-        }
-        
-        .btn-sm {
-            padding: 4px 10px;
-            border-radius: 2px;
-            font-size: 11px;
-            cursor: pointer;
-            border: 1px solid #555;
-            background: #333;
-            color: #ccc;
-        }
-        .btn-sm:hover { background: #444; }
-        .btn-primary { background: var(--accent); border-color: var(--accent); color: white; }
-        .btn-primary:hover { background: #005a9e; }
-
-        /* 2. 冲突解决建议 (Resolver) */
-        .resolver-card {
-            background: #252526;
-            border: 1px solid var(--color-conflict);
-            border-left-width: 4px;
-            padding: 12px;
-            border-radius: 4px;
-            margin-bottom: 12px;
-        }
-        
-        .suggestion-item {
-            display: flex;
-            align-items: center;
-            padding: 6px;
-            border: 1px solid #333;
-            background: #2d2d2d;
-            margin-top: 6px;
-            border-radius: 2px;
-            cursor: pointer;
-            font-size: 11px;
-        }
-        .suggestion-item:hover { background: #383838; border-color: #555; }
-        .suggestion-icon { margin-right: 8px; color: var(--color-success); font-weight: bold; }
-
-        /* 3. 全屏差异对比视图 (Diff View Modal) */
-        .modal-overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.6);
-            z-index: 1000;
-            display: none;
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-overlay.visible { display: flex; }
-        
-        .modal-container {
-            width: 90vw;
-            height: 85vh;
-            background: var(--bg-app);
-            border: 1px solid #454545;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 12px 48px rgba(0,0,0,0.5);
-        }
-        
-        .diff-header {
-            height: 48px;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            padding: 0 16px;
-            justify-content: space-between;
-            background: var(--bg-header);
-        }
-        
-        .diff-body {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-        }
-        
-        .diff-pane {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        .diff-pane-header {
-            padding: 8px;
-            text-align: center;
-            background: #252526;
-            border-bottom: 1px solid var(--border-color);
-            font-weight: bold;
-        }
-        .diff-content {
-            flex: 1;
-            overflow: auto;
-            padding: 16px;
-            background: #1e1e1e;
-        }
-        
-        .diff-item {
-            padding: 10px;
-            border: 1px solid #333;
-            margin-bottom: 8px;
-            background: #252526;
-            opacity: 0.5;
-        }
-        .diff-item.changed {
-            opacity: 1;
-            border: 1px solid var(--accent);
-            background: rgba(14, 99, 156, 0.1);
-        }
-        .diff-tag {
-            display: inline-block;
-            padding: 2px 4px;
-            background: var(--accent);
-            color: white;
-            font-size: 10px;
-            border-radius: 2px;
-            margin-bottom: 4px;
-        }
-
-        /* 动画 */
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
+        /* Toast */
+        .toast { position: fixed; bottom: 30px; right: 30px; background: #333; color: white; padding: 10px 20px; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); transform: translateY(100px); transition: transform 0.3s; z-index: 1000; display: flex; align-items: center; gap: 8px; border-left: 4px solid var(--color-success); }
+        .toast.visible { transform: translateY(0); }
     </style>
 </head>
-<body>
+<body oncontextmenu="return false;">
 
     <div class="app-shell">
-        
         <!-- Activity Bar -->
         <div class="activity-bar">
-            <div class="activity-item active" title="行程设计器">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-            </div>
-            <!-- ... other icons ... -->
-            <div class="activity-item" title="导入排期结果" onclick="toggleModal()">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            </div>
+            <div class="activity-item active" title="Explorer">📄</div>
+            <div class="activity-item" title="Search">🔍</div>
+            <div class="activity-item" title="Source Control">📦</div>
+            <div class="activity-item" style="margin-top: auto;">⚙️</div>
         </div>
 
         <!-- Sidebar -->
         <div class="sidebar">
-            <div class="sidebar-header">
-                <span>行程资源管理器</span>
-                <span>...</span>
+            <div class="sidebar-header">EXPLORER</div>
+            <div class="sidebar-search">
+                <input type="text" class="search-input" placeholder="Filter groups..." onkeyup="filterGroups(this.value)">
             </div>
-            <div class="sidebar-content">
-                <!-- 团组列表 -->
+            <div class="sidebar-content" id="groupList">
                 <div class="panel-section">
-                    <div class="panel-header">团组控制台 (GROUPS)</div>
+                    <div class="panel-header"><span>OPEN GROUPS</span></div>
                     <div style="padding: 4px 0;">
-                        <div class="group-item selected">
-                            <div class="checkbox checked">✓</div>
-                            <div class="group-color" style="background: #1890ff;"></div>
-                            <div class="group-name">深圳实验中学</div>
-                            <span class="group-meta">45人</span>
-                        </div>
-                        <!-- ... -->
+                        <!-- Groups injected by JS -->
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Main Stage -->
-        <div class="main-stage">
-            
-            <!-- Top Bar -->
-            <div class="top-bar">
-                 <div class="week-navigator">
-                    <div class="nav-btn">◀</div>
-                    <div class="current-week">2025-09-12 ~ 09-18</div>
-                    <div class="nav-btn">▶</div>
-                </div>
-                <div class="breadcrumbs"><span class="crumb active">第2周排期</span></div>
-                <div style="flex:1"></div>
-            </div>
-
-            <!-- Toolbar -->
-            <div class="editor-toolbar">
-                <div class="tool-group">
-                    <div class="tool-toggle active">每日关注</div>
-                    <div class="tool-toggle">仅显示冲突</div>
-                </div>
-            </div>
-
-            <!-- Canvas -->
-            <div class="timeline-canvas">
-                <div class="grid-header">
-                     <div class="grid-cell-header"></div>
-                    <div class="grid-cell-header"><span class="day-name">周一</span><span class="day-date">09-12</span></div>
-                    <div class="grid-cell-header"><span class="day-name">周二</span><span class="day-date today">09-13</span></div>
-                    <!-- ... -->
-                </div>
-
-                <div class="grid-row">
-                    <div class="time-label morning">上午<br>09:00</div>
-                    <div class="grid-cell">
-                        <!-- 正常活动 -->
-                        <div class="task-card" style="border-left-color: #1890ff;" onclick="togglePopover(event, 'normal')">
-                            <div class="card-header"><span class="card-title">深圳实验</span></div>
-                            <div class="card-footer"><span class="card-loc">科技馆A</span><span>45人</span></div>
+        <div class="vertical-split">
+            <!-- Main Stage -->
+            <div class="horizontal-split">
+                <div class="main-stage">
+                    <div class="top-bar">
+                        <div class="breadcrumbs">
+                            <span class="crumb active">Itinerary Designer</span>
                         </div>
                     </div>
-                    <div class="grid-cell">
-                        <!-- 冲突活动 -->
-                        <div class="task-card conflict" style="border: 1px solid #f14c4c;" onclick="togglePopover(event, 'conflict')">
-                            <div class="card-header"><span class="card-title">冲突警告</span></div>
-                            <div class="card-footer"><span class="card-loc">科技馆A</span><span>超员</span></div>
+
+                    <div class="timeline-container" id="canvas">
+                        <div class="grid-header">
+                            <div class="grid-cell-header"></div>
+                            <div class="grid-cell-header"><div>Mon</div><div style="font-size:16px; color:#fff">12</div></div>
+                            <div class="grid-cell-header today"><div>Tue</div><div style="font-size:16px; color:var(--accent)">13</div></div>
+                            <div class="grid-cell-header"><div>Wed</div><div style="font-size:16px; color:#fff">14</div></div>
+                            <div class="grid-cell-header"><div>Thu</div><div style="font-size:16px; color:#fff">15</div></div>
+                            <div class="grid-cell-header"><div>Fri</div><div style="font-size:16px; color:#fff">16</div></div>
+                            <div class="grid-cell-header"><div>Sat</div><div style="font-size:16px; color:#fff">17</div></div>
+                            <div class="grid-cell-header"><div>Sun</div><div style="font-size:16px; color:#fff">18</div></div>
                         </div>
+
+                        <!-- Grid generated by JS -->
+                        <div id="gridContent"></div>
                     </div>
-                    <!-- ... -->
+                </div>
+
+                <!-- Inspector -->
+                <div class="inspector">
+                    <div class="sidebar-header">INSPECTOR</div>
+                    <div id="inspectorContent" class="inspector-content">
+                        <div class="empty-state">Select an activity to edit properties.</div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Popover: Contextual Edit -->
-            <div id="editPopover" class="popover">
-                <div class="popover-header">
-                    <span>编辑活动</span>
-                    <span style="cursor:pointer; color:#888" onclick="hidePopover()">✕</span>
+            <!-- Bottom Panel -->
+            <div class="bottom-panel">
+                <div class="panel-tabs">
+                    <div class="panel-tab active">PROBLEMS <span class="badge-count" style="background:#f14c4c; color:white; border-radius:8px; padding:0 4px; font-size:9px; margin-left:4px">1</span></div>
+                    <div class="panel-tab">OUTPUT</div>
                 </div>
-                
-                <!-- 正常编辑内容 -->
-                <div id="normalContent">
-                    <div class="prop-group">
-                        <label class="prop-label">团组</label>
-                        <input type="text" class="prop-input" value="深圳实验中学" disabled>
-                    </div>
-                    <div class="prop-group">
-                        <label class="prop-label">地点</label>
-                        <select class="prop-input">
-                            <option>科技馆A厅</option>
-                            <option>植物园</option>
-                        </select>
-                    </div>
-                    <div class="popover-actions">
-                        <button class="btn-sm">取消</button>
-                        <button class="btn-sm btn-primary">保存</button>
-                    </div>
-                </div>
-
-                <!-- 冲突解决内容 -->
-                <div id="conflictContent" style="display:none">
-                    <div class="resolver-card">
-                        <div style="color: #f88; font-weight:bold; margin-bottom:4px">科技馆A厅 容量超限</div>
-                        <div style="font-size:11px; color:#aaa">当前: 85人 / 容量: 50人</div>
-                    </div>
-                    <div style="font-size:11px; color:#ccc; margin-bottom:6px">推荐解决方案：</div>
-                    
-                    <div class="suggestion-item">
-                        <span class="suggestion-icon">A</span>
-                        <div>
-                            <div style="font-weight:bold">更换到 科技馆B厅</div>
-                            <div style="color:#888; font-size:10px">容量充足 (100人)，无冲突</div>
-                        </div>
-                    </div>
-                    <div class="suggestion-item">
-                        <span class="suggestion-icon">B</span>
-                         <div>
-                            <div style="font-weight:bold">推迟到 下午 14:00</div>
-                            <div style="color:#888; font-size:10px">原地点空闲</div>
-                        </div>
-                    </div>
-                     <div class="popover-actions">
-                        <button class="btn-sm" style="color:#f88">强制保存</button>
-                        <button class="btn-sm">取消</button>
+                <div class="panel-body">
+                    <div class="problem-item" onclick="focusConflict()">
+                        <span class="problem-icon">ⓧ</span>
+                        <span>Capacity Exceeded: 科技馆A (85/50)</span>
+                        <span class="problem-loc">Mon, Morning</span>
                     </div>
                 </div>
             </div>
 
             <!-- Status Bar -->
-            <div class="status-bar">
-                <div class="status-section">
-                    <div class="status-item"><span>✔ 在线</span></div>
-                    <div class="status-item" onclick="togglePopover(null, 'conflict', true)"><span>⚠ 1 冲突</span></div>
-                </div>
+            <div class="status-bar" style="height:22px; background:#007acc; color:white; display:flex; align-items:center; padding:0 10px; font-size:11px;">
+                <div style="flex:1">Ready</div>
+                <div>Ln 1, Col 1</div>
             </div>
         </div>
-        
-        <!-- Inspector -->
-        <div class="inspector">
-             <div class="sidebar-header"><span>属性</span></div>
-             <div class="sidebar-content" style="padding:16px; color:#666; text-align:center; margin-top:40px">
-                 点击活动查看详情
-             </div>
-        </div>
-
     </div>
 
-    <!-- Modal: Diff View -->
-    <div id="diffModal" class="modal-overlay">
-        <div class="modal-container">
-            <div class="diff-header">
-                <div style="font-weight:bold; font-size:16px; color:#e0e0e0">排期导入预览 (Diff)</div>
-                <div style="display:flex; gap:10px">
-                    <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#aaa">
-                        <div style="width:10px; height:10px; background:rgba(14,99,156,0.3); border:1px solid #0e639c"></div>
-                        <span>变动</span>
-                    </div>
-                    <button class="btn-sm">取消</button>
-                    <button class="btn-sm btn-primary">确认合并 (Merge)</button>
-                </div>
-            </div>
-            <div class="diff-body">
-                <!-- 左侧：当前 -->
-                <div class="diff-pane" style="border-right:1px solid #333">
-                    <div class="diff-pane-header">当前排期 (Current)</div>
-                    <div class="diff-content">
-                        <div class="diff-item">
-                            <div style="font-weight:bold">周一 上午</div>
-                            <div>深圳实验 @ 科技馆A</div>
-                        </div>
-                        <div class="diff-item changed">
-                            <div class="diff-tag">变更前</div>
-                            <div style="font-weight:bold">周二 下午</div>
-                            <div>广州天河 @ 植物园</div>
-                        </div>
-                    </div>
-                </div>
-                <!-- 右侧：导入 -->
-                <div class="diff-pane">
-                    <div class="diff-pane-header">导入排期 (Incoming)</div>
-                    <div class="diff-content">
-                        <div class="diff-item">
-                            <div style="font-weight:bold">周一 上午</div>
-                            <div>深圳实验 @ 科技馆A</div>
-                        </div>
-                        <div class="diff-item changed">
-                            <div class="diff-tag">变更后</div>
-                            <div style="font-weight:bold">周二 下午</div>
-                            <div style="color:var(--accent)">广州天河 @ 科技馆B (调整地点)</div>
-                        </div>
-                         <div class="diff-item changed">
-                            <div class="diff-tag">新增</div>
-                            <div style="font-weight:bold">周三 上午</div>
-                            <div style="color:#89d185">武汉华中 @ 创客室</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div id="toast" class="toast">
+        <span>✅</span> <span>Changes Saved</span>
     </div>
 
     <script>
-        function togglePopover(event, type, center = false) {
-            const popover = document.getElementById('editPopover');
-            const normalContent = document.getElementById('normalContent');
-            const conflictContent = document.getElementById('conflictContent');
+        // --- 模拟数据 ---
+        const groups = [
+            { id: 'g1', name: '深圳实验中学', color: '#1890ff', count: 45 },
+            { id: 'g2', name: '广州天河小学', color: '#52c41a', count: 32 },
+            { id: 'g3', name: '北师大附中', color: '#722ed1', count: 28 },
+            { id: 'g4', name: '武汉华中附中', color: '#fa8c16', count: 50 }
+        ];
+
+        const activities = [
+            { id: 'a1', groupId: 'g1', day: 0, slot: 'MORNING', loc: '科技馆A', notes: 'Food, Bus' },
+            { id: 'a2', groupId: 'g2', day: 0, slot: 'AFTERNOON', loc: '植物园', notes: '' },
+            { id: 'a3', groupId: 'g1', day: 1, slot: 'MORNING', loc: '科技馆A', notes: 'Conflict!', isConflict: true },
+            { id: 'a4', groupId: 'g3', day: 2, slot: 'MORNING', loc: '创客室', notes: '' }
+        ];
+
+        // --- 状态 ---
+        let selectedId = null;
+
+        // --- 初始化 ---
+        function init() {
+            renderSidebar();
+            renderGrid();
+        }
+
+        // --- 渲染侧边栏 ---
+        function renderSidebar() {
+            const container = document.querySelector('#groupList .panel-section div');
+            container.innerHTML = groups.map(g => `
+                <div class="group-item" data-id="${g.id}" onclick="toggleGroup('${g.id}')">
+                    <div class="group-color" style="background:${g.color}"></div>
+                    <span>${g.name}</span>
+                    <span class="eye-icon">👁</span>
+                </div>
+            `).join('');
+        }
+
+        // --- 筛选团组 ---
+        function filterGroups(val) {
+            const items = document.querySelectorAll('.group-item');
+            val = val.toLowerCase();
+            items.forEach(item => {
+                const text = item.innerText.toLowerCase();
+                item.style.display = text.includes(val) ? 'flex' : 'none';
+            });
+        }
+
+        // --- 切换团组显示 ---
+        function toggleGroup(gid) {
+            const el = document.querySelector(`.group-item[data-id="${gid}"]`);
+            el.classList.toggle('hidden');
+            const isHidden = el.classList.contains('hidden');
             
-            if (popover.classList.contains('visible') && !center) {
-                popover.classList.remove('visible');
-                return;
-            }
+            // 隐藏所有该团组的卡片
+            document.querySelectorAll(`.task-card[data-gid="${gid}"]`).forEach(card => {
+                card.classList.toggle('hidden', isHidden);
+            });
+        }
 
-            if (type === 'conflict') {
-                normalContent.style.display = 'none';
-                conflictContent.style.display = 'block';
-            } else {
-                normalContent.style.display = 'block';
-                conflictContent.style.display = 'none';
-            }
-
-            if (event) {
-                // 简单定位逻辑
-                const rect = event.currentTarget.getBoundingClientRect();
-                popover.style.left = (rect.right + 10) + 'px';
-                popover.style.top = rect.top + 'px';
-            } else if (center) {
-                popover.style.left = '50%';
-                popover.style.top = '50%';
-                popover.style.transform = 'translate(-50%, -50%)';
-            }
+        // --- 渲染网格 ---
+        function renderGrid() {
+            const container = document.getElementById('gridContent');
+            const slots = ['MORNING', 'AFTERNOON'];
             
-            popover.classList.add('visible');
-            event?.stopPropagation();
+            let html = '';
+            slots.forEach(slot => {
+                html += `<div class="grid-row">
+                    <div class="time-label" style="border-left: 3px solid ${slot==='MORNING'?'#1890ff':'#52c41a'}">${slot}</div>`;
+                
+                for(let day=0; day<7; day++) {
+                    const cellActs = activities.filter(a => a.day === day && a.slot === slot);
+                    html += `<div class="grid-cell" id="cell-${day}-${slot}">`;
+                    
+                    cellActs.forEach(act => {
+                        const group = groups.find(g => g.id === act.groupId);
+                        html += `
+                            <div class="task-card ${act.isConflict ? 'conflict' : ''}" 
+                                 data-id="${act.id}" data-gid="${act.groupId}"
+                                 onclick="selectActivity(event, '${act.id}')"
+                                 style="border-left-color: ${act.isConflict ? '#f14c4c' : group.color}">
+                                <div class="card-row">
+                                    <span class="card-title" style="${act.isConflict?'color:#ff8888':''}">${group.name}</span>
+                                </div>
+                                <div class="card-row">
+                                    <span class="card-loc">${act.loc}</span>
+                                    <span>${group.count}p</span>
+                                </div>
+                                ${act.notes ? `<div class="card-icons"><span class="icon-tag">${act.notes}</span></div>` : ''}
+                            </div>
+                        `;
+                    });
+                    
+                    html += `</div>`;
+                }
+                html += `</div>`;
+            });
+            container.innerHTML = html;
         }
 
-        function hidePopover() {
-            document.getElementById('editPopover').classList.remove('visible');
-        }
+        // --- 选中活动 & 渲染属性面板 ---
+        function selectActivity(e, aid) {
+            e.stopPropagation();
+            selectedId = aid;
+            
+            // 高亮 UI
+            document.querySelectorAll('.task-card').forEach(c => c.classList.remove('selected'));
+            const card = document.querySelector(`.task-card[data-id="${aid}"]`);
+            if(card) card.classList.add('selected');
 
-        function toggleModal() {
-            const modal = document.getElementById('diffModal');
-            if (modal.classList.contains('visible')) {
-                modal.classList.remove('visible');
+            // 渲染 Inspector
+            const act = activities.find(a => a.id === aid);
+            const group = groups.find(g => g.id === act.groupId);
+            const container = document.getElementById('inspectorContent');
+            
+            if (act.isConflict) {
+                 container.innerHTML = `
+                    <div style="background:#3a2525; border:1px solid #f14c4c; padding:10px; border-radius:4px; margin-bottom:10px">
+                        <div style="color:#ff8888; font-weight:bold; margin-bottom:4px">❌ Conflict Detected</div>
+                        <div style="font-size:11px; color:#ccc">Location capacity exceeded.</div>
+                    </div>
+                    <div class="prop-row"><span class="prop-key">Name</span><input class="input-dark" value="${group.name}"></div>
+                    <button class="input-dark" style="background:#0e639c; margin-top:10px" onclick="showToast()">Auto Fix</button>
+                `;
             } else {
-                modal.classList.add('visible');
+                container.innerHTML = `
+                    <div class="prop-row">
+                        <span class="prop-key">Group Name</span>
+                        <input type="text" class="input-dark" value="${group.name}">
+                    </div>
+                    <div class="prop-row">
+                        <span class="prop-key">Location</span>
+                        <select class="input-dark">
+                            <option>${act.loc}</option>
+                            <option>植物园</option>
+                            <option>创客室</option>
+                        </select>
+                    </div>
+                    <div class="prop-row">
+                        <span class="prop-key">People</span>
+                        <input type="number" class="input-dark" value="${group.count}">
+                    </div>
+                    <button class="input-dark" style="background:#0e639c; margin-top:10px" onclick="showToast()">Save Changes</button>
+                `;
             }
         }
-        
-        // 点击空白关闭
-        document.body.addEventListener('click', (e) => {
-            if (!e.target.closest('.popover') && !e.target.closest('.task-card') && !e.target.closest('.status-item')) {
-                hidePopover();
+
+        // --- 定位冲突 ---
+        function focusConflict() {
+            const conflictAct = activities.find(a => a.isConflict);
+            if (conflictAct) {
+                // 模拟滚动
+                const card = document.querySelector(`.task-card[data-id="${conflictAct.id}"]`);
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // 选中
+                selectActivity(new Event('click'), conflictAct.id);
+                // 闪烁动画
+                card.parentElement.classList.add('highlight-flash');
+                setTimeout(() => card.parentElement.classList.remove('highlight-flash'), 1000);
+            }
+        }
+
+        // --- Toast ---
+        function showToast() {
+            const t = document.getElementById('toast');
+            t.classList.add('visible');
+            setTimeout(() => t.classList.remove('visible'), 2000);
+        }
+
+        // --- 快捷键 ---
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Delete' && selectedId) {
+                const card = document.querySelector(`.task-card[data-id="${selectedId}"]`);
+                if(card) {
+                    card.style.opacity = '0';
+                    setTimeout(() => card.remove(), 200);
+                    document.getElementById('inspectorContent').innerHTML = '<div class="empty-state">Deleted.</div>';
+                    selectedId = null;
+                }
             }
         });
+
+        // 启动
+        init();
+
     </script>
 </body>
 </html>

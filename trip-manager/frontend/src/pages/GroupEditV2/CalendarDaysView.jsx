@@ -43,7 +43,15 @@ const presetResourcesData = [
 
 const DEFAULT_PLAN_DURATION = 2;
 
-const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange, showResources = true }) => {
+const CalendarDaysView = ({
+  groupData,
+  schedules = [],
+  onUpdate,
+  onPlanChange,
+  showResources = true,
+  resourceWidth,
+  showAiRuleLink = true
+}) => {
   const repeatableResources = useMemo(
     () => presetResourcesData.filter((resource) => !resource.isUnique),
     []
@@ -92,6 +100,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange, s
   const [aiRulesForm] = Form.useForm();
   const calendarRef = useRef(null);
   const dragPreviewRef = useRef(null);
+  const resourcePanelStyle = resourceWidth ? { width: resourceWidth } : undefined;
 
   // 加载行程方案
   useEffect(() => {
@@ -1296,6 +1305,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange, s
         {showResources && (
           <div
             className="resource-cards-container"
+            style={resourcePanelStyle}
             onDragOver={(e) => {
               e.preventDefault();
               e.dataTransfer.dropEffect = 'move';
@@ -1351,22 +1361,24 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange, s
             <div className="resource-hint">
               <div className="resource-hint-header">
                 <span className="resource-hint-label">行程方案</span>
-                <Button
-                  type="link"
-                  size="small"
-                  className="ai-rule-link"
-                  onClick={() => {
-                    const nextRules = aiRules || defaultAiRules;
-                    aiRulesForm.setFieldsValue({
-                      timeSlots: nextRules.timeSlots,
-                      requireAllPlanItems: nextRules.requireAllPlanItems,
-                      slotWindows: nextRules.slotWindows
-                    });
-                    setAiRulesVisible(true);
-                  }}
-                >
-                  AI规则
-                </Button>
+                {showAiRuleLink && (
+                  <Button
+                    type="link"
+                    size="small"
+                    className="ai-rule-link"
+                    onClick={() => {
+                      const nextRules = aiRules || defaultAiRules;
+                      aiRulesForm.setFieldsValue({
+                        timeSlots: nextRules.timeSlots,
+                        requireAllPlanItems: nextRules.requireAllPlanItems,
+                        slotWindows: nextRules.slotWindows
+                      });
+                      setAiRulesVisible(true);
+                    }}
+                  >
+                    AI规则
+                  </Button>
+                )}
               </div>
               <Select
                 size="small"

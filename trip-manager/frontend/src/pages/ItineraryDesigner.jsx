@@ -10,6 +10,8 @@ import {
   StepForwardOutlined,
   SettingOutlined,
   CloseOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   ExportOutlined,
   DragOutlined,
   CalendarOutlined,
@@ -133,6 +135,7 @@ function ItineraryDesigner() {
   const [groupCalendarDetailGroupId, setGroupCalendarDetailGroupId] = useState(null);
   const [groupCalendarDetailSchedules, setGroupCalendarDetailSchedules] = useState([]);
   const [groupCalendarDetailLoading, setGroupCalendarDetailLoading] = useState(false);
+  const [groupCalendarDetailResourcesVisible, setGroupCalendarDetailResourcesVisible] = useState(true);
   const groupCalendarDetailSaveTimeoutRef = useRef(null);
   
   const [groupCalendarHeight, setGroupCalendarHeight] = useState(() => getStoredGroupCalendarHeight());
@@ -583,6 +586,7 @@ function ItineraryDesigner() {
     if (!groupId) return;
     setGroupCalendarDetailSchedules([]);
     setGroupCalendarDetailGroupId(groupId);
+    setGroupCalendarDetailResourcesVisible(true);
     setGroupCalendarDetailVisible(true);
   };
 
@@ -1902,6 +1906,14 @@ function ItineraryDesigner() {
               )}
             </div>
             <div className="group-calendar-detail-actions">
+              <Tooltip title={groupCalendarDetailResourcesVisible ? '收起资源栏' : '展开资源栏'}>
+                <Button
+                  size="small"
+                  type="text"
+                  icon={groupCalendarDetailResourcesVisible ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
+                  onClick={() => setGroupCalendarDetailResourcesVisible(prev => !prev)}
+                />
+              </Tooltip>
               <Button
                 size="small"
                 type="text"
@@ -1920,7 +1932,9 @@ function ItineraryDesigner() {
                 groupData={groupCalendarDetailGroup}
                 schedules={groupCalendarDetailSchedules}
                 onUpdate={handleGroupCalendarDetailUpdate}
-                showResources={false}
+                showResources={groupCalendarDetailResourcesVisible}
+                resourceWidth="25%"
+                showAiRuleLink={false}
               />
             )}
           </div>
