@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { Card, Button, Modal, Form, Select, InputNumber, Input, message, Checkbox, Tooltip, Badge, DatePicker, Drawer, Upload } from 'antd';
+import { Card, Button, Modal, Form, Select, InputNumber, Input, message, Checkbox, Tooltip, Badge, DatePicker, Drawer, Upload, Spin } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
@@ -19,6 +19,7 @@ import {
 import api from '../services/api';
 import dayjs from 'dayjs';
 import useDataSync from '../hooks/useDataSync';
+import CalendarDaysView from './GroupEditV2/CalendarDaysView';
 import './ItineraryDesigner.css';
 
 const { Option } = Select;
@@ -128,6 +129,11 @@ function ItineraryDesigner() {
   const [planningImportResult, setPlanningImportResult] = useState(null);
   const [groupCalendarVisible, setGroupCalendarVisible] = useState(false);
   const [groupCalendarGroupId, setGroupCalendarGroupId] = useState(null);
+  const [groupCalendarDetailVisible, setGroupCalendarDetailVisible] = useState(false);
+  const [groupCalendarDetailGroupId, setGroupCalendarDetailGroupId] = useState(null);
+  const [groupCalendarDetailSchedules, setGroupCalendarDetailSchedules] = useState([]);
+  const [groupCalendarDetailLoading, setGroupCalendarDetailLoading] = useState(false);
+  const groupCalendarDetailSaveTimeoutRef = useRef(null);
   
   const [groupCalendarHeight, setGroupCalendarHeight] = useState(() => getStoredGroupCalendarHeight());
   const [groupCalendarResizing, setGroupCalendarResizing] = useState(false);
@@ -404,7 +410,19 @@ function ItineraryDesigner() {
       clearTimeout(groupCalendarSaveTimeoutRef.current);
     };
   }, []);
-useEffect(() => {
+
+  useEffect(() => {
+    if (!groupCalendarDetailVisible || !groupCalendarDetailGroupId) return;
+    loadGroupCalendarDetailSchedules(groupCalendarDetailGroupId);
+  }, [groupCalendarDetailVisible, groupCalendarDetailGroupId]);
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(groupCalendarDetailSaveTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!planningDateRange || planningDateRange.length !== 2) {
       planningForm.setFieldsValue({ groupIds: [] });
       return;
@@ -546,11 +564,43 @@ useEffect(() => {
     }, 300);
   };
 
+  const loadGroupCalendarDetailSchedules = async (groupId) => {
+    if (!groupId) return;
+    setGroupCalendarDetailLoading(true);
+    try {
+      const response = await api.get(`/groups/${groupId}/schedules`);
+      const loaded = Array.isArray(response.data) ? response.data : [];
+      setGroupCalendarDetailSchedules(loaded);
+    } catch (error) {
+      message.error('加载日程失败');
+      setGroupCalendarDetailSchedules([]);
+    } finally {
+      setGroupCalendarDetailLoading(false);
+    }
+  };
+
   const openGroupCalendarDetail = (groupId) => {
     if (!groupId) return;
-    const baseUrl = window.location?.origin || '';
-    const targetUrl = `${baseUrl}/groups/v2/edit/${groupId}?tab=schedule`;
-    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    setGroupCalendarDetailSchedules([]);
+    setGroupCalendarDetailGroupId(groupId);
+    setGroupCalendarDetailVisible(true);
+  };
+
+  const handleGroupCalendarDetailUpdate = (updatedSchedules) => {
+    setGroupCalendarDetailSchedules(updatedSchedules);
+    clearTimeout(groupCalendarDetailSaveTimeoutRef.current);
+    groupCalendarDetailSaveTimeoutRef.current = setTimeout(async () => {
+      if (!groupCalendarDetailGroupId) return;
+      try {
+        const response = await api.post(`/groups/${groupCalendarDetailGroupId}/schedules/batch`, {
+          scheduleList: updatedSchedules
+        });
+        const saved = Array.isArray(response.data) ? response.data : updatedSchedules;
+        setGroupCalendarDetailSchedules(saved);
+      } catch (error) {
+        message.error('保存日程失败');
+      }
+    }, 500);
   };
 
   const openPlanningExportModal = () => {
@@ -885,118 +935,111 @@ useEffect(() => {
   // 工具面板已移除
 
   const renderTimelineHeader = () => (
-    <div style={{
-      background: '#fafafa',
-      padding: '8px 16px',
-      borderBottom: '1px solid #e8e8e8',
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      flexShrink: 0,
-      height: '56px'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Button
-            size="small"
-            onClick={() => setGroupPanelVisible(true)}
-          >
-            团组控制台
-          </Button>
-          <Button
-            size="small"
-            icon={<CalendarOutlined />}
-            onClick={() => setDatePickerOpen(true)}
-          />
-          <DatePicker
-            value={weekStartDate}
-            onChange={handleWeekStartChange}
-            allowClear={false}
-            size="small"
-            format="YYYY-MM-DD"
-            placeholder="请选择日期"
-            open={datePickerOpen}
-            onOpenChange={(open) => setDatePickerOpen(open)}
-          />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Button
-            type="text"
-            icon={<LeftOutlined />}
-            onClick={() => handleWeekShift(-7)}
-            title="前一周"
-          />
-          <span style={{ minWidth: '160px', textAlign: 'center', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+    <div className="page-header" style={{ marginBottom: 0, borderRadius: '8px 8px 0 0', borderBottom: '1px solid #f0f0f0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Button
+              size="small"
+              onClick={() => setGroupPanelVisible(true)}
+            >
+              团组控制台
+            </Button>
+            <Button
+              size="small"
+              icon={<CalendarOutlined />}
+              onClick={() => setDatePickerOpen(true)}
+            />
+            <DatePicker
+              value={weekStartDate}
+              onChange={handleWeekStartChange}
+              allowClear={false}
+              size="small"
+              format="YYYY-MM-DD"
+              placeholder="请选择日期"
+              open={datePickerOpen}
+              onOpenChange={(open) => setDatePickerOpen(open)}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Button
               type="text"
-              size="small"
-              icon={<StepBackwardOutlined />}
-              onClick={() => handleWeekShift(-1)}
-              title="上一天"
+              icon={<LeftOutlined />}
+              onClick={() => handleWeekShift(-7)}
+              title="前一周"
             />
-            <span>
-              {dayjs(dateRange[0]).format('YYYY年MM月DD日')} ~ {dayjs(dateRange[6]).format('MM月DD日')}
+            <span style={{ minWidth: '160px', textAlign: 'center', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <Button
+                type="text"
+                size="small"
+                icon={<StepBackwardOutlined />}
+                onClick={() => handleWeekShift(-1)}
+                title="上一天"
+              />
+              <span>
+                {dayjs(dateRange[0]).format('YYYY年MM月DD日')} ~ {dayjs(dateRange[6]).format('MM月DD日')}
+              </span>
+              <Button
+                type="text"
+                size="small"
+                icon={<StepForwardOutlined />}
+                onClick={() => handleWeekShift(1)}
+                title="下一天"
+              />
             </span>
             <Button
               type="text"
-              size="small"
-              icon={<StepForwardOutlined />}
-              onClick={() => handleWeekShift(1)}
-              title="下一天"
+              icon={<RightOutlined />}
+              onClick={() => handleWeekShift(7)}
+              title="后一周"
             />
-          </span>
-          <Button
-            type="text"
-            icon={<RightOutlined />}
-            onClick={() => handleWeekShift(7)}
-            title="后一周"
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
-            <Checkbox
-              checked={showDailyFocus}
-              onChange={handleDailyFocusToggle}
-            >
-              每日关注
-            </Checkbox>
-            <Tooltip title="同名团组跨天固定在同一行（可能出现空行）">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
               <Checkbox
-                checked={alignGroupRows}
-                onChange={handleGroupRowAlignToggle}
+                checked={showDailyFocus}
+                onChange={handleDailyFocusToggle}
               >
-                对齐团组行
+                每日关注
               </Checkbox>
-            </Tooltip>
-            <Checkbox.Group
-              value={enabledTimeSlots}
-              onChange={handleTimeSlotToggle}
-              options={timeSlots.map(slot => ({ label: slot.label, value: slot.key }))}
-            />
+              <Tooltip title="同名团组跨天固定在同一行（可能出现空行）">
+                <Checkbox
+                  checked={alignGroupRows}
+                  onChange={handleGroupRowAlignToggle}
+                >
+                  对齐团组行
+                </Checkbox>
+              </Tooltip>
+              <Checkbox.Group
+                value={enabledTimeSlots}
+                onChange={handleTimeSlotToggle}
+                options={timeSlots.map(slot => ({ label: slot.label, value: slot.key }))}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <Button
-          icon={<UploadOutlined />}
-          size="small"
-          onClick={openPlanningImportModal}
-        >
-          导入排程结果(JSON)
-        </Button>
-        <Button
-          icon={<ExportOutlined />}
-          size="small"
-          onClick={openPlanningExportModal}
-        >
-          导出排程输入包(JSON)
-        </Button>
-        <Button
-          icon={<ExportOutlined />}
-          size="small"
-          onClick={() => exportData()}
-        >
-          导出
-        </Button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <Button
+            icon={<UploadOutlined />}
+            size="small"
+            onClick={openPlanningImportModal}
+          >
+            导入
+          </Button>
+          <Button
+            icon={<ExportOutlined />}
+            size="small"
+            onClick={openPlanningExportModal}
+          >
+            导出包
+          </Button>
+          <Button
+            icon={<ExportOutlined />}
+            size="small"
+            onClick={() => exportData()}
+          >
+            导出CSV
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -1674,6 +1717,10 @@ useEffect(() => {
   const planningImportSummary = planningImportResult?.summary || null;
   const planningImportConflicts = planningImportResult?.conflicts || [];
   const planningImportFile = planningImportFileList[0];
+  const groupCalendarDetailGroup = groups.find(group => group.id === groupCalendarDetailGroupId);
+  const groupCalendarDetailAvailableHeight = groupCalendarVisible ? groupCalendarHeight : 0;
+  const groupCalendarDetailHeight = Math.max(20, 100 - groupCalendarDetailAvailableHeight);
+  const groupCalendarDetailTop = 0;
   const groupCalendarSlotKeys = ['MORNING', 'AFTERNOON'];
   const groupCalendarGroup = groups.find(group => group.id === groupCalendarGroupId);
   const groupCalendarDates = groupCalendarGroup ? getGroupDateRange(groupCalendarGroup) : [];
@@ -1825,6 +1872,60 @@ useEffect(() => {
           </div>
         )}
       </Drawer>
+
+      <Modal
+        open={groupCalendarDetailVisible}
+        onCancel={() => setGroupCalendarDetailVisible(false)}
+        footer={null}
+        closable={false}
+        mask={false}
+        width="100%"
+        className="group-calendar-detail-modal"
+        wrapClassName="group-calendar-detail-wrap"
+        style={{ top: `${groupCalendarDetailTop}vh` }}
+        styles={{ body: { padding: 0, height: `${groupCalendarDetailHeight}vh` } }}
+      >
+        <div className="group-calendar-detail">
+          <div className="group-calendar-detail-header">
+            <div className="group-calendar-detail-info">
+              <span
+                className="group-color-dot"
+                style={{ backgroundColor: groupCalendarDetailGroup?.color || '#d9d9d9' }}
+              />
+              <span className="group-calendar-detail-name">
+                {groupCalendarDetailGroup?.name || '\u672a\u9009\u62e9\u56e2\u7ec4'}
+              </span>
+              {groupCalendarDetailGroup && (
+                <span className="group-calendar-detail-dates">
+                  {dayjs(groupCalendarDetailGroup.start_date).format('YYYY-MM-DD')} ~ {dayjs(groupCalendarDetailGroup.end_date).format('YYYY-MM-DD')}
+                </span>
+              )}
+            </div>
+            <div className="group-calendar-detail-actions">
+              <Button
+                size="small"
+                type="text"
+                icon={<CloseOutlined />}
+                onClick={() => setGroupCalendarDetailVisible(false)}
+              />
+            </div>
+          </div>
+          <div className="group-calendar-detail-body">
+            {groupCalendarDetailLoading ? (
+              <div className="group-calendar-detail-loading">
+                <Spin />
+              </div>
+            ) : (
+              <CalendarDaysView
+                groupData={groupCalendarDetailGroup}
+                schedules={groupCalendarDetailSchedules}
+                onUpdate={handleGroupCalendarDetailUpdate}
+                showResources={false}
+              />
+            )}
+          </div>
+        </div>
+      </Modal>
 
       {/* 详情编辑弹窗 */}
       <Modal

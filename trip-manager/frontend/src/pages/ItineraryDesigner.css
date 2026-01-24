@@ -763,3 +763,86 @@
 .group-calendar-drawer.resizing .group-calendar-grid {
   pointer-events: none;
 }
+
+.group-calendar-detail-modal {
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
+  padding-bottom: 0;
+}
+
+.group-calendar-detail-wrap {
+  pointer-events: none;
+}
+
+.group-calendar-detail-wrap .ant-modal {
+  pointer-events: auto;
+}
+
+.group-calendar-detail-modal .ant-modal-content {
+  padding: 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.group-calendar-detail {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #fff;
+}
+
+.group-calendar-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #e8e8e8;
+  background: #fff;
+}
+
+.group-calendar-detail-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.group-calendar-detail-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-calendar-detail-dates {
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-calendar-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.group-calendar-detail-body {
+  flex: 1;
+  min-height: 0;
+  background: #f5f7fa;
+}
+
+.group-calendar-detail-loading {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

@@ -46,6 +46,10 @@
   height: 100%;
 }
 
+.calendar-layout.calendar-only {
+  width: 100%;
+}
+
 .calendar-container {
   flex: 1;
   background: white;
@@ -60,6 +64,11 @@
 }
 
 /* 滚动包装器 */
+.calendar-layout.calendar-only .calendar-container {
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
 .calendar-scroll-wrapper {
   width: 100%;
   flex: 1 1 auto;

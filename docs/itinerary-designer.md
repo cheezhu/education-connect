@@ -1,10 +1,95 @@
-﻿﻿# 行程设计器 / 日历详情 AI 调用方式整理
+﻿# 行程设计器（ItineraryDesigner）详解
+
+## 功能定位
+多团组 7 日时间轴排期中心：批量查看、编辑、拖拽、冲突检查、AI 自动排期。
+
+## 数据加载
+- GET `/groups`
+- GET `/activities/raw`
+- GET `/locations`
+- 读取系统配置：
+  - `/config/itinerary-week-start`
+  - `/config/itinerary-time-slots`
+  - `/config/itinerary-daily-focus`
+  - `/config/itinerary-group-row-align`
+- 本地缓存：localStorage
+
+## 网格结构
+- 7 天视图（以 weekStartDate 为起点）
+- 时段：MORNING / AFTERNOON / EVENING（可隐藏）
+- 每格显示当前时段内的多个活动卡片
+
+## 交互
+- 选择团组：筛选显示
+- 拖拽活动：调整日期与时段
+- 点击单元格：打开编辑弹窗，支持添加活动
+- 导出：当前周 + 选中团组的活动导出为 CSV
+
+## 冲突检查（前端）
+- 同团组同时间段冲突
+- 地点容量超限
+- 地点不可用日期
+- 团组类型限制
+
+> 注意：前端冲突检查字段与后端并非完全一致（见 `docs/issues-known.md`）。
+
+## AI 多团组生成
+- 打开弹窗，选择团组与日期范围
+- 预览 / 生成：调用 `/ai/plan/global`
+- 生成后写入 itinerary plans + schedules + activities
+
+## 团组行对齐 / 紧凑模式
+### 背景与问题
+当同一时段有多个团组时，为了方便跨天对比，系统会把同名团组固定在同一行。这会导致某些日期出现“空行”，降低密度。
+
+### 目标
+- 保留跨天对齐能力（便于横向对比）
+- 提供紧凑模式（只显示当天有安排的团组）
+- 对齐模式下的空行弱化显示
+
+### 方案说明
+#### 1) 对齐模式（默认开启）
+- 行顺序基于整个时间段的团组集合
+- 某天没有该团组时显示为空行
+- 空行以淡色细线占位，减少视觉噪音
+
+#### 2) 紧凑模式
+- 仅渲染当天实际出现的团组行
+- 同名团组跨天不再严格固定在同一行
+- 适合希望提高密度、减少空行的场景
+
+### 使用方式
+行程设计器顶部工具栏提供开关：
+- **对齐团组行**（提示：同名团组跨天固定在同一行，可能出现空行）
+  - 开启：对齐模式
+  - 关闭：紧凑模式
+
+开关状态会全局保存并在前端做本地缓存：
+- system_config key：`itinerary_group_row_align`
+- localStorage key：`itinerary_group_row_align`
+
+### 相关文件
+- `trip-manager/frontend/src/pages/ItineraryDesigner.jsx`
+  - 新增状态 `alignGroupRows`
+  - 新增开关“对齐团组行”
+  - 渲染逻辑支持对齐/紧凑两种生成方式
+- `trip-manager/frontend/src/pages/ItineraryDesigner.css`
+  - 对齐模式空行样式弱化
+- `trip-manager/backend/src/routes/systemConfig.js`
+  - 配置读取/保存接口
+
+### 可选后续优化
+- 支持系统级默认值配置
+- 进一步压缩空行高度
+- 将开关移入“设置”页面，减少工具栏拥挤
+
+## AI 调用方式
 
 本项目 AI 相关能力分为三条路径：跨团组排程（导出/导入）、行程设计器内置多团组生成（后端直调）、日历详情（单团组 AI 行程）。三者目的、入口与数据流不同，避免混用。
 
 ---
 
-## 1) 跨团组排程（导出 / 导入）
+### 1) 跨团组排程（导出 / 导入）
 
 **定位**  
 面向多团组跨天排程，适合把排程问题交给外部大模型或离线算法处理。
@@ -32,7 +117,7 @@
 
 ---
 
-## 2) 行程设计器内置多团组生成（后端直调）
+### 2) 行程设计器内置多团组生成（后端直调）
 
 **定位**  
 直接由后端生成排程结果，适合快速生成“可用版本”的排程。
@@ -53,7 +138,7 @@
 
 ---
 
-## 3) 日历详情（单团组 AI 行程）
+### 3) 日历详情（单团组 AI 行程）
 
 **定位**  
 针对单个团组、基于其行程方案生成/补全详细日程。
@@ -79,7 +164,7 @@
 
 ---
 
-## 核心区别对比
+### 核心区别对比
 
 | 维度 | 跨团组排程（导出/导入） | 行程设计器内置多团组生成 | 日历详情（单团组 AI） |
 | --- | --- | --- | --- |
@@ -91,7 +176,7 @@
 
 ---
 
-## 相关文件/模块
+### 相关文件/模块
 - 前端（行程设计器）：`trip-manager/frontend/src/pages/ItineraryDesigner.jsx`
 - 前端（日历详情）：`trip-manager/frontend/src/pages/GroupEditV2/CalendarDaysView.jsx`
 - 后端（导出/导入）：`trip-manager/backend/src/routes/planning.js`

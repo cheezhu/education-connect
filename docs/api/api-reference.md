@@ -1,4 +1,4 @@
-﻿﻿# API 端点清单（后端）
+﻿﻿﻿﻿﻿# API 端点清单（后端）
 
 基础路径：`/api`
 认证：HTTP Basic Auth（前端默认 admin/admin123）
@@ -68,7 +68,7 @@
 - POST `/ai/plan/global`（多团组排期）
 - POST `/ai/plan/itinerary`（单团组方案排期）
 
-详见：`docs/ai/ai-planner.md`
+详见：`docs/ai-planner.md`
 
 ## 排程输入包导出 /planning
 - POST `/planning/export`：导出 planning_input.json（附件下载）

@@ -43,7 +43,7 @@ const presetResourcesData = [
 
 const DEFAULT_PLAN_DURATION = 2;
 
-const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange }) => {
+const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange, showResources = true }) => {
   const repeatableResources = useMemo(
     () => presetResourcesData.filter((resource) => !resource.isUnique),
     []
@@ -1276,7 +1276,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
     >
       {/* 移除独立工具栏，集成到顶部 */}
 
-      <div className="calendar-layout">
+      <div className={`calendar-layout${showResources ? '' : ' calendar-only'}`}>
         {/* 日历容器 */}
         <div className="calendar-container">
           <div className="calendar-scroll-wrapper">
@@ -1293,58 +1293,59 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
         </div>
 
         {/* 行程资源卡片区域 */}
-        <div className="resource-cards-container"
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-          }}
-          onDrop={(e) => {
-            e.preventDefault();
-            // 处理从日历拖回的活动（方案行程点）
-            if (draggedActivity) {
-              const resourceId = draggedActivity.resourceId || '';
-              let planResource = null;
+        {showResources && (
+          <div
+            className="resource-cards-container"
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (draggedActivity) {
+                const resourceId = draggedActivity.resourceId || '';
+                let planResource = null;
 
-              if (typeof resourceId === 'string' && resourceId.startsWith('plan-')) {
-                planResource = planResources.find(r => r.id === resourceId) || null;
-              }
+                if (typeof resourceId === 'string' && resourceId.startsWith('plan-')) {
+                  planResource = planResources.find(r => r.id === resourceId) || null;
+                }
 
-              if (!planResource) {
-                const activityLocationId = Number(draggedActivity.locationId);
-                if (Number.isFinite(activityLocationId)) {
-                  planResource = planResources.find(r => Number(r.locationId) === activityLocationId) || null;
+                if (!planResource) {
+                  const activityLocationId = Number(draggedActivity.locationId);
+                  if (Number.isFinite(activityLocationId)) {
+                    planResource = planResources.find(r => Number(r.locationId) === activityLocationId) || null;
+                  }
+                }
+
+                if (planResource) {
+                  setAvailablePlanResources(prev => {
+                    if (prev.find(r => r.id === planResource.id)) {
+                      return prev;
+                    }
+                    return [...prev, planResource].sort((a, b) => {
+                      const aIndex = planResources.findIndex(r => r.id === a.id);
+                      const bIndex = planResources.findIndex(r => r.id === b.id);
+                      return aIndex - bIndex;
+                    });
+                  });
+
+                  const updatedActivities = activities.filter(a => a.id !== draggedActivity.id);
+                  setActivities(updatedActivities);
+                  onUpdate(updatedActivities);
+                  message.success(`?? ${draggedActivity.title} ????`, 1);
                 }
               }
 
-              if (planResource) {
-                setAvailablePlanResources(prev => {
-                  if (prev.find(r => r.id === planResource.id)) {
-                    return prev;
-                  }
-                  return [...prev, planResource].sort((a, b) => {
-                    const aIndex = planResources.findIndex(r => r.id === a.id);
-                    const bIndex = planResources.findIndex(r => r.id === b.id);
-                    return aIndex - bIndex;
-                  });
-                });
-
-                const updatedActivities = activities.filter(a => a.id !== draggedActivity.id);
-                setActivities(updatedActivities);
-                onUpdate(updatedActivities);
-                message.success(`已将 ${draggedActivity.title} 返回方案`, 1);
-              }
-            }
-
-            // 清除所有拖拽状态
-            setDraggedActivity(null);
-            setDraggedResource(null);
-            // dragGhost已移除
-            setDropIndicator(null);
-            setIsDragging(false);
-            setReturningActivity(null);
-            // 清除拖拽偏移
-            dragOffsetRef.current = { x: 0, y: 0 };
-          }}
+              // ????????
+              setDraggedActivity(null);
+              setDraggedResource(null);
+              // dragGhost???
+              setDropIndicator(null);
+              setIsDragging(false);
+              setReturningActivity(null);
+              // ??????
+              dragOffsetRef.current = { x: 0, y: 0 };
+            }}
         >
           <div className="resource-header">
             <div className="resource-hint">
@@ -1477,6 +1478,7 @@ const CalendarDaysView = ({ groupData, schedules = [], onUpdate, onPlanChange })
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* 拖拽影子已移除 - 使用简单虚线框 */}
