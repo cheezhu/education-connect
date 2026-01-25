@@ -1,4 +1,24 @@
-/* 全局样式重置 */
+﻿﻿﻿:root {
+  --bg-app: #1e1e1e;
+  --bg-activity: #333333;
+  --bg-sidebar: #252526;
+  --bg-editor: #1e1e1e;
+  --bg-header: #2d2d2d;
+  --bg-panel: #1e1e1e;
+  --bg-menu: #252526;
+  --bg-input: #3c3c3c;
+  --border-color: #454545;
+  --text-main: #cccccc;
+  --text-muted: #858585;
+  --text-strong: #ffffff;
+  --accent: #0e639c;
+  --accent-strong: #007acc;
+  --selection: rgba(14, 99, 156, 0.4);
+  --color-conflict: #f14c4c;
+  --color-warning: #cca700;
+  --color-success: #89d185;
+}
+﻿/* 全局样式重置 */
 * {
   box-sizing: border-box;
 }
@@ -25,7 +45,7 @@
 
 /* 内容区域优化 */
 .ant-layout-content {
-  min-height: calc(100vh - 42px);
+  min-height: 100vh;
 }
 
 /* 卡片样式统一 */
@@ -234,194 +254,182 @@
     display: none !important;
   }
 
-  .ant-layout-content {
-    margin-top: 0 !important;
-    padding: 0 !important;
-  }
+  .app-content {
+  padding: 16px 20px;
+  overflow: auto;
+  height: 100%;
+  min-height: 0;
+}
 }
 
 /* ========================================= */
-/* 新增：方案C优化版样式 (Unified Navbar) */
+/* Unified Navbar (Left Dock) */
 /* ========================================= */
+.app-shell {
+  min-height: 100vh;
+  height: 100vh;
+  background: #f5f7fa;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
 
-/* 单一导航栏 - 集成面包屑 - 仅42px高度 */
+.app-main {
+  flex: 1;
+  min-width: 0;
+  background: #f5f7fa;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.app-content {
+  padding: 16px 20px;
+  overflow: auto;
+  height: 100%;
+  min-height: 0;
+}
+
+.app-content--full {
+  padding: 0;
+  background: #f5f7fa;
+}
+
 .unified-navbar {
-    height: 42px;
-    background: #1a1a1a;
-    display: flex;
-    align-items: center;
-    padding: 0 12px;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 1000;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  width: 64px;
+  height: 100vh;
+  background: #1e1e1e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  border-right: 1px solid #2a2a2a;
 }
 
-/* Logo区域 */
 .logo-section {
-    display: flex;
-    align-items: center;
-    margin-right: 16px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
 }
 
 .mini-logo {
-    width: 24px;
-    height: 24px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 11px;
-    font-weight: bold;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #0e639c 0%, #007acc 100%);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
 }
 
-/* 导航菜单 - 极简图标 */
 .nav-menu {
-    display: flex;
-    align-items: center;
-    gap: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
 }
 
 .nav-icon-btn {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: rgba(255,255,255,0.5);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.15s;
-    position: relative;
-    font-size: 14px;
+  width: 100%;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #858585;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 16px;
 }
 
 .nav-icon-btn:hover {
-    background: rgba(255,255,255,0.08);
-    color: rgba(255,255,255,0.9);
+  background: #2a2d2e;
+  color: #e0e0e0;
 }
 
 .nav-icon-btn.active {
-    color: #667eea;
-    background: rgba(102,126,234,0.12);
+  color: #ffffff;
+  background: #2a2d2e;
+  border-left-color: #0e639c;
 }
 
-/* 面包屑分隔线 */
-.nav-divider {
-    width: 1px;
-    height: 20px;
-    background: rgba(255,255,255,0.1);
-    margin: 0 12px;
+.nav-spacer {
+  flex: 1;
 }
 
-/* 面包屑导航 - 集成在导航栏中 */
-.breadcrumb-inline {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    flex: 1;
-}
-
-.bread-item {
-    color: rgba(255,255,255,0.5);
-    text-decoration: none;
-    transition: color 0.15s;
-    cursor: pointer;
-}
-
-.bread-item:hover {
-    color: rgba(255,255,255,0.8);
-}
-
-.bread-separator {
-    color: rgba(255,255,255,0.3);
-    font-size: 10px;
-}
-
-.bread-current {
-    color: #667eea;
-    font-weight: 500;
-}
-
-/* 快速操作区 */
 .quick-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .action-icon {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: rgba(255,255,255,0.5);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.15s;
-    font-size: 13px;
-    position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #858585;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 14px;
+  position: relative;
 }
 
 .action-icon:hover {
-    background: rgba(255,255,255,0.08);
-    color: rgba(255,255,255,0.9);
+  background: #2a2d2e;
+  color: #e0e0e0;
 }
 
-/* 通知红点 */
 .badge-dot {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    width: 5px;
-    height: 5px;
-    background: #ff4757;
-    border-radius: 50%;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 5px;
+  height: 5px;
+  background: #f14c4c;
+  border-radius: 50%;
 }
 
-/* 用户信息 */
 .user-section {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 8px;
-    margin-left: 8px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-bottom: 4px;
 }
 
 .user-section:hover {
-    background: rgba(255,255,255,0.08);
+  background: #2a2d2e;
 }
 
 .user-avatar {
-    width: 20px;
-    height: 20px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 9px;
-    font-weight: bold;
+  width: 22px;
+  height: 22px;
+  background: linear-gradient(135deg, #0e639c 0%, #007acc 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 9px;
+  font-weight: bold;
 }
 
 .user-name {
-    color: rgba(255,255,255,0.7);
-    font-size: 11px;
+  display: none;
 }
-
-/* 悬停提示 (tooltip) 样式由 Ant Design 的 Tooltip 覆盖，这里仅作自定义备用 */
-.custom-tooltip {
-    /* ... */
-}
-

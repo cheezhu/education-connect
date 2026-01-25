@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import { Layout, Dropdown, Tooltip, Avatar } from 'antd';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
+﻿import React, { useState } from 'react';
+import { Layout, Dropdown, Tooltip } from 'antd';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
-  CalendarOutlined,
   CompassOutlined,
   TeamOutlined,
   EnvironmentOutlined,
@@ -27,14 +26,20 @@ function App() {
 
   return (
     <Router>
-      <Layout style={{ minHeight: '100vh', background: '#f5f7fa' }}>
-        <UnifiedNavbar />
-        <Content style={{
-          marginTop: '42px',
-          padding: '20px',
-          overflow: 'auto',
-          height: 'calc(100vh - 42px)'
-        }}>
+      <AppLayout editMode={editMode} />
+    </Router>
+  );
+}
+
+function AppLayout({ editMode }) {
+  const location = useLocation();
+  const isDesigner = location.pathname.startsWith('/designer');
+
+  return (
+    <Layout className="app-shell">
+      <UnifiedNavbar />
+      <Layout className="app-main">
+        <Content className={`app-content${isDesigner ? ' app-content--full' : ''}`}>
           <Routes>
             <Route
               path="/groups"
@@ -79,11 +84,10 @@ function App() {
           </Routes>
         </Content>
       </Layout>
-    </Router>
+    </Layout>
   );
 }
 
-// 统一导航栏组件 (Unified Navbar)
 function UnifiedNavbar() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -96,15 +100,13 @@ function UnifiedNavbar() {
     return currentPath.startsWith(path);
   };
 
-  // 导航菜单项配置
   const navItems = [
-    { path: '/designer', icon: <CompassOutlined />, label: '行程设计器' }, // Changed icon to Compass for "Target" feel or Design
+    { path: '/designer', icon: <CompassOutlined />, label: '行程设计器' },
     { path: '/groups', icon: <TeamOutlined />, label: '团组管理' },
     { path: '/locations', icon: <EnvironmentOutlined />, label: '行程资源' },
     { path: '/statistics', icon: <BarChartOutlined />, label: '统计报表' }
   ];
 
-  // 用户菜单
   const userMenuItems = [
     { key: 'profile', label: '个人资料' },
     { key: 'settings', label: '系统设置' },
@@ -121,44 +123,16 @@ function UnifiedNavbar() {
     }
   };
 
-  // 生成面包屑路径
-  const getBreadcrumbs = () => {
-    const crumbs = [{ label: '首页', path: '/' }];
-    
-    if (currentPath.startsWith('/groups')) {
-      crumbs.push({ label: '团组管理', path: '/groups' });
-      if (currentPath.includes('/new')) {
-        crumbs.push({ label: '新建团组' });
-      } else if (currentPath.includes('/edit')) {
-        crumbs.push({ label: '编辑团组' });
-      }
-    } else if (currentPath.startsWith('/locations')) {
-      crumbs.push({ label: '行程资源', path: '/locations' });
-    } else if (currentPath.startsWith('/statistics')) {
-      crumbs.push({ label: '统计报表', path: '/statistics' });
-    } else if (currentPath.startsWith('/designer')) {
-      crumbs.push({ label: '行程设计器', path: '/designer' });
-    } else if (currentPath.startsWith('/settings')) {
-      crumbs.push({ label: '系统设置', path: '/settings' });
-    }
-
-    return crumbs;
-  };
-
-  const breadcrumbs = getBreadcrumbs();
-
   return (
     <nav className="unified-navbar">
-      {/* Logo */}
       <div className="logo-section">
         <div className="mini-logo">TM</div>
       </div>
 
-      {/* 图标导航 */}
       <div className="nav-menu">
         {navItems.map(item => (
-          <Tooltip key={item.path} title={item.label} placement="bottom">
-            <div 
+          <Tooltip key={item.path} title={item.label} placement="right">
+            <div
               className={`nav-icon-btn ${isActivePath(item.path) ? 'active' : ''}`}
               onClick={() => navigate(item.path)}
             >
@@ -168,53 +142,32 @@ function UnifiedNavbar() {
         ))}
       </div>
 
-      {/* 分隔线 */}
-      <div className="nav-divider"></div>
+      <div className="nav-spacer"></div>
 
-      {/* 面包屑导航 - 融入导航栏 */}
-      <div className="breadcrumb-inline">
-        {breadcrumbs.map((crumb, index) => (
-          <React.Fragment key={index}>
-            {index > 0 && <span className="bread-separator">›</span>}
-            {crumb.path && index < breadcrumbs.length - 1 ? (
-              <Link to={crumb.path} className="bread-item">
-                {crumb.label}
-              </Link>
-            ) : (
-              <span className={index === breadcrumbs.length - 1 ? 'bread-current' : 'bread-item'}>
-                {crumb.label}
-              </span>
-            )}
-          </React.Fragment>
-        ))}
-      </div>
-
-      {/* 快速操作区 */}
       <div className="quick-actions">
-        <Tooltip title="搜索">
+        <Tooltip title="搜索" placement="right">
           <div className="action-icon">
             <SearchOutlined />
           </div>
         </Tooltip>
-        <Tooltip title="导出">
+        <Tooltip title="导出" placement="right">
           <div className="action-icon">
             <ExportOutlined />
           </div>
         </Tooltip>
-        <Tooltip title="通知">
+        <Tooltip title="通知" placement="right">
           <div className="action-icon">
             <BellOutlined />
             <span className="badge-dot"></span>
           </div>
         </Tooltip>
-        <Tooltip title="设置">
+        <Tooltip title="设置" placement="right">
           <div className="action-icon" onClick={() => navigate('/settings')}>
             <SettingOutlined />
           </div>
         </Tooltip>
       </div>
 
-      {/* 用户信息 */}
       <Dropdown menu={userMenuProps} placement="bottomRight">
         <div className="user-section">
           <div className="user-avatar">管</div>

@@ -1,26 +1,24 @@
-/* 行程设计器容器 */
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/* 行程设计器容器 */
 .itinerary-designer {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--bg-editor);
   overflow: hidden;
   position: relative;
 }
-
 /* 时间轴网格 */
 .timeline-grid {
   width: 100%;
   height: 100%;
-  border: 1px solid #e8e8e8;
-  border-radius: 6px;
+  border: none;
+  border-radius: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  background: white;
+  background: var(--bg-editor);
   display: flex;
   flex-direction: column;
 }
-
 .itinerary-center {
   flex: 1;
   display: flex;
@@ -28,51 +26,44 @@
   min-width: 0;
   height: 100%;
 }
-
 .timeline-wrapper {
   flex: 1;
   min-height: 0;
 }
-
 .daily-focus-row {
   display: grid;
   grid-template-columns: 100px repeat(7, minmax(0, 1fr));
-  border-top: 1px solid #e8e8e8;
-  background: #fafafa;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-header);
   flex-shrink: 0;
   width: 100%;
   box-sizing: border-box;
 }
-
 .daily-focus-label-cell {
   padding: 8px;
-  border-right: 1px solid #e8e8e8;
-  background: #fff;
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-editor);
   display: flex;
   flex-direction: column;
   gap: 6px;
   font-size: 12px;
 }
-
 .daily-focus-title {
   font-size: 12px;
   font-weight: 600;
   color: #595959;
 }
-
 .daily-focus-cell {
   padding: 8px;
-  border-right: 1px solid #e8e8e8;
-  background: #fff;
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-editor);
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-
 .daily-focus-cell:last-child {
   border-right: none;
 }
-
 .daily-focus-section {
   display: flex;
   flex-direction: column;
@@ -81,47 +72,41 @@
   padding: 6px;
   border-radius: 4px;
 }
-
 .daily-focus-section-title {
   font-size: 12px;
   font-weight: 600;
   color: #595959;
 }
-
 .daily-focus-item {
   font-size: 11px;
   color: #595959;
   line-height: 1.4;
 }
-
 /* 时间轴表头 */
 .timeline-header {
   display: grid;
   grid-template-columns: 100px repeat(7, minmax(0, 1fr));
-  background: #fafafa;
-  border-bottom: 2px solid #e8e8e8;
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-color);
   position: sticky;
   top: 0;
   z-index: 10;
   flex-shrink: 0;
 }
-
 /* 时间轴行 */
 .timeline-row {
   display: grid;
   grid-template-columns: 100px repeat(7, minmax(0, 1fr));
-  border-bottom: 1px solid #e8e8e8;
+  border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
-
 .timeline-row:last-child {
   border-bottom: none;
 }
-
 /* 时间标签单元格 */
 .time-label-cell {
   padding: 8px 4px;
-  border-right: 1px solid #e8e8e8;
+  border-right: 1px solid var(--border-color);
   min-height: 120px;
   height: auto;
   display: flex;
@@ -135,17 +120,15 @@
   background: inherit;
   font-size: 12px;
 }
-
 .timeline-header .time-label-cell {
   min-height: 40px;
   padding: 6px 4px;
 }
-
 /* 日期表头单元格 */
 .date-header-cell {
   padding: 6px 6px;
-  border-right: 1px solid #e8e8e8;
-  background: #fafafa;
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-header);
   font-weight: bold;
   text-align: center;
   min-height: 40px;
@@ -153,15 +136,13 @@
   align-items: center;
   justify-content: center;
 }
-
 .date-header-cell:last-child {
   border-right: none;
 }
-
 /* 时间轴单元格 */
 .timeline-cell {
   padding: 8px;
-  border-right: 1px solid #e8e8e8;
+  border-right: 1px solid var(--border-color);
   min-height: 120px;
   height: auto;
   cursor: pointer;
@@ -171,27 +152,21 @@
   align-items: flex-start;
   justify-content: flex-start;
 }
-
 .timeline-cell:last-child {
   border-right: none;
 }
-
 .timeline-cell:hover {
-  background-opacity: 0.8;
-  transform: scale(1.02);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transform: none;
+  box-shadow: none;
 }
-
 .timeline-cell.aligned-rows {
   padding: 3px 5px;
   min-height: 84px;
 }
-
 .timeline-cell.aligned-rows:hover {
   transform: none;
   box-shadow: none;
 }
-
 /* 空单元格 */
 .empty-cell {
   display: flex;
@@ -204,11 +179,9 @@
   min-height: 100px;
   padding: 20px;
 }
-
 .empty-cell:hover {
   color: #1890ff;
 }
-
 /* 活动摘要 */
 .activity-summary {
   display: flex;
@@ -220,16 +193,13 @@
   min-height: 60px;
   padding: 4px;
 }
-
 .activity-summary.grouped {
   gap: 4px;
 }
-
 .activity-summary.aligned {
   gap: 0;
   padding: 1px 0;
 }
-
 .activity-summary.aligned .activity-group-row {
   min-height: 18px;
   padding: 0;
@@ -237,21 +207,18 @@
   flex-wrap: wrap;
   overflow-x: hidden;
 }
-
 .activity-summary.aligned .activity-group-row.empty {
   min-height: 12px;
   opacity: 0.22;
 }
-
 .activity-summary.aligned .activity-group-row.empty::after {
   content: '';
   flex: 1;
-  height: 0.5px;
+  height: 1px;
   background: rgba(0,0,0,0.12);
   border-radius: 1px;
   align-self: center;
 }
-
 .activity-group-row {
   display: flex;
   align-items: flex-start;
@@ -262,27 +229,23 @@
   padding-bottom: 2px;
   min-height: 36px;
 }
-
 .activity-group-row.empty {
   min-height: 36px;
 }
-
 /* 拖拽相关样式 */
 .dragging {
   opacity: 0.8 !important;
   transform: scale(1.05) rotate(2deg) !important;
   z-index: 1000 !important;
   box-shadow: 0 8px 24px rgba(0,0,0,0.3) !important;
-  border: 2px solid #1890ff !important;
+  border: 1px solid #1890ff !important;
   background: rgba(24, 144, 255, 0.1) !important;
 }
-
 .drag-over {
-  border: 2px solid #1890ff !important;
+  border: 1px solid #1890ff !important;
   background: rgba(24, 144, 255, 0.1) !important;
-  transform: scale(1.02);
+  transform: none;
 }
-
 /* 团组色块 */
 .group-color-dot {
   width: 12px;
@@ -290,105 +253,86 @@
   border-radius: 2px;
   display: inline-block;
 }
-
 /* 响应式调整 */
 @media (max-width: 1200px) {
   .timeline-header,
   .timeline-row {
     grid-template-columns: 80px repeat(7, 1fr);
   }
-
   .time-label-cell {
     font-size: 11px;
     padding: 6px 2px;
   }
-
   .timeline-cell {
     min-height: 70px;
     padding: 4px;
   }
-
   .timeline-cell.aligned-rows {
     min-height: 56px;
     padding: 2px 3px;
   }
 }
-
 @media (max-width: 768px) {
   .timeline-header,
   .timeline-row {
     grid-template-columns: 80px repeat(5, 1fr);
   }
-
   .timeline-cell {
     min-height: 60px;
     padding: 4px;
   }
-
   .timeline-cell.aligned-rows {
     min-height: 50px;
     padding: 2px 3px;
   }
-
   .empty-cell {
     min-height: 50px;
     font-size: 10px;
   }
 }
-
 /* 选中效果 */
 .timeline-cell.selected {
-  border: 2px solid #1890ff;
+  border: 1px solid #1890ff;
   background: rgba(24, 144, 255, 0.1);
 }
-
 /* 冲突提示 */
 .timeline-cell.conflict {
-  border: 2px solid #ff4d4f;
+  border: 1px solid #ff4d4f;
   background: rgba(255, 77, 79, 0.1);
 }
-
 /* 动画效果 */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
 .timeline-grid {
   animation: fadeIn 0.3s ease;
 }
-
 /* 滚动条样式 */
 .itinerary-designer ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-
 .itinerary-designer ::-webkit-scrollbar-track {
   background: #f1f1f1;
   border-radius: 3px;
 }
-
 .itinerary-designer ::-webkit-scrollbar-thumb {
   background: #c1c1c1;
   border-radius: 3px;
 }
-
 .itinerary-designer ::-webkit-scrollbar-thumb:hover {
   background: #a1a1a1;
 }
-
 /* 工具提示样式 */
 .timeline-cell[title] {
   position: relative;
 }
-
 /* 加载状态 */
 .timeline-grid.loading {
   opacity: 0.6;
   pointer-events: none;
 }
-
 /* 状态指示器 */
 .status-indicator {
   position: absolute;
@@ -398,29 +342,23 @@
   height: 8px;
   border-radius: 50%;
 }
-
 .status-indicator.success {
   background: #52c41a;
 }
-
 .status-indicator.warning {
   background: #faad14;
 }
-
 .status-indicator.error {
   background: #f5222d;
 }
-
 /* 批量选择模式 */
 .timeline-cell.batch-mode {
   cursor: crosshair;
 }
-
 .timeline-cell.batch-selected {
-  border: 2px solid #722ed1;
+  border: 1px solid #722ed1;
   background: rgba(114, 46, 209, 0.1);
 }
-
 /* 标签式活动卡片（默认） */
 .activity-card-tag {
   transition: all 0.15s ease;
@@ -428,107 +366,86 @@
   position: relative;
   white-space: nowrap;
 }
-
 .activity-card-tag:hover {
   box-shadow: 0 3px 8px rgba(0,0,0,0.15) !important;
   z-index: 10;
   white-space: nowrap;
 }
-
 .activity-card-tag:hover .tag-delete-btn {
   display: inline-block !important;
 }
-
 .activity-card-tag[draggable="true"] {
   cursor: grab;
 }
-
 .activity-card-tag[draggable="true"]:active {
   cursor: grabbing;
 }
-
 /* 极简式活动卡片 */
 .activity-card-minimal {
   transition: all 0.15s ease;
   position: relative;
 }
-
 .activity-card-minimal:hover {
-  background: rgba(255,255,255,0.9) !important;
+  background: rgba(255,255,255,0.12) !important;
   box-shadow: 2px 0 6px rgba(0,0,0,0.1) !important;
 }
-
 .activity-card-minimal:hover .activity-card-group,
 .activity-card-minimal:hover .activity-card-location {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .activity-card-minimal:hover .minimal-delete-btn {
   display: inline-block !important;
 }
-
 .activity-card-minimal[draggable="true"] {
   cursor: grab;
 }
-
 .activity-card-minimal[draggable="true"]:active {
   cursor: grabbing;
 }
-
 .activity-card-minimal.compact {
   line-height: 13px;
   padding-right: 14px;
 }
-
 .activity-summary.aligned .activity-card-minimal.compact {
   padding: 0 5px;
   margin-bottom: 0;
 }
-
 .activity-summary.aligned .activity-card-minimal.compact .activity-card-group {
   font-size: 9px;
   line-height: 11px;
 }
-
 .activity-summary.aligned .activity-card-minimal.compact .activity-card-location {
   font-size: 8px;
   line-height: 10px;
 }
-
 .activity-card-minimal.compact .activity-card-line {
   display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .activity-card-minimal.compact .activity-card-group {
   font-size: clamp(9px, 1vw, 10px);
   font-weight: 500;
   color: #333;
 }
-
 .activity-card-minimal.compact .activity-card-location {
   font-size: clamp(8px, 0.9vw, 9px);
   color: #666;
 }
-
 .activity-card-minimal .activity-card-group,
 .activity-card-minimal .activity-card-location {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .activity-card-minimal.compact .minimal-delete-btn {
   position: absolute;
   top: 2px;
   right: 2px;
 }
-
-
 /* 时间格优化 */
 .timeline-cell .activity-summary {
   width: 100%;
@@ -538,7 +455,6 @@
   gap: 2px;
   align-items: stretch;
 }
-
 /* 工具提示增强 */
 .activity-tooltip {
   position: absolute;
@@ -556,11 +472,9 @@
   opacity: 0;
   transition: opacity 0.2s ease;
 }
-
 .activity-card-mini:hover .activity-tooltip {
   opacity: 1;
 }
-
 /* 快速操作按钮 */
 .quick-action-buttons {
   position: absolute;
@@ -571,11 +485,9 @@
   opacity: 0;
   transition: opacity 0.2s ease;
 }
-
 .activity-card-mini:hover .quick-action-buttons {
   opacity: 1;
 }
-
 .quick-action-btn {
   width: 14px;
   height: 14px;
@@ -588,32 +500,27 @@
   cursor: pointer;
   font-size: 8px;
 }
-
 .quick-action-btn:hover {
-  background: white;
+  background: var(--bg-editor);
   box-shadow: 0 1px 4px rgba(0,0,0,0.2);
 }
-
 /* group calendar drawer */
 .group-calendar {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
-
 .group-calendar-header {
   padding: 8px 12px;
-  border-bottom: 1px solid #e8e8e8;
-  background: #fff;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-editor);
 }
-
 .group-calendar-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
-
 .group-calendar-title {
   display: flex;
   align-items: center;
@@ -622,7 +529,6 @@
   font-size: 13px;
   color: #333;
 }
-
 .group-calendar-name-link {
   appearance: none;
   border: none;
@@ -633,24 +539,20 @@
   color: #1677ff;
   cursor: pointer;
 }
-
 .group-calendar-name-link:hover {
   text-decoration: underline;
 }
-
 .group-calendar-dates {
   font-weight: 500;
   font-size: 11px;
   color: #666;
 }
-
 .group-calendar-grid {
   flex: 1;
   overflow: auto;
   padding: 12px;
-  background: #fafafa;
+  background: var(--bg-header);
 }
-
 .group-calendar-resize-handle {
   height: 8px;
   background: #f0f0f0;
@@ -659,37 +561,32 @@
   align-items: center;
   justify-content: center;
 }
-
 .group-calendar-resize-handle::after {
   content: '';
   width: 36px;
-  height: 3px;
+  height: 1px;
   border-radius: 2px;
   background: #c7c7c7;
 }
-
 .group-calendar-row {
   display: grid;
-  border-bottom: 1px solid #e8e8e8;
-  background: #fff;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-editor);
   width: max-content;
   min-width: 100%;
 }
-
 .group-calendar-row:last-child {
   border-bottom: none;
 }
-
 .group-calendar-header-row {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #fafafa;
+  background: var(--bg-header);
 }
-
 .group-calendar-time-cell {
   padding: 6px 8px;
-  border-right: 1px solid #e8e8e8;
+  border-right: 1px solid var(--border-color);
   font-size: 12px;
   font-weight: 600;
   color: #333;
@@ -698,55 +595,47 @@
   background: inherit;
   z-index: 3;
 }
-
 .group-calendar-date-cell {
   padding: 6px 4px;
-  border-right: 1px solid #e8e8e8;
+  border-right: 1px solid var(--border-color);
   text-align: center;
   font-size: 11px;
   color: #666;
 }
-
 .group-calendar-date-cell:last-child {
   border-right: none;
 }
-
 .group-calendar-cell {
   padding: 4px 6px;
-  border-right: 1px solid #e8e8e8;
+  border-right: 1px solid var(--border-color);
   min-height: 30px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: #fff;
+  background: var(--bg-editor);
 }
-
 .group-calendar-cell:last-child {
   border-right: none;
 }
-
 .group-calendar-item {
   font-size: 11px;
   line-height: 1.2;
   padding: 2px 6px;
-  border-left: 3px solid #1890ff;
+  border-left: 2px solid #1890ff;
   background: #f5f7ff;
   border-radius: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .group-calendar-more {
   font-size: 10px;
   color: #999;
 }
-
 .group-calendar-empty {
   font-size: 10px;
   color: #bbb;
 }
-
 .group-calendar-empty-state {
   padding: 24px;
   color: #999;
@@ -755,53 +644,44 @@
   align-items: center;
   justify-content: space-between;
 }
-
 .group-calendar-drawer .ant-drawer-header {
   display: none;
 }
-
 .group-calendar-drawer.resizing .group-calendar-grid {
   pointer-events: none;
 }
-
 .group-calendar-detail-modal {
   max-width: 100%;
   width: 100%;
   margin: 0;
   padding-bottom: 0;
 }
-
 .group-calendar-detail-wrap {
   pointer-events: none;
 }
-
 .group-calendar-detail-wrap .ant-modal {
   pointer-events: auto;
 }
-
 .group-calendar-detail-modal .ant-modal-content {
   padding: 0;
-  border-radius: 8px;
+  border-radius: 0;
   overflow: hidden;
 }
-
 .group-calendar-detail {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #fff;
+  background: var(--bg-editor);
 }
-
 .group-calendar-detail-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 8px 16px;
-  border-bottom: 1px solid #e8e8e8;
-  background: #fff;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-editor);
 }
-
 .group-calendar-detail-info {
   display: flex;
   align-items: center;
@@ -809,7 +689,6 @@
   min-width: 0;
   flex: 1;
 }
-
 .group-calendar-detail-name {
   font-weight: 600;
   font-size: 14px;
@@ -818,7 +697,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .group-calendar-detail-dates {
   font-size: 12px;
   color: #666;
@@ -826,23 +704,249 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .group-calendar-detail-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
 }
-
 .group-calendar-detail-body {
   flex: 1;
   min-height: 0;
-  background: #f5f7fa;
+  background: var(--bg-editor);
 }
-
 .group-calendar-detail-loading {
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+/* ========================================= */
+/* Workstation theme overrides (Itinerary) */
+/* ========================================= */
+.itinerary-designer {
+  --bg-app: #f5f7fa;
+  --bg-activity: #ffffff;
+  --bg-sidebar: #f5f7fa;
+  --bg-editor: #ffffff;
+  --bg-header: #fafafa;
+  --bg-panel: #ffffff;
+  --bg-menu: #ffffff;
+  --bg-input: #ffffff;
+  --border-color: #e5e7eb;
+  --text-main: #262626;
+  --text-muted: #8c8c8c;
+  --text-strong: #1f1f1f;
+  --accent: #1677ff;
+  --accent-strong: #0958d9;
+  --selection: rgba(22, 119, 255, 0.12);
+  --color-conflict: #ff4d4f;
+  --color-warning: #faad14;
+  --color-success: #52c41a;
+  background: var(--bg-app);
+  color: var(--text-main);
+  height: 100%;
+  min-height: 100%;
+}
+.itinerary-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.itinerary-designer .page-header.itinerary-header {
+  margin-bottom: 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-header);
+  color: var(--text-main);
+  box-shadow: none;
+}
+.itinerary-designer .page-header.itinerary-header .ant-btn {
+  background: #ffffff;
+  border-color: var(--border-color);
+  color: var(--text-main);
+}
+.itinerary-designer .page-header.itinerary-header .ant-btn.ant-btn-text {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-main);
+}
+.itinerary-designer .page-header.itinerary-header .ant-checkbox-wrapper,
+.itinerary-designer .page-header.itinerary-header .ant-checkbox-wrapper span {
+  color: var(--text-main);
+}
+.itinerary-designer .timeline-grid {
+  background: var(--bg-editor);
+  border: 1px solid var(--border-color);
+  border-radius: 0;
+  box-shadow: none;
+}
+.itinerary-designer .daily-focus-row {
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-color);
+}
+.itinerary-designer .daily-focus-label-cell,
+.itinerary-designer .daily-focus-cell {
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border-color);
+  color: var(--text-main);
+}
+.itinerary-designer .daily-focus-section {
+  background: #f5f5f5;
+}
+.itinerary-designer .daily-focus-title,
+.itinerary-designer .daily-focus-section-title {
+  color: var(--text-main);
+}
+.itinerary-designer .daily-focus-item {
+  color: var(--text-muted);
+}
+.itinerary-designer .timeline-header {
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-color);
+}
+.itinerary-designer .timeline-row {
+  border-bottom: 1px solid var(--border-color);
+}
+.itinerary-designer .time-label-cell {
+  border-right: 1px solid var(--border-color);
+  color: var(--text-main);
+  background: var(--bg-sidebar);
+}
+.itinerary-designer .date-header-cell {
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-header);
+  color: var(--text-main);
+}
+.itinerary-designer .timeline-cell {
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-editor);
+  color: var(--text-main);
+}
+.itinerary-designer .timeline-cell:hover {
+  background: #f5f7fa;
+  transform: none;
+  box-shadow: none;
+}
+.itinerary-designer .activity-summary.aligned .activity-group-row.empty::after {
+  background: rgba(0, 0, 0, 0.08);
+}
+.itinerary-designer .empty-cell {
+  color: var(--text-muted);
+}
+.itinerary-designer .empty-cell:hover {
+  color: var(--accent);
+}
+.itinerary-designer .dragging {
+  border: 1px solid var(--accent) !important;
+  background: var(--selection) !important;
+}
+.itinerary-designer .drag-over {
+  border: 1px solid var(--accent) !important;
+  background: var(--selection) !important;
+}
+.itinerary-designer .timeline-cell.selected {
+  border: 1px solid var(--accent);
+  background: var(--selection);
+}
+.itinerary-designer .timeline-cell.conflict {
+  border: 1px solid var(--color-conflict);
+  background: rgba(241, 76, 76, 0.12);
+}
+.itinerary-designer .activity-card-minimal:hover {
+  background: rgba(22, 119, 255, 0.06) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+}
+.itinerary-designer ::-webkit-scrollbar-track {
+  background: #f0f0f0;
+}
+.itinerary-designer ::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+}
+.itinerary-designer ::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+.itinerary-designer .group-calendar-header,
+.itinerary-designer .group-calendar-grid,
+.itinerary-designer .group-calendar-row,
+.itinerary-designer .group-calendar-detail,
+.itinerary-designer .group-calendar-detail-header {
+  background: var(--bg-panel);
+  color: var(--text-main);
+  border-color: var(--border-color);
+}
+.itinerary-designer .group-calendar-time-cell,
+.itinerary-designer .group-calendar-date-cell {
+  background: var(--bg-sidebar);
+  color: var(--text-main);
+  border-right: 1px solid var(--border-color);
+}
+.itinerary-designer .group-calendar-cell {
+  background: var(--bg-editor);
+  border-right: 1px solid var(--border-color);
+}
+.itinerary-designer .group-calendar-item {
+  background: #ffffff;
+  color: var(--text-main);
+}
+.itinerary-designer .group-calendar-detail-body {
+  background: var(--bg-editor);
+}
+.itinerary-designer .group-calendar-resize-handle {
+  background: #f0f0f0;
+}
+.itinerary-designer .group-calendar-resize-handle::after {
+  background: #d9d9d9;
+}
+.itinerary-designer .group-calendar-empty-state,
+.itinerary-designer .group-calendar-empty,
+.itinerary-designer .group-calendar-more {
+  color: var(--text-muted);
+}
+.itinerary-designer .ant-drawer-content {
+  background: var(--bg-panel);
+  color: var(--text-main);
+}
+.itinerary-designer .ant-drawer-header {
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-color);
+}
+.itinerary-designer .ant-drawer-title {
+  color: var(--text-main);
+}
+.itinerary-designer {
+  margin: 0;
+  padding: 0;
+}
+/* Borderless workstation adjustments */
+.itinerary-designer .timeline-grid {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+.itinerary-designer .timeline-header {
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-header);
+}
+.itinerary-designer .date-header-cell,
+.itinerary-designer .time-label-cell,
+.itinerary-designer .timeline-cell,
+.itinerary-designer .daily-focus-row,
+.itinerary-designer .daily-focus-label-cell,
+.itinerary-designer .daily-focus-cell {
+  border-right: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+}
+.itinerary-designer .page-header.itinerary-header {
+  border-radius: 0;
+  box-shadow: none;
+}
+.itinerary-designer .timeline-cell:hover {
+  background: #f5f7fa;
+  box-shadow: none;
+}
+.itinerary-designer .activity-card-minimal,
+.itinerary-designer .activity-card-minimal.compact {
+  border-radius: 0 3px 3px 0;
+  box-shadow: none;
 }

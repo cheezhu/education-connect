@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿import React, { useState, useEffect, useRef } from 'react';
 import { Card, Button, Modal, Form, Select, InputNumber, Input, message, Checkbox, Tooltip, Badge, DatePicker, Drawer, Upload, Spin } from 'antd';
 import {
   PlusOutlined,
@@ -153,9 +153,9 @@ function ItineraryDesigner() {
 
   // 时间段定义
   const timeSlots = [
-    { key: 'MORNING', label: '上午', time: '06:00-12:00', color: '#e6f7ff', borderColor: '#1890ff' },
-    { key: 'AFTERNOON', label: '下午', time: '12:00-18:00', color: '#f6ffed', borderColor: '#52c41a' },
-    { key: 'EVENING', label: '晚上', time: '18:00-20:45', color: '#fff2e8', borderColor: '#fa8c16' }
+    { key: 'MORNING', label: '上午', time: '06:00-12:00', color: 'transparent', borderColor: '#0e639c' },
+    { key: 'AFTERNOON', label: '下午', time: '12:00-18:00', color: 'transparent', borderColor: '#89d185' },
+    { key: 'EVENING', label: '晚上', time: '18:00-20:45', color: 'transparent', borderColor: '#cca700' }
   ];
 
   const visibleTimeSlots = timeSlots.filter((slot) => enabledTimeSlots.includes(slot.key));
@@ -921,10 +921,10 @@ function ItineraryDesigner() {
                   <div style={{ fontWeight: 'bold', fontSize: '12px' }}>
                     {group.name}
                   </div>
-                  <div style={{ fontSize: '10px', color: '#666' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                     📅 {dayjs(group.start_date).format('MM-DD')} ~ {dayjs(group.end_date).format('MM-DD')}
                   </div>
-                  <div style={{ fontSize: '10px', color: '#666' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                     👥 {group.student_count + group.teacher_count}人 🏫 {group.type === 'primary' ? '小学' : '中学'}
                   </div>
                 </div>
@@ -939,7 +939,7 @@ function ItineraryDesigner() {
   // 工具面板已移除
 
   const renderTimelineHeader = () => (
-    <div className="page-header" style={{ marginBottom: 0, borderRadius: '8px 8px 0 0', borderBottom: '1px solid #f0f0f0' }}>
+    <div className="page-header itinerary-header">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1060,7 +1060,7 @@ function ItineraryDesigner() {
               <span style={{ fontWeight: 'bold' }}>
                 {dayjs(date).format('MM-DD')}
               </span>
-              <span style={{ fontSize: '12px', color: '#666' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                 {dayjs(date).format('ddd')}
               </span>
             </div>
@@ -1075,7 +1075,7 @@ function ItineraryDesigner() {
             className="time-label-cell"
             style={{
               backgroundColor: timeSlot.color,
-              borderLeft: `4px solid ${timeSlot.borderColor}`
+              borderLeft: `3px solid ${timeSlot.borderColor}`
             }}
           >
             <div style={{ textAlign: 'center' }}>
@@ -1127,8 +1127,8 @@ function ItineraryDesigner() {
                 >
                   {rowGroupNames.length === 0 ? (
                     <div className="empty-cell">
-                      <PlusOutlined style={{ color: '#999' }} />
-                      <div style={{ fontSize: '10px', color: '#999' }}>点击添加</div>
+                      <PlusOutlined style={{ color: 'var(--text-muted)' }} />
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>点击添加</div>
                     </div>
                   ) : (
                     <div className={`activity-summary grouped ${alignGroupRows ? "aligned" : "compact"}`}>
@@ -1250,7 +1250,7 @@ function ItineraryDesigner() {
             padding: '4px 12px 4px 10px',
             backgroundColor: group?.color + '20',
             borderRadius: '14px',
-            border: `1.5px solid ${group?.color}`,
+            border: `1px solid ${group?.color}`,
             fontSize: '11px',
             marginRight: '4px',
             marginBottom: '4px',
@@ -1262,8 +1262,8 @@ function ItineraryDesigner() {
             handleCellClick(null, null, [activity]);
           }}
         >
-          <span style={{ fontWeight: '600', color: '#333' }}>{group?.name}</span>
-          {location && <span style={{ opacity: 0.7, fontSize: '10px', color: '#666' }}> @{location.name}</span>}
+          <span style={{ fontWeight: '600', color: 'var(--text-strong)' }}>{group?.name}</span>
+          {location && <span style={{ opacity: 0.7, fontSize: '10px', color: 'var(--text-muted)' }}> @{location.name}</span>}
 
           {/* 悬停时显示的删除按钮 */}
           <span
@@ -1277,7 +1277,7 @@ function ItineraryDesigner() {
               padding: '0 4px',
               borderRadius: '8px',
               background: 'rgba(255,255,255,0.8)',
-              color: '#999',
+              color: 'var(--text-muted)',
               fontSize: '10px',
               display: 'none',
               cursor: 'pointer'
@@ -1296,10 +1296,10 @@ function ItineraryDesigner() {
           <div
             className="activity-card-minimal compact"
             style={{
-              borderLeft: `3px solid ${group?.color}`,
+              borderLeft: `2px solid ${group?.color}`,
               marginBottom: '4px',
               cursor: 'grab',
-              backgroundColor: 'rgba(255,255,255,0.5)',
+              backgroundColor: 'rgba(255,255,255,0.06)',
               padding: '2px 8px',
               borderRadius: '0 4px 4px 0',
               position: 'relative'
@@ -1321,7 +1321,7 @@ function ItineraryDesigner() {
               }}
               style={{
                 padding: '0 4px',
-                color: '#999',
+                color: 'var(--text-muted)',
                 fontSize: '10px',
                 display: 'none',
                 cursor: 'pointer'
@@ -1337,11 +1337,11 @@ function ItineraryDesigner() {
         <div
           className="activity-card-minimal"
           style={{
-            borderLeft: `3px solid ${group?.color}`,
+            borderLeft: `2px solid ${group?.color}`,
             marginBottom: '4px',
             fontSize: '11px',
             cursor: 'grab',
-            backgroundColor: 'rgba(255,255,255,0.5)',
+            backgroundColor: 'rgba(255,255,255,0.06)',
             padding: '2px 8px',
             borderRadius: '0 4px 4px 0',
             position: 'relative'
@@ -1352,7 +1352,7 @@ function ItineraryDesigner() {
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontWeight: '500', lineHeight: '16px', color: '#333' }}>{group?.name}</div>
+            <div style={{ fontWeight: '500', lineHeight: '16px', color: 'var(--text-strong)' }}>{group?.name}</div>
             <span
               className="minimal-delete-btn"
               onClick={(e) => {
@@ -1361,7 +1361,7 @@ function ItineraryDesigner() {
               }}
               style={{
                 padding: '0 4px',
-                color: '#999',
+                color: 'var(--text-muted)',
                 fontSize: '10px',
                 display: 'none',
                 cursor: 'pointer'
@@ -1370,7 +1370,7 @@ function ItineraryDesigner() {
               ×
             </span>
           </div>
-          {location && <div style={{ fontSize: '10px', color: '#666', lineHeight: '14px' }}>{location.name}</div>}
+          {location && <div style={{ fontSize: '10px', color: 'var(--text-muted)', lineHeight: '14px' }}>{location.name}</div>}
         </div>
       );
     }
@@ -1752,7 +1752,7 @@ function ItineraryDesigner() {
     <div className="itinerary-designer">
       {renderTimelineHeader()}
 
-      <div style={{ display: 'flex', height: 'calc(100vh - 56px)', flex: 1 }}>
+      <div className="itinerary-body">
         {/* 中央时间轴 */}
         <div className="itinerary-center">
         <div className="timeline-wrapper">
@@ -2019,7 +2019,7 @@ function ItineraryDesigner() {
 
           {/* 现有活动列表 */}
           {selectedTimeSlot?.activities.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
               该时段暂无安排
             </div>
           ) : (
@@ -2137,7 +2137,7 @@ function ItineraryDesigner() {
         </Upload.Dragger>
 
         {planningImportPayload ? (
-          <div style={{ marginTop: 12, fontSize: 12, color: '#666' }}>
+          <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
             {planningImportFile ? (
               <div>
                 {`文件: ${planningImportFile.name} (${(planningImportFile.size / 1024).toFixed(1)} KB)`}
@@ -2224,7 +2224,7 @@ function ItineraryDesigner() {
               </Select>
             </Form.Item>
           ) : (
-            <div style={{ fontSize: 12, color: '#666', marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
               导入团组数: {planningImportSelectedGroupIds.length}
             </div>
           )}
