@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Select, Input, Tag, Button, Space, Table, message, Modal, DatePicker, InputNumber } from 'antd';
+import { Card, Select, Input, Tag, Button, Space, Table, message, Modal, DatePicker, InputNumber, Popconfirm } from 'antd';
 import {
   PlusOutlined,
   FileTextOutlined,
-  UnorderedListOutlined
+  UnorderedListOutlined,
+  StopOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
@@ -21,7 +22,7 @@ const GroupManagementV2 = () => {
   const [loading, setLoading] = useState(false);
   const [itineraryPlans, setItineraryPlans] = useState([]);
   const [filters, setFilters] = useState({
-    status: 'all',
+    status: 'active',
     type: 'all',
     searchText: ''
   });
@@ -38,6 +39,8 @@ const GroupManagementV2 = () => {
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [bulkRows, setBulkRows] = useState(() => [createBulkRow()]);
   const [bulkErrors, setBulkErrors] = useState({});
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [batchDeleting, setBatchDeleting] = useState(false);
 
   // 状态颜色映射
   const statusColors = {
@@ -56,13 +59,7 @@ const GroupManagementV2 = () => {
       // 为V1数据添加V2扩展字段（临时处理）
       const enhancedGroups = response.data.map(group => ({
         ...group,
-        status: calculateStatus(group),
-        completed_activities: Math.floor(Math.random() * 15) + 1,
-        activity_count: 15,
-        contact_person: group.contact_person || '张老师',
-        contact_phone: group.contact_phone || '13800138000',
-        tags: generateTags(group),
-        completion_rate: calculateCompletionRate(group)
+        status: group.status ?? calculateStatus(group)
       }));
 
       setGroups(enhancedGroups);
@@ -77,6 +74,7 @@ const GroupManagementV2 = () => {
 
   // 计算团组状态
   const calculateStatus = (group) => {
+    if (group.status === '已取消') return '已取消';
     const today = dayjs();
     const startDate = dayjs(group.start_date);
     const endDate = dayjs(group.end_date);
@@ -84,30 +82,6 @@ const GroupManagementV2 = () => {
     if (today.isBefore(startDate)) return '准备中';
     if (today.isAfter(endDate)) return '已完成';
     return '进行中';
-  };
-
-  // 生成标签
-  const generateTags = (group) => {
-    const tags = [];
-    if (group.student_count > 45) tags.push('大型团组');
-    if (group.type === 'primary') tags.push('小学');
-    else tags.push('中学');
-    if (dayjs(group.start_date).month() === 8) tags.push('9月出行');
-    return tags;
-  };
-
-  // 计算完成率
-  const calculateCompletionRate = (group) => {
-    const today = dayjs();
-    const startDate = dayjs(group.start_date);
-    const endDate = dayjs(group.end_date);
-
-    if (today.isBefore(startDate)) return 0;
-    if (today.isAfter(endDate)) return 100;
-
-    const totalDays = endDate.diff(startDate, 'day') + 1;
-    const passedDays = today.diff(startDate, 'day') + 1;
-    return Math.round((passedDays / totalDays) * 100);
   };
 
   const addBulkRow = () => {
@@ -203,7 +177,9 @@ const GroupManagementV2 = () => {
     let filtered = [...groups];
 
     // 状态筛选
-    if (filters.status !== 'all') {
+    if (filters.status === 'active') {
+      filtered = filtered.filter(g => g.status !== '已取消');
+    } else if (filters.status !== 'all') {
       filtered = filtered.filter(g => g.status === filters.status);
     }
 
@@ -216,9 +192,9 @@ const GroupManagementV2 = () => {
     if (filters.searchText) {
       const searchLower = filters.searchText.toLowerCase();
       filtered = filtered.filter(g =>
-        g.name.toLowerCase().includes(searchLower) ||
-        g.contact_person?.toLowerCase().includes(searchLower) ||
-        g.tags?.some(tag => tag.toLowerCase().includes(searchLower))
+        (g.name || '').toLowerCase().includes(searchLower) ||
+        (g.contact_person || '').toLowerCase().includes(searchLower) ||
+        (g.contact_phone || '').toLowerCase().includes(searchLower)
       );
     }
 
@@ -251,11 +227,6 @@ const GroupManagementV2 = () => {
         item.id === group.id ? { ...item, itinerary_plan_id: nextPlanId } : item
       )
     );
-    setFilteredGroups(prev =>
-      prev.map(item =>
-        item.id === group.id ? { ...item, itinerary_plan_id: nextPlanId } : item
-      )
-    );
 
     try {
       await api.put(`/groups/${group.id}`, { itinerary_plan_id: nextPlanId });
@@ -266,12 +237,52 @@ const GroupManagementV2 = () => {
           item.id === group.id ? { ...item, itinerary_plan_id: prevPlanId } : item
         )
       );
-      setFilteredGroups(prev =>
-        prev.map(item =>
-          item.id === group.id ? { ...item, itinerary_plan_id: prevPlanId } : item
-        )
-      );
       message.error('保存行程方案失败');
+    }
+  };
+
+
+  const handleCancelGroup = async (groupId) => {
+    if (!groupId) return;
+    try {
+      await api.delete(`/groups/${groupId}`);
+      message.success('团组已取消，相关数据已删除');
+      fetchGroups();
+    } catch (error) {
+      const errorMessage = error?.response?.data?.error || '取消失败';
+      message.error(errorMessage);
+    }
+  };
+
+  const handleBatchCancel = async () => {
+    if (!selectedRowKeys.length) {
+      message.error('请先选择团组');
+      return;
+    }
+
+    setBatchDeleting(true);
+    try {
+      const response = await api.post('/groups/batch-delete', {
+        ids: selectedRowKeys
+      });
+
+      const deletedIds = response.data?.deletedIds || [];
+      const missingIds = response.data?.missingIds || [];
+
+      if (deletedIds.length) {
+        message.success(`已取消 ${deletedIds.length} 个团组`);
+      }
+      if (missingIds.length) {
+        message.error(`有 ${missingIds.length} 个团组未删除`);
+      }
+
+      setSelectedRowKeys([]);
+      fetchGroups();
+    } catch (error) {
+      const errorMessage = error?.response?.data?.error || '取消失败';
+      message.error(errorMessage);
+    } finally {
+      setBatchDeleting(false);
     }
   };
 
@@ -318,7 +329,7 @@ const GroupManagementV2 = () => {
     {
       title: '人数',
       key: 'participants',
-      render: (_, record) => `${record.student_count + record.teacher_count}人`
+      render: (_, record) => `${(record.student_count || 0) + (record.teacher_count || 0)}人`
     },
     {
       title: '开始日期',
@@ -347,6 +358,7 @@ const GroupManagementV2 = () => {
           allowClear
           placeholder="未选择"
           value={record.itinerary_plan_id ?? undefined}
+          disabled={record.status === '已取消'}
           style={{ width: 160 }}
           onChange={(value) => handlePlanChange(record, value)}
         >
@@ -361,30 +373,50 @@ const GroupManagementV2 = () => {
     {
       title: '操作',
       key: 'actions',
-      render: (_, record) => (
-        <Space>
-          <Button
-            icon={<FileTextOutlined />}
-            size="small"
-            onClick={() => openGroupTab(record.id, 'info')}
-          >
-            团组信息
-          </Button>
-          <Button
-            icon={<PlusOutlined />}
-            size="small"
-            onClick={() => openGroupTab(record.id, 'schedule')}
-          >
-            日历详情
-          </Button>
-          <Button
-            size="small"
-            onClick={() => openGroupTab(record.id, 'schedule-detail')}
-          >
-            详细日程
-          </Button>
-        </Space>
-      )
+      render: (_, record) => {
+        const isCancelled = record.status === '已取消';
+        return (
+          <Space>
+            <Button
+              icon={<FileTextOutlined />}
+              size="small"
+              onClick={() => openGroupTab(record.id, 'info')}
+            >
+              团组详情
+            </Button>
+            <Button
+              icon={<PlusOutlined />}
+              size="small"
+              disabled={isCancelled}
+              onClick={() => openGroupTab(record.id, 'schedule')}
+            >
+              添加日程
+            </Button>
+            <Button
+              size="small"
+              disabled={isCancelled}
+              onClick={() => openGroupTab(record.id, 'schedule-detail')}
+            >
+              日历详情
+            </Button>
+            <Popconfirm
+              title="确定取消该团组吗？"
+              description="取消后将永久删除该团组及相关日程与人员信息"
+              okText="取消"
+              cancelText="不取消"
+              onConfirm={() => handleCancelGroup(record.id)}
+            >
+              <Button
+                danger
+                size="small"
+                icon={<StopOutlined />}
+              >
+                取消
+              </Button>
+            </Popconfirm>
+          </Space>
+        );
+      }
     }
   ];
 
@@ -400,6 +432,7 @@ const GroupManagementV2 = () => {
             onChange={val => setFilters({...filters, status: val})}
             placeholder="选择状态"
           >
+            <Option value="active">进行中/未取消</Option>
             <Option value="all">全部状态</Option>
             <Option value="准备中">准备中</Option>
             <Option value="进行中">进行中</Option>
@@ -421,7 +454,7 @@ const GroupManagementV2 = () => {
 
           <Search
             size="small"
-            placeholder="搜索团组名称、联系人或标签"
+            placeholder="搜索团组名称或联系人"
             allowClear
             style={{ width: 200 }}
             onSearch={val => setFilters({...filters, searchText: val})}
@@ -439,6 +472,26 @@ const GroupManagementV2 = () => {
             >
               {'\u6279\u91cf\u521b\u5efa'}
             </Button>
+            <Popconfirm
+              title="确定取消所选团组吗？"
+              description="取消后将永久删除所选团组及相关日程与人员信息"
+              okText="取消所选"
+              cancelText="不取消"
+              onConfirm={handleBatchCancel}
+              disabled={selectedRowKeys.length === 0}
+            >
+              <Button
+                danger
+                size="small"
+                icon={<StopOutlined />}
+                loading={batchDeleting}
+                disabled={selectedRowKeys.length === 0}
+              >
+                {`取消所选${selectedRowKeys.length ? ` (${selectedRowKeys.length})` : ''}`}
+              </Button>
+            </Popconfirm>
+
+
 
             <Button
               type="primary"
@@ -459,6 +512,10 @@ const GroupManagementV2 = () => {
         rowKey="id"
         size="small"
         className="group-table"
+        rowSelection={{
+          selectedRowKeys,
+          onChange: (keys) => setSelectedRowKeys(keys)
+        }}
         pagination={{ pageSize: 10, size: 'small' }}
       />
 
@@ -542,7 +599,7 @@ const GroupManagementV2 = () => {
                     disabled={bulkRows.length === 1}
                     onClick={() => removeBulkRow(row.id)}
                   >
-                    {'删除'}
+                    {'取消'}
                   </Button>
                 </div>
               );

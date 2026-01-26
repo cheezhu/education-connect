@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "docs/cal-overview.md",
+                "file": "docs/studio-field.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "cal-overview"
+              "title": "studio-field"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "docs/cal-overview.md",
+                "file": "docs/calendar-sync-rules.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for cal-overview"
+              "title": "Backlinks for calendar-sync-rules"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "docs/cal-overview.md",
+                "file": "docs/studio-field.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of cal-overview"
+              "title": "Outline of studio-field"
             }
           }
         ],
@@ -186,40 +186,41 @@
   "active": "2411584888c4ede4",
   "lastOpenFiles": [
     "trip-manager/backend/db/trip.db-journal",
+    "trip-manager/frontend/vite.config.js.timestamp-1769352751415-306d047be01c7.mjs",
+    "trip-manager/frontend/vite.config.js.timestamp-1769352591452-99fff8a7301eb.mjs",
+    "docs/calendar-sync-rules.md",
+    "docs/config-auth.md",
+    "docs/cal-overview.md",
+    "docs/api/api-reference.md",
+    "docs/api/sample-payloads.md",
+    "docs/README.md",
+    "docs/overview-project.md",
     "docs/design/design-architecture.md",
+    "README.md",
+    "group-management-update/group-management-optimization.md",
+    "trip-manager/README.md",
+    "group-management-update/group-management-ui-issues.md",
+    "docs/itinerary-designer.md",
     "docs/design/design-workstation-concept.html",
     "docs/design",
     "trip-manager/frontend/src/design-workstation-concept.html",
     "docs/arch-overview.md",
     "docs/account-admin.md",
     "docs/ui-frontend.md",
-    "docs/README.md",
-    "docs/overview-project.md",
     "docs/ops-runbook.md",
     "docs/db-schema.md",
-    "docs/itinerary-designer.md",
     "docs/itinerary-row-alignment.md",
     "docs/itinerary-grid-optimizations.md",
     "docs/itinerary-ai-workflows.md",
     "docs/issues-known.md",
     "docs/file-map.md",
     "docs/db-design.md",
-    "docs/config-auth.md",
-    "docs/cal-overview.md",
     "docs/cal-schedule-activity-sync.md",
-    "docs/AI for Planning/export planning_input.json.md",
-    "docs/cal-calendar-days-view.md",
-    "docs/arch-system-architecture.md",
-    "docs/AI for Planning/ai-planner.md",
-    "docs/archive/strategy-vision-roadmap.md",
-    "docs/archive/strategy-studio-field-feature-design.md",
-    "docs/archive/strategy-studio-field-architecture-analysis.md",
     "docs/archive/strategy",
     "docs/archive/history",
     "docs/archive",
     "trip-manager/frontend/vite.config.js.timestamp-1769285861241-b38eec141f182.mjs",
     "docs/account-admin",
-    "trip-manager/frontend/src/pages/Settings.css",
     "trip-manager/backend/node_modules/undici/docs/assets/lifecycle-diagram.png"
   ]
 }

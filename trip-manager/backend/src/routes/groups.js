@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const requireEditLock = require('../middleware/editLock');
+const CANCELLED_STATUS = '已取消';
 
 // 获取所有团组
 router.get('/', (req, res) => {
@@ -53,6 +54,7 @@ const normalizeGroupPayload = (payload = {}) => {
   const duration = payload.duration ?? calculateDuration(startDate, endDate);
   const color = payload.color ?? getRandomGroupColor();
   const itineraryPlanId = payload.itineraryPlanId ?? payload.itinerary_plan_id ?? null;
+  const status = payload.status ?? null;
   const contactPerson = payload.contactPerson ?? payload.contact_person;
   const contactPhone = payload.contactPhone ?? payload.contact_phone;
   const notes = payload.notes ?? '';
@@ -67,6 +69,7 @@ const normalizeGroupPayload = (payload = {}) => {
     duration,
     color,
     itineraryPlanId,
+    status,
     contactPerson,
     contactPhone,
     notes
@@ -141,6 +144,7 @@ router.post('/', requireEditLock, (req, res) => {
     duration, 
     color,
     itineraryPlanId,
+    status,
     contactPerson,
     contactPhone,
     notes,
@@ -159,6 +163,7 @@ router.post('/', requireEditLock, (req, res) => {
   const resolvedTeacherCount = teacherCount ?? teacher_count ?? 4;
   const resolvedDuration = duration ?? calculateDuration(resolvedStartDate, resolvedEndDate);
   const resolvedColor = color ?? getRandomGroupColor();
+  const resolvedStatus = status ?? null;
   const resolvedContactPerson = contactPerson ?? contact_person;
   const resolvedContactPhone = contactPhone ?? contact_phone;
   const resolvedItineraryPlanId = itineraryPlanId ?? itinerary_plan_id ?? null;
@@ -173,13 +178,13 @@ router.post('/', requireEditLock, (req, res) => {
     const result = req.db.prepare(`
       INSERT INTO groups (
         name, type, student_count, teacher_count, 
-        start_date, end_date, duration, color, itinerary_plan_id, contact_person,
+        start_date, end_date, duration, color, itinerary_plan_id, status, contact_person,
         contact_phone, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name, type, resolvedStudentCount, resolvedTeacherCount,
       resolvedStartDate, resolvedEndDate, resolvedDuration, resolvedColor, resolvedItineraryPlanId,
-      resolvedContactPerson, resolvedContactPhone, notes
+      resolvedStatus, resolvedContactPerson, resolvedContactPhone, notes
     );
 
     const newGroup = req.db.prepare('SELECT * FROM groups WHERE id = ?').get(result.lastInsertRowid);
@@ -190,17 +195,104 @@ router.post('/', requireEditLock, (req, res) => {
   }
 });
 
+// 批量更新团组状态（需要编辑锁）
+router.put('/batch-status', requireEditLock, (req, res) => {
+  const { ids, status } = req.body;
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: '缺少团组ID列表' });
+  }
+
+  const nextStatus = status === undefined ? null : status;
+  const shouldClearSchedules = nextStatus === CANCELLED_STATUS;
+  const updateStmt = req.db.prepare(`
+    UPDATE groups
+    SET status = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+  const deleteSchedulesStmt = req.db.prepare('DELETE FROM schedules WHERE group_id = ?');
+  const deleteActivitiesStmt = req.db.prepare('DELETE FROM activities WHERE group_id = ?');
+  const selectStmt = req.db.prepare('SELECT id FROM groups WHERE id = ?');
+
+  const updateBatch = req.db.transaction((items) => {
+    const updatedIds = [];
+    const missingIds = [];
+
+    items.forEach((id) => {
+      const exists = selectStmt.get(id);
+      if (!exists) {
+        missingIds.push(id);
+        return;
+      }
+      updateStmt.run(nextStatus, id);
+      if (shouldClearSchedules) {
+        deleteSchedulesStmt.run(id);
+        deleteActivitiesStmt.run(id);
+      }
+      updatedIds.push(id);
+    });
+
+    return { updatedIds, missingIds };
+  });
+
+  try {
+    const result = updateBatch(ids);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('批量更新团组状态失败:', error);
+    res.status(500).json({ error: '批量更新团组状态失败' });
+  }
+});
+
+// 批量删除团组（需要编辑锁）
+router.post('/batch-delete', requireEditLock, (req, res) => {
+  const { ids } = req.body;
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: '缺少团组ID列表' });
+  }
+
+  const deleteStmt = req.db.prepare('DELETE FROM groups WHERE id = ?');
+  const selectStmt = req.db.prepare('SELECT id FROM groups WHERE id = ?');
+
+  const deleteBatch = req.db.transaction((items) => {
+    const deletedIds = [];
+    const missingIds = [];
+
+    items.forEach((id) => {
+      const exists = selectStmt.get(id);
+      if (!exists) {
+        missingIds.push(id);
+        return;
+      }
+      deleteStmt.run(id);
+      deletedIds.push(id);
+    });
+
+    return { deletedIds, missingIds };
+  });
+
+  try {
+    const result = deleteBatch(ids);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('批量删除团组失败:', error);
+    res.status(500).json({ error: '批量删除团组失败' });
+  }
+});
+
 // 更新团组（需要编辑锁）
 router.put('/:id', requireEditLock, (req, res) => {
   const { id } = req.params;
   const updates = [];
   const values = [];
+  const shouldClearSchedules = req.body.status === CANCELLED_STATUS;
 
   // 构建更新字段
   const allowedFields = [
     'name', 'type', 'student_count', 'teacher_count',
     'start_date', 'end_date', 'duration', 'color', 'contact_person',
-    'contact_phone', 'notes', 'itinerary_plan_id'
+    'contact_phone', 'notes', 'itinerary_plan_id', 'status'
   ];
 
   allowedFields.forEach(field => {
@@ -218,18 +310,32 @@ router.put('/:id', requireEditLock, (req, res) => {
   values.push(id);
 
   try {
-    const result = req.db.prepare(`
-      UPDATE groups 
-      SET ${updates.join(', ')}
-      WHERE id = ?
-    `).run(...values);
+    const updateGroup = req.db.transaction(() => {
+      const result = req.db.prepare(`
+        UPDATE groups 
+        SET ${updates.join(', ')}
+        WHERE id = ?
+      `).run(...values);
 
-    if (result.changes === 0) {
+      if (result.changes === 0) {
+        return { notFound: true };
+      }
+
+      if (shouldClearSchedules) {
+        req.db.prepare('DELETE FROM schedules WHERE group_id = ?').run(id);
+        req.db.prepare('DELETE FROM activities WHERE group_id = ?').run(id);
+      }
+
+      const updatedGroup = req.db.prepare('SELECT * FROM groups WHERE id = ?').get(id);
+      return { updatedGroup };
+    });
+
+    const result = updateGroup();
+    if (result?.notFound) {
       return res.status(404).json({ error: '团组不存在' });
     }
 
-    const updatedGroup = req.db.prepare('SELECT * FROM groups WHERE id = ?').get(id);
-    res.json({ success: true, group: updatedGroup });
+    res.json({ success: true, group: result.updatedGroup });
   } catch (error) {
     console.error('更新团组失败:', error);
     res.status(500).json({ error: '更新团组失败' });
@@ -239,17 +345,6 @@ router.put('/:id', requireEditLock, (req, res) => {
 // 删除团组（需要编辑锁）
 router.delete('/:id', requireEditLock, (req, res) => {
   const { id } = req.params;
-
-  // 检查是否有关联的活动
-  const activityCount = req.db.prepare(
-    'SELECT COUNT(*) as count FROM activities WHERE group_id = ?'
-  ).get(id);
-
-  if (activityCount.count > 0) {
-    return res.status(400).json({ 
-      error: '无法删除团组，存在关联的活动安排' 
-    });
-  }
 
   try {
     const result = req.db.prepare('DELETE FROM groups WHERE id = ?').run(id);

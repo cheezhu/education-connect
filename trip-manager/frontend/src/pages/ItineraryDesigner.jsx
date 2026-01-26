@@ -31,6 +31,11 @@ function ItineraryDesigner() {
   const GROUP_CALENDAR_HEIGHT_MIN = 20;
   const GROUP_CALENDAR_HEIGHT_MAX = 70;
   const timeSlotKeys = ['MORNING', 'AFTERNOON', 'EVENING'];
+  const timeSlotWindows = {
+    MORNING: { start: '06:00', end: '12:00' },
+    AFTERNOON: { start: '12:00', end: '18:00' },
+    EVENING: { start: '18:00', end: '20:45' }
+  };
   const getStoredWeekStartDate = () => {
     try {
       const stored = localStorage.getItem('itinerary_week_start');
@@ -71,15 +76,15 @@ function ItineraryDesigner() {
     return true;
   };
 
-  const getStoredGroupRowAlign = () => {
+  const getStoredShowUnscheduled = () => {
     try {
-      const stored = localStorage.getItem('itinerary_group_row_align');
+      const stored = localStorage.getItem('itinerary_show_unscheduled');
       if (stored === 'true') return true;
       if (stored === 'false') return false;
     } catch (error) {
       // ignore
     }
-    return true;
+    return false;
   };
 
   
@@ -114,11 +119,12 @@ function ItineraryDesigner() {
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [enabledTimeSlots, setEnabledTimeSlots] = useState(() => getStoredTimeSlots());
   const [showDailyFocus, setShowDailyFocus] = useState(() => getStoredDailyFocus());
-  const [alignGroupRows, setAlignGroupRows] = useState(() => getStoredGroupRowAlign());
+  const [showUnscheduledGroups, setShowUnscheduledGroups] = useState(() => getStoredShowUnscheduled());
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
   const [draggedActivity, setDraggedActivity] = useState(null);
   const cardStyle = 'minimal';
+  const alignGroupRows = false;
   const [batchMode, setBatchMode] = useState(false); // 批量选择模式
   const [selectedActivities, setSelectedActivities] = useState([]); // 选中的活动
   const [planningExportVisible, setPlanningExportVisible] = useState(false);
@@ -137,6 +143,7 @@ function ItineraryDesigner() {
   const [groupCalendarDetailLoading, setGroupCalendarDetailLoading] = useState(false);
   const [groupCalendarDetailResourcesVisible, setGroupCalendarDetailResourcesVisible] = useState(true);
   const groupCalendarDetailSaveTimeoutRef = useRef(null);
+  const groupCalendarDetailSaveTokenRef = useRef(0);
   
   const [groupCalendarHeight, setGroupCalendarHeight] = useState(() => getStoredGroupCalendarHeight());
   const [groupCalendarResizing, setGroupCalendarResizing] = useState(false);
@@ -269,24 +276,6 @@ function ItineraryDesigner() {
     }
   };
 
-  const loadGroupRowAlignConfig = async () => {
-    try {
-      const response = await api.get('/config/itinerary-group-row-align');
-      if (typeof response.data?.enabled === 'boolean') {
-        const nextValue = response.data.enabled;
-        if (nextValue !== alignGroupRows) {
-          setAlignGroupRows(nextValue);
-        }
-        try {
-          localStorage.setItem('itinerary_group_row_align', nextValue ? 'true' : 'false');
-        } catch (error) {
-          // ignore
-        }
-      }
-    } catch (error) {
-    }
-  };
-
   
   const loadGroupCalendarHeightConfig = async () => {
     try {
@@ -335,22 +324,6 @@ function ItineraryDesigner() {
     }
   };
 
-  const persistGroupRowAlignConfig = async (enabled) => {
-    setAlignGroupRows(enabled);
-    try {
-      localStorage.setItem('itinerary_group_row_align', enabled ? 'true' : 'false');
-    } catch (error) {
-      // ignore
-    }
-    try {
-      await api.put('/config/itinerary-group-row-align', {
-        enabled
-      });
-    } catch (error) {
-      message.error('保存团组行对齐设置失败');
-    }
-  };
-
   
   const persistGroupCalendarHeightConfig = async (heightValue) => {
     const normalized = normalizeGroupCalendarHeight(heightValue);
@@ -378,8 +351,14 @@ function ItineraryDesigner() {
     persistDailyFocusConfig(event.target.checked);
   };
 
-  const handleGroupRowAlignToggle = (event) => {
-    persistGroupRowAlignConfig(event.target.checked);
+  const handleShowUnscheduledToggle = (event) => {
+    const nextValue = event.target.checked;
+    setShowUnscheduledGroups(nextValue);
+    try {
+      localStorage.setItem('itinerary_show_unscheduled', nextValue ? 'true' : 'false');
+    } catch (error) {
+      // ignore
+    }
   };
 
   const handleWeekStartChange = (value) => {
@@ -398,7 +377,6 @@ function ItineraryDesigner() {
     loadWeekStartDate();
     loadTimeSlotConfig();
     loadDailyFocusConfig();
-    loadGroupRowAlignConfig();
     loadGroupCalendarHeightConfig();
     const unregister = registerRefreshCallback(refreshData);
     return unregister;
@@ -473,6 +451,170 @@ function ItineraryDesigner() {
 
   const getTimeSlotLabel = (slotKey) => {
     return timeSlots.find(slot => slot.key === slotKey)?.label || slotKey;
+  };
+
+  const getGroupDisplayName = (group) => group?.name || '未命名团组';
+
+  const isGroupActiveOnDate = (group, date) => {
+    if (!group?.start_date || !group?.end_date) return false;
+    const currentDate = dayjs(date);
+    const start = dayjs(group.start_date);
+    const end = dayjs(group.end_date);
+    if (!currentDate.isValid() || !start.isValid() || !end.isValid()) return false;
+    return !start.isAfter(currentDate, 'day') && !end.isBefore(currentDate, 'day');
+  };
+
+  const getActiveGroupsForDate = (date) => (
+    groups.filter(group => (
+      selectedGroups.includes(group.id) && isGroupActiveOnDate(group, date)
+    ))
+  );
+
+  const getActiveGroupNamesForDate = (date) => (
+    new Set(getActiveGroupsForDate(date).map(getGroupDisplayName))
+  );
+
+  const toMinutes = (timeValue) => {
+    if (!timeValue || typeof timeValue !== 'string') return null;
+    const [hourStr, minuteStr] = timeValue.split(':');
+    const hour = Number(hourStr);
+    const minute = Number(minuteStr);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    return hour * 60 + minute;
+  };
+
+  const getTimeSlotFromStart = (startTime) => {
+    const minutes = toMinutes(startTime);
+    if (minutes === null) return 'MORNING';
+    if (minutes < 12 * 60) return 'MORNING';
+    if (minutes < 18 * 60) return 'AFTERNOON';
+    return 'EVENING';
+  };
+
+  const resolveTimeSlotByOverlap = (startTime, endTime) => {
+    const startMinutes = toMinutes(startTime);
+    const endMinutes = toMinutes(endTime);
+    if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) {
+      return getTimeSlotFromStart(startTime);
+    }
+
+    let bestSlot = null;
+    let bestOverlap = -1;
+    Object.entries(timeSlotWindows).forEach(([slotKey, window]) => {
+      const windowStart = toMinutes(window.start);
+      const windowEnd = toMinutes(window.end);
+      if (!Number.isFinite(windowStart) || !Number.isFinite(windowEnd)) return;
+      const overlap = Math.max(
+        0,
+        Math.min(endMinutes, windowEnd) - Math.max(startMinutes, windowStart)
+      );
+      if (overlap > bestOverlap) {
+        bestOverlap = overlap;
+        bestSlot = slotKey;
+      }
+    });
+
+    if (bestSlot && bestOverlap > 0) {
+      return bestSlot;
+    }
+    return getTimeSlotFromStart(startTime);
+  };
+
+  const buildScheduleMatchKey = (schedule) => {
+    const title = schedule?.title || schedule?.location || schedule?.description || '';
+    const locationId = schedule?.locationId ?? '';
+    const resourceId = schedule?.resourceId ?? schedule?.resource_id ?? '';
+    return [
+      schedule?.date || '',
+      schedule?.startTime || '',
+      schedule?.endTime || '',
+      locationId,
+      resourceId,
+      title
+    ].join('|');
+  };
+
+  const isPlanSchedule = (schedule) => {
+    const resourceId = schedule?.resourceId ?? schedule?.resource_id;
+    return typeof resourceId === 'string' && resourceId.startsWith('plan-');
+  };
+
+  const resolveScheduleId = (schedule) => {
+    if (Number.isFinite(schedule?.id)) return schedule.id;
+    const numericId = Number(schedule?.id);
+    if (Number.isFinite(numericId)) return numericId;
+    return schedule?.__optimisticId || buildScheduleMatchKey(schedule);
+  };
+
+  const mapSchedulesToActivities = ({ schedules, group, existingActivities }) => {
+    const participantCount = group
+      ? (group.student_count || 0) + (group.teacher_count || 0)
+      : 0;
+    const existingByScheduleId = new Map();
+    (existingActivities || []).forEach((activity) => {
+      if (activity.scheduleId == null) return;
+      existingByScheduleId.set(String(activity.scheduleId), activity);
+    });
+
+    const planSchedules = (schedules || []).filter(isPlanSchedule);
+
+    return planSchedules.map((schedule) => {
+      const scheduleId = resolveScheduleId(schedule);
+      const timeSlot = resolveTimeSlotByOverlap(schedule.startTime, schedule.endTime);
+      const baseActivity = {
+        id: `tmp-activity-${scheduleId}`,
+        scheduleId,
+        isPlanItem: true,
+        groupId: group?.id ?? schedule.groupId,
+        locationId: schedule.locationId ?? null,
+        date: schedule.date,
+        timeSlot,
+        participantCount
+      };
+      const existing = existingByScheduleId.get(String(scheduleId));
+      if (existing) {
+        return {
+          ...existing,
+          ...baseActivity,
+          id: existing.id
+        };
+      }
+      return baseActivity;
+    });
+  };
+
+  const applyOptimisticScheduleUpdate = ({ groupId, schedules }) => {
+    const group = groups.find(g => g.id === groupId) || { id: groupId, student_count: 0, teacher_count: 0 };
+    setActivities((prev) => {
+      const planScheduleIds = new Set(
+        (schedules || [])
+          .filter(isPlanSchedule)
+          .map((schedule) => String(resolveScheduleId(schedule)))
+      );
+      const isPlanActivity = (activity) => (
+        Boolean(activity.isPlanItem)
+        || (activity.scheduleId != null && planScheduleIds.has(String(activity.scheduleId)))
+      );
+      const scheduleActivities = mapSchedulesToActivities({
+        schedules,
+        group,
+        existingActivities: prev.filter(activity => activity.groupId === groupId && isPlanActivity(activity))
+      });
+      const preserved = prev.filter(activity => activity.groupId !== groupId || !isPlanActivity(activity));
+      return [...preserved, ...scheduleActivities];
+    });
+  };
+
+  const refreshActivitiesOnly = async (token) => {
+    try {
+      const response = await api.get('/activities/raw');
+      if (token && token !== groupCalendarDetailSaveTokenRef.current) return;
+      if (Array.isArray(response.data)) {
+        setActivities(response.data);
+      }
+    } catch (error) {
+      message.warning('同步活动失败');
+    }
   };
 
   const getArrivalsForDate = (dateString) => {
@@ -592,15 +734,25 @@ function ItineraryDesigner() {
 
   const handleGroupCalendarDetailUpdate = (updatedSchedules) => {
     setGroupCalendarDetailSchedules(updatedSchedules);
+    if (groupCalendarDetailGroupId) {
+      applyOptimisticScheduleUpdate({
+        groupId: groupCalendarDetailGroupId,
+        schedules: updatedSchedules
+      });
+    }
     clearTimeout(groupCalendarDetailSaveTimeoutRef.current);
     groupCalendarDetailSaveTimeoutRef.current = setTimeout(async () => {
       if (!groupCalendarDetailGroupId) return;
+      groupCalendarDetailSaveTokenRef.current += 1;
+      const saveToken = groupCalendarDetailSaveTokenRef.current;
       try {
         const response = await api.post(`/groups/${groupCalendarDetailGroupId}/schedules/batch`, {
           scheduleList: updatedSchedules
         });
+        if (saveToken !== groupCalendarDetailSaveTokenRef.current) return;
         const saved = Array.isArray(response.data) ? response.data : updatedSchedules;
         setGroupCalendarDetailSchedules(saved);
+        await refreshActivitiesOnly(saveToken);
       } catch (error) {
         message.error('保存日程失败');
       }
@@ -1004,14 +1156,12 @@ function ItineraryDesigner() {
               >
                 每日关注
               </Checkbox>
-              <Tooltip title="同名团组跨天固定在同一行（可能出现空行）">
-                <Checkbox
-                  checked={alignGroupRows}
-                  onChange={handleGroupRowAlignToggle}
-                >
-                  对齐团组行
-                </Checkbox>
-              </Tooltip>
+              <Checkbox
+                checked={showUnscheduledGroups}
+                onChange={handleShowUnscheduledToggle}
+              >
+                未安排行程
+              </Checkbox>
               <Checkbox.Group
                 value={enabledTimeSlots}
                 onChange={handleTimeSlotToggle}
@@ -1091,9 +1241,14 @@ function ItineraryDesigner() {
                 const slotActivities = getActivitiesForSlot(date, timeSlot.key);
                 slotActivities.forEach((activity) => {
                   const group = groups.find(g => g.id === activity.groupId);
-                  const groupName = group?.name || '\u672a\u547d\u540d\u56e2\u7ec4';
+                  const groupName = getGroupDisplayName(group);
                   groupNamesForSlot.add(groupName);
                 });
+                if (showUnscheduledGroups) {
+                  getActiveGroupsForDate(date).forEach((group) => {
+                    groupNamesForSlot.add(getGroupDisplayName(group));
+                  });
+                }
               });
             }
             const orderedGroupNames = alignGroupRows
@@ -1103,13 +1258,23 @@ function ItineraryDesigner() {
               const slotActivities = getActivitiesForSlot(date, timeSlot.key);
               const groupedByName = slotActivities.reduce((acc, activity) => {
                 const group = groups.find(g => g.id === activity.groupId);
-                const groupName = group?.name || '\u672a\u547d\u540d\u56e2\u7ec4';
+                const groupName = getGroupDisplayName(group);
                 if (!acc.has(groupName)) {
                   acc.set(groupName, []);
                 }
                 acc.get(groupName).push({ activity, group });
                 return acc;
               }, new Map());
+              const activeGroupNames = showUnscheduledGroups
+                ? getActiveGroupNamesForDate(date)
+                : null;
+              if (showUnscheduledGroups) {
+                activeGroupNames.forEach((groupName) => {
+                  if (!groupedByName.has(groupName)) {
+                    groupedByName.set(groupName, []);
+                  }
+                });
+              }
               const rowGroupNames = alignGroupRows
                 ? orderedGroupNames
                 : Array.from(groupedByName.keys()).sort((a, b) => a.localeCompare(b, 'zh'));
@@ -1134,10 +1299,22 @@ function ItineraryDesigner() {
                     <div className={`activity-summary grouped ${alignGroupRows ? "aligned" : "compact"}`}>
                       {rowGroupNames.map((groupName) => {
                         const items = groupedByName.get(groupName) || [];
+                        const isActiveGroup = showUnscheduledGroups
+                          ? activeGroupNames?.has(groupName)
+                          : items.length > 0;
+                        const showPlaceholder = showUnscheduledGroups && isActiveGroup && items.length === 0;
+                        const rowClassName = [
+                          'activity-group-row',
+                          items.length === 0 ? 'empty' : '',
+                          showPlaceholder ? 'unscheduled' : '',
+                          showUnscheduledGroups && !isActiveGroup ? 'inactive' : ''
+                        ]
+                          .filter(Boolean)
+                          .join(' ');
                         return (
                           <div
                             key={groupName}
-                            className={`activity-group-row ${items.length ? '' : 'empty'}`}
+                            className={rowClassName}
                           >
                             {items.map(({ activity, group }) => {
                               const isCompact = items.length > 1;
@@ -1173,6 +1350,14 @@ function ItineraryDesigner() {
                                 </div>
                               );
                             })}
+                            {showPlaceholder && (
+                              <div
+                                className="unscheduled-card"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                {groupName}
+                              </div>
+                            )}
                           </div>
                         );
                       })}

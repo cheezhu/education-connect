@@ -77,12 +77,18 @@ const activityColumns = db.prepare("PRAGMA table_info(activities)").all().map(co
 if (!activityColumns.includes('schedule_id')) {
   db.exec('ALTER TABLE activities ADD COLUMN schedule_id INTEGER');
 }
+if (!activityColumns.includes('is_plan_item')) {
+  db.exec('ALTER TABLE activities ADD COLUMN is_plan_item INTEGER DEFAULT 0');
+}
 db.exec('CREATE INDEX IF NOT EXISTS idx_activities_schedule ON activities(schedule_id)');
 
 const groupColumns = db.prepare("PRAGMA table_info(groups)").all().map(col => col.name);
 if (!groupColumns.includes('itinerary_plan_id')) {
   db.exec('ALTER TABLE groups ADD COLUMN itinerary_plan_id INTEGER');
   db.exec('CREATE INDEX IF NOT EXISTS idx_groups_itinerary_plan ON groups(itinerary_plan_id)');
+}
+if (!groupColumns.includes('status')) {
+  db.exec('ALTER TABLE groups ADD COLUMN status VARCHAR(20)');
 }
 
 const locationColumns = db.prepare("PRAGMA table_info(locations)").all().map(col => col.name);

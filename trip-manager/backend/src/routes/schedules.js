@@ -55,10 +55,19 @@ const getTimeSlotFromRange = (startTime, endTime) => {
 };
 
 const syncSchedulesToActivities = (db, groupId) => {
-  const schedules = db.prepare(`
+  const planSchedules = db.prepare(`
     SELECT id, group_id, activity_date, start_time, end_time, location_id
     FROM schedules
     WHERE group_id = ?
+      AND resource_id LIKE 'plan-%'
+  `).all(groupId);
+
+  const nonPlanResourceSchedules = db.prepare(`
+    SELECT id
+    FROM schedules
+    WHERE group_id = ?
+      AND resource_id IS NOT NULL
+      AND resource_id NOT LIKE 'plan-%'
   `).all(groupId);
 
   const group = db.prepare(`
@@ -73,13 +82,13 @@ const syncSchedulesToActivities = (db, groupId) => {
 
   const insertActivity = db.prepare(`
     INSERT INTO activities (
-      schedule_id, group_id, location_id, activity_date, time_slot, participant_count
-    ) VALUES (?, ?, ?, ?, ?, ?)
+      schedule_id, is_plan_item, group_id, location_id, activity_date, time_slot, participant_count
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
 
   const updateActivity = db.prepare(`
     UPDATE activities
-    SET group_id = ?, location_id = ?, activity_date = ?, time_slot = ?, participant_count = ?, updated_at = CURRENT_TIMESTAMP
+    SET is_plan_item = ?, group_id = ?, location_id = ?, activity_date = ?, time_slot = ?, participant_count = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `);
 
@@ -89,11 +98,12 @@ const syncSchedulesToActivities = (db, groupId) => {
     WHERE schedule_id = ?
   `);
 
-  schedules.forEach((schedule) => {
+  planSchedules.forEach((schedule) => {
     const timeSlot = getTimeSlotFromRange(schedule.start_time, schedule.end_time);
     const existing = findActivityBySchedule.get(schedule.id);
     if (existing) {
       updateActivity.run(
+        1,
         groupId,
         schedule.location_id ?? null,
         schedule.activity_date,
@@ -104,6 +114,7 @@ const syncSchedulesToActivities = (db, groupId) => {
     } else {
       insertActivity.run(
         schedule.id,
+        1,
         groupId,
         schedule.location_id ?? null,
         schedule.activity_date,
@@ -113,19 +124,28 @@ const syncSchedulesToActivities = (db, groupId) => {
     }
   });
 
-  if (schedules.length === 0) {
-    db.prepare('DELETE FROM activities WHERE group_id = ? AND schedule_id IS NOT NULL').run(groupId);
-    return;
+  if (planSchedules.length === 0) {
+    db.prepare('DELETE FROM activities WHERE group_id = ? AND is_plan_item = 1').run(groupId);
+  } else {
+    const scheduleIds = planSchedules.map((item) => item.id);
+    const placeholders = scheduleIds.map(() => '?').join(', ');
+    db.prepare(`
+      DELETE FROM activities
+      WHERE group_id = ?
+        AND is_plan_item = 1
+        AND schedule_id NOT IN (${placeholders})
+    `).run(groupId, ...scheduleIds);
   }
 
-  const scheduleIds = schedules.map((item) => item.id);
-  const placeholders = scheduleIds.map(() => '?').join(', ');
-  db.prepare(`
-    DELETE FROM activities
-    WHERE group_id = ?
-      AND schedule_id IS NOT NULL
-      AND schedule_id NOT IN (${placeholders})
-  `).run(groupId, ...scheduleIds);
+  if (nonPlanResourceSchedules.length > 0) {
+    const nonPlanIds = nonPlanResourceSchedules.map(item => item.id);
+    const placeholders = nonPlanIds.map(() => '?').join(', ');
+    db.prepare(`
+      DELETE FROM activities
+      WHERE group_id = ?
+        AND schedule_id IN (${placeholders})
+    `).run(groupId, ...nonPlanIds);
+  }
 };
 
 const mapScheduleRow = (row) => ({

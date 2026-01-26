@@ -23,6 +23,7 @@ CREATE TABLE groups (
     duration INTEGER CHECK(duration > 0) DEFAULT 5,
     color VARCHAR(7) DEFAULT '#1890ff',
     itinerary_plan_id INTEGER,
+    status VARCHAR(20),
     contact_person VARCHAR(100),
     contact_phone VARCHAR(20),
     notes TEXT,
@@ -52,6 +53,7 @@ CREATE TABLE locations (
 CREATE TABLE activities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     schedule_id INTEGER,
+    is_plan_item BOOLEAN DEFAULT 0,
     group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     location_id INTEGER REFERENCES locations(id),
     activity_date DATE NOT NULL,

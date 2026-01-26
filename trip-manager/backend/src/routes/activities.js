@@ -9,7 +9,8 @@ const mapActivityRow = (row) => ({
   date: row.activity_date,
   timeSlot: row.time_slot,
   participantCount: row.participant_count,
-  scheduleId: row.schedule_id
+  scheduleId: row.schedule_id,
+  isPlanItem: Boolean(row.is_plan_item)
 });
 
 const toMinutes = (timeValue) => {
@@ -267,7 +268,7 @@ router.get('/', (req, res) => {
 // 获取原始活动数据（用于团组管理页面）
 router.get('/raw', (req, res) => {
   const activities = req.db.prepare(`
-    SELECT id, schedule_id, group_id, location_id, activity_date, time_slot, participant_count
+    SELECT id, schedule_id, is_plan_item, group_id, location_id, activity_date, time_slot, participant_count
     FROM activities
     ORDER BY activity_date, time_slot
   `).all();
