@@ -26,6 +26,7 @@
 - **时间段映射**: 以日历时间窗口为准，按 `schedule` 时间段与窗口的**重叠时长**确定 `timeSlot`。
   - 若跨多个窗口，取重叠时长最大的窗口
   - 若无有效重叠，退回按 `startTime` 推导（解析失败默认 MORNING）
+- **同步前提**：仅当 `schedule.location_id` 有值（通过选择地点关联行程点）时才会同步到行程设计器。
 - **字段同步（覆盖）**:
   - schedule.id -> activity.schedule_id
   - schedule.group_id -> activity.group_id
@@ -37,7 +38,7 @@
   - 若存在 activity.schedule_id = schedule.id -> 更新该 activity
   - 若不存在 -> 新建 activity
 - **删除逻辑**:
-  - 若 schedule 被删除，则删除关联的 activity
+  - 若 schedule 被删除或清空 `location_id`，则删除关联的 activity
   - 若本次 batch 为空，则删除该团组所有 `schedule_id` 非空的 activity
 
 ### 3) activity -> schedule (行程设计器同步到日历详情)

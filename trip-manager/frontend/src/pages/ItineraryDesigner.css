@@ -257,9 +257,20 @@
   min-height: 34px;
   margin-bottom: 4px;
   max-width: 100%;
+  position: relative;
+  padding-left: 14px;
 }
 .activity-summary.aligned .unscheduled-card {
   min-height: 34px;
+}
+.unscheduled-day-marker {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
 }
 /* 拖拽相关样式 */
 .dragging {
@@ -474,6 +485,27 @@
   position: absolute;
   top: 2px;
   right: 2px;
+}
+.activity-day-marker {
+  position: absolute;
+  left: 2px;
+  top: 3px;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+}
+.activity-day-marker-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+.activity-day-marker-dot.arrival {
+  background: #52c41a;
+}
+.activity-day-marker-dot.departure {
+  background: #fa8c16;
 }
 /* 时间格优化 */
 .timeline-cell .activity-summary {

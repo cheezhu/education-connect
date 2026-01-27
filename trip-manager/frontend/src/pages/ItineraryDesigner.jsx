@@ -474,6 +474,14 @@ function ItineraryDesigner() {
     new Set(getActiveGroupsForDate(date).map(getGroupDisplayName))
   );
 
+  const isGroupArrivalDay = (group, dateString) => (
+    Boolean(group?.start_date && dateString && group.start_date === dateString)
+  );
+
+  const isGroupDepartureDay = (group, dateString) => (
+    Boolean(group?.end_date && dateString && group.end_date === dateString)
+  );
+
   const toMinutes = (timeValue) => {
     if (!timeValue || typeof timeValue !== 'string') return null;
     const [hourStr, minuteStr] = timeValue.split(':');
@@ -726,10 +734,17 @@ function ItineraryDesigner() {
 
   const openGroupCalendarDetail = (groupId) => {
     if (!groupId) return;
-    setGroupCalendarDetailSchedules([]);
-    setGroupCalendarDetailGroupId(groupId);
-    setGroupCalendarDetailResourcesVisible(true);
+    const isSameGroup = groupId === groupCalendarDetailGroupId;
+    const alreadyOpen = groupCalendarDetailVisible && isSameGroup;
+    if (!isSameGroup) {
+      setGroupCalendarDetailSchedules([]);
+      setGroupCalendarDetailGroupId(groupId);
+      setGroupCalendarDetailResourcesVisible(true);
+    }
     setGroupCalendarDetailVisible(true);
+    if (alreadyOpen) {
+      loadGroupCalendarDetailSchedules(groupId);
+    }
   };
 
   const handleGroupCalendarDetailUpdate = (updatedSchedules) => {
@@ -1255,6 +1270,7 @@ function ItineraryDesigner() {
               ? Array.from(groupNamesForSlot).sort((a, b) => a.localeCompare(b, 'zh'))
               : [];
             return dateRange.map((date, dateIndex) => {
+              const dateString = formatDateString(date);
               const slotActivities = getActivitiesForSlot(date, timeSlot.key);
               const groupedByName = slotActivities.reduce((acc, activity) => {
                 const group = groups.find(g => g.id === activity.groupId);
@@ -1299,10 +1315,16 @@ function ItineraryDesigner() {
                     <div className={`activity-summary grouped ${alignGroupRows ? "aligned" : "compact"}`}>
                       {rowGroupNames.map((groupName) => {
                         const items = groupedByName.get(groupName) || [];
+                        const fallbackGroup = showUnscheduledGroups
+                          ? getActiveGroupsForDate(date).find(group => getGroupDisplayName(group) === groupName)
+                          : null;
+                        const groupForRow = items[0]?.group || fallbackGroup || null;
                         const isActiveGroup = showUnscheduledGroups
                           ? activeGroupNames?.has(groupName)
                           : items.length > 0;
                         const showPlaceholder = showUnscheduledGroups && isActiveGroup && items.length === 0;
+                        const showArrivalMarker = showPlaceholder && isGroupArrivalDay(groupForRow, dateString);
+                        const showDepartureMarker = showPlaceholder && isGroupDepartureDay(groupForRow, dateString);
                         const rowClassName = [
                           'activity-group-row',
                           items.length === 0 ? 'empty' : '',
@@ -1353,8 +1375,23 @@ function ItineraryDesigner() {
                             {showPlaceholder && (
                               <div
                                 className="unscheduled-card"
-                                onClick={(event) => event.stopPropagation()}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  if (groupForRow?.id) {
+                                    openGroupCalendar(groupForRow.id);
+                                  }
+                                }}
                               >
+                                {(showArrivalMarker || showDepartureMarker) && (
+                                  <div className="unscheduled-day-marker">
+                                    {showArrivalMarker && (
+                                      <span className="activity-day-marker-dot arrival" />
+                                    )}
+                                    {showDepartureMarker && (
+                                      <span className="activity-day-marker-dot departure" />
+                                    )}
+                                  </div>
+                                )}
                                 {groupName}
                               </div>
                             )}
@@ -1425,6 +1462,24 @@ function ItineraryDesigner() {
 
   // 渲染活动卡片 - 根据不同样式
   const renderActivityCard = (activity, group, location, compact = false) => {
+    const isArrivalDay = isGroupArrivalDay(group, activity?.date);
+    const isDepartureDay = isGroupDepartureDay(group, activity?.date);
+    const dayMarkers = [];
+    if (isArrivalDay) dayMarkers.push('arrival');
+    if (isDepartureDay) dayMarkers.push('departure');
+    const renderDayMarkers = () => (
+      dayMarkers.length ? (
+        <div className="activity-day-marker">
+          {dayMarkers.map((marker) => (
+            <span
+              key={`${activity.id}-${marker}`}
+              className={`activity-day-marker-dot ${marker}`}
+            />
+          ))}
+        </div>
+      ) : null
+    );
+
     // 标签式（默认）
     if (cardStyle === 'tag') {
       return (
@@ -1447,6 +1502,7 @@ function ItineraryDesigner() {
             handleCellClick(null, null, [activity]);
           }}
         >
+          {renderDayMarkers()}
           <span style={{ fontWeight: '600', color: 'var(--text-strong)' }}>{group?.name}</span>
           {location && <span style={{ opacity: 0.7, fontSize: '10px', color: 'var(--text-muted)' }}> @{location.name}</span>}
 
@@ -1494,6 +1550,7 @@ function ItineraryDesigner() {
               handleCellClick(null, null, [activity]);
             }}
           >
+            {renderDayMarkers()}
             <div className="activity-card-line activity-card-group">{group?.name}</div>
             {location && (
               <div className="activity-card-line activity-card-location">{location.name}</div>
@@ -1536,6 +1593,7 @@ function ItineraryDesigner() {
             handleCellClick(null, null, [activity]);
           }}
         >
+          {renderDayMarkers()}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontWeight: '500', lineHeight: '16px', color: 'var(--text-strong)' }}>{group?.name}</div>
             <span

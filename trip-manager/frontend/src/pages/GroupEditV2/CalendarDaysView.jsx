@@ -357,6 +357,15 @@ const CalendarDaysView = ({
     return new Map(entries);
   }, [locations]);
 
+  const locationMap = useMemo(() => {
+    const entries = Array.isArray(locations)
+      ? locations
+          .map((loc) => [Number(loc.id), loc])
+          .filter(([id, loc]) => Number.isFinite(id) && loc)
+      : [];
+    return new Map(entries);
+  }, [locations]);
+
   const resolveLocationColor = (locationId, fallbackColor) => {
     const id = Number(locationId);
     if (Number.isFinite(id)) {

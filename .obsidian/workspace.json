@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "docs/studio-field.md",
+                "file": "UPDATE_LOG.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "studio-field"
+              "title": "UPDATE_LOG"
             }
           }
         ]
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "docs/studio-field.md",
+                "file": "UPDATE_LOG.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of studio-field"
+              "title": "Outline of UPDATE_LOG"
             }
           }
         ],
@@ -186,6 +186,8 @@
   "active": "2411584888c4ede4",
   "lastOpenFiles": [
     "trip-manager/backend/db/trip.db-journal",
+    "docs/studio-field.md",
+    "UPDATE_LOG.md",
     "trip-manager/frontend/vite.config.js.timestamp-1769352751415-306d047be01c7.mjs",
     "trip-manager/frontend/vite.config.js.timestamp-1769352591452-99fff8a7301eb.mjs",
     "docs/calendar-sync-rules.md",
@@ -214,13 +216,10 @@
     "docs/itinerary-ai-workflows.md",
     "docs/issues-known.md",
     "docs/file-map.md",
-    "docs/db-design.md",
-    "docs/cal-schedule-activity-sync.md",
     "docs/archive/strategy",
     "docs/archive/history",
     "docs/archive",
     "trip-manager/frontend/vite.config.js.timestamp-1769285861241-b38eec141f182.mjs",
-    "docs/account-admin",
     "trip-manager/backend/node_modules/undici/docs/assets/lifecycle-diagram.png"
   ]
 }

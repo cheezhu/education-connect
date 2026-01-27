@@ -55,19 +55,11 @@ const getTimeSlotFromRange = (startTime, endTime) => {
 };
 
 const syncSchedulesToActivities = (db, groupId) => {
-  const planSchedules = db.prepare(`
-    SELECT id, group_id, activity_date, start_time, end_time, location_id
+  const syncableSchedules = db.prepare(`
+    SELECT id, group_id, activity_date, start_time, end_time, location_id, resource_id
     FROM schedules
     WHERE group_id = ?
-      AND resource_id LIKE 'plan-%'
-  `).all(groupId);
-
-  const nonPlanResourceSchedules = db.prepare(`
-    SELECT id
-    FROM schedules
-    WHERE group_id = ?
-      AND resource_id IS NOT NULL
-      AND resource_id NOT LIKE 'plan-%'
+      AND location_id IS NOT NULL
   `).all(groupId);
 
   const group = db.prepare(`
@@ -98,12 +90,13 @@ const syncSchedulesToActivities = (db, groupId) => {
     WHERE schedule_id = ?
   `);
 
-  planSchedules.forEach((schedule) => {
+  syncableSchedules.forEach((schedule) => {
     const timeSlot = getTimeSlotFromRange(schedule.start_time, schedule.end_time);
+    const isPlanItem = typeof schedule.resource_id === 'string' && schedule.resource_id.startsWith('plan-');
     const existing = findActivityBySchedule.get(schedule.id);
     if (existing) {
       updateActivity.run(
-        1,
+        isPlanItem ? 1 : 0,
         groupId,
         schedule.location_id ?? null,
         schedule.activity_date,
@@ -114,7 +107,7 @@ const syncSchedulesToActivities = (db, groupId) => {
     } else {
       insertActivity.run(
         schedule.id,
-        1,
+        isPlanItem ? 1 : 0,
         groupId,
         schedule.location_id ?? null,
         schedule.activity_date,
@@ -124,27 +117,17 @@ const syncSchedulesToActivities = (db, groupId) => {
     }
   });
 
-  if (planSchedules.length === 0) {
-    db.prepare('DELETE FROM activities WHERE group_id = ? AND is_plan_item = 1').run(groupId);
+  if (syncableSchedules.length === 0) {
+    db.prepare('DELETE FROM activities WHERE group_id = ? AND schedule_id IS NOT NULL').run(groupId);
   } else {
-    const scheduleIds = planSchedules.map((item) => item.id);
+    const scheduleIds = syncableSchedules.map((item) => item.id);
     const placeholders = scheduleIds.map(() => '?').join(', ');
     db.prepare(`
       DELETE FROM activities
       WHERE group_id = ?
-        AND is_plan_item = 1
+        AND schedule_id IS NOT NULL
         AND schedule_id NOT IN (${placeholders})
     `).run(groupId, ...scheduleIds);
-  }
-
-  if (nonPlanResourceSchedules.length > 0) {
-    const nonPlanIds = nonPlanResourceSchedules.map(item => item.id);
-    const placeholders = nonPlanIds.map(() => '?').join(', ');
-    db.prepare(`
-      DELETE FROM activities
-      WHERE group_id = ?
-        AND schedule_id IN (${placeholders})
-    `).run(groupId, ...nonPlanIds);
   }
 };
 
