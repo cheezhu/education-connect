@@ -4,7 +4,7 @@
   display: flex;
   flex-direction: column;
   background: var(--bg-editor);
-  overflow: hidden;
+  overflow: visible;
   position: relative;
 }
 /* 时间轴网格 */
@@ -708,13 +708,24 @@
 .group-calendar-drawer .ant-drawer-header {
   display: none;
 }
-.group-calendar-drawer.ant-drawer-bottom .ant-drawer-content-wrapper {
-  left: var(--nav-width) !important;
-  right: 0 !important;
-  width: calc(100vw - var(--nav-width)) !important;
-}
 .group-calendar-drawer.resizing .group-calendar-grid {
   pointer-events: none;
+}
+.group-calendar-drawer {
+  position: absolute !important;
+  inset: 0;
+}
+.group-calendar-drawer .ant-drawer-content-wrapper {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto;
+  width: auto;
+}
+.itinerary-modal-wrap {
+  position: absolute;
+  inset: 0;
 }
 .group-calendar-detail-modal {
   max-width: 100%;
@@ -724,15 +735,9 @@
 }
 .group-calendar-detail-wrap {
   pointer-events: none;
-  left: var(--nav-width);
-  width: calc(100% - var(--nav-width));
 }
 .group-calendar-detail-wrap .ant-modal {
   pointer-events: auto;
-}
-.itinerary-modal-wrap {
-  left: var(--nav-width);
-  width: calc(100% - var(--nav-width));
 }
 .group-calendar-detail-modal .ant-modal-content {
   padding: 0;

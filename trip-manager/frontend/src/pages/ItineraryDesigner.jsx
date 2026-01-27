@@ -157,6 +157,14 @@ function ItineraryDesigner() {
   const planningImportOnlySelected = Form.useWatch('onlySelectedGroups', planningImportForm);
   const planningImportGroupIds = Form.useWatch('groupIds', planningImportForm);
   const { registerRefreshCallback } = useDataSync();
+  const designerRef = useRef(null);
+  const getDesignerContainer = () => (
+    designerRef.current || document.querySelector('.app-main') || document.body
+  );
+  const overlayStyles = {
+    wrapper: { position: 'absolute', inset: 0 },
+    mask: { position: 'absolute', inset: 0 }
+  };
 
   // 时间段定义
   const timeSlots = [
@@ -1149,6 +1157,7 @@ function ItineraryDesigner() {
               placeholder="请选择日期"
               open={datePickerOpen}
               onOpenChange={(open) => setDatePickerOpen(open)}
+              getPopupContainer={getDesignerContainer}
             />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2042,7 +2051,7 @@ function ItineraryDesigner() {
     : '64px 1fr';
 
   return (
-    <div className="itinerary-designer">
+    <div className="itinerary-designer" ref={designerRef}>
       {renderTimelineHeader()}
 
       <div className="itinerary-body">
@@ -2078,7 +2087,8 @@ function ItineraryDesigner() {
         mask={false}
         closable={false}
         bodyStyle={{ padding: 0, height: '100%' }}
-        className={`group-calendar-drawer${groupCalendarResizing ? ' resizing' : ''}`}
+        rootClassName={`group-calendar-drawer${groupCalendarResizing ? ' resizing' : ''}`}
+        getContainer={getDesignerContainer}
       >
         <div
           className="group-calendar-resize-handle"
@@ -2245,7 +2255,11 @@ function ItineraryDesigner() {
         className="group-calendar-detail-modal"
         wrapClassName="group-calendar-detail-wrap itinerary-modal-wrap"
         style={{ top: `${groupCalendarDetailTop}vh` }}
-        styles={{ body: { padding: 0, height: `${groupCalendarDetailHeight}vh` } }}
+        styles={{
+          ...overlayStyles,
+          body: { padding: 0, height: `${groupCalendarDetailHeight}vh` }
+        }}
+        getContainer={getDesignerContainer}
       >
         <div className="group-calendar-detail">
           <div className="group-calendar-detail-header">
@@ -2307,6 +2321,8 @@ function ItineraryDesigner() {
         width={800}
         wrapClassName="itinerary-modal-wrap"
         footer={null}
+        getContainer={getDesignerContainer}
+        styles={overlayStyles}
       >
         <div style={{ maxHeight: '400px', overflow: 'auto' }}>
           {/* 添加活动按钮 */}
@@ -2458,6 +2474,8 @@ function ItineraryDesigner() {
         open={planningImportVisible}
         onCancel={() => setPlanningImportVisible(false)}
         wrapClassName="itinerary-modal-wrap"
+        getContainer={getDesignerContainer}
+        styles={overlayStyles}
         footer={[
           <Button key="cancel" onClick={() => setPlanningImportVisible(false)}>
             取消
@@ -2625,6 +2643,8 @@ function ItineraryDesigner() {
         open={planningExportVisible}
         onCancel={() => setPlanningExportVisible(false)}
         wrapClassName="itinerary-modal-wrap"
+        getContainer={getDesignerContainer}
+        styles={overlayStyles}
         footer={[
           <Button key="cancel" onClick={() => setPlanningExportVisible(false)}>
             取消
@@ -2646,7 +2666,7 @@ function ItineraryDesigner() {
             label="日期范围"
             rules={[{ required: true, message: '请选择日期范围' }]}
           >
-            <DatePicker.RangePicker />
+            <DatePicker.RangePicker getPopupContainer={getDesignerContainer} />
           </Form.Item>
 
           <Form.Item
