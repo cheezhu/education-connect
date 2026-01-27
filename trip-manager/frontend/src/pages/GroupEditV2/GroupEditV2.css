@@ -732,6 +732,70 @@
   font-family: inherit;
 }
 
+.group-edit-v2 .group-tag-input {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group-edit-v2 .group-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 24px;
+  align-items: center;
+}
+
+.group-edit-v2 .group-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: #f0f5ff;
+  border: 1px solid #adc6ff;
+  font-size: 11px;
+  color: #1d39c4;
+}
+
+.group-edit-v2 .group-tag-pill button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #1d39c4;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.group-edit-v2 .group-tag-empty {
+  font-size: 11px;
+  color: #bfbfbf;
+}
+
+.group-edit-v2 .group-tag-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.group-edit-v2 .group-tag-controls input {
+  flex: 1;
+}
+
+.group-edit-v2 .tag-add-btn {
+  border: 1px solid #d9d9d9;
+  background: #fafafa;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.group-edit-v2 .tag-add-btn:hover {
+  border-color: #40a9ff;
+  color: #1890ff;
+}
+
 /* \u884c\u7a0b\u5929\u6570\u663e\u793a */
 .group-edit-v2 .duration-display {
   padding: 4px 8px;

@@ -1,4 +1,5 @@
 ﻿﻿﻿:root {
+  --nav-width: 40px;
   --bg-app: #1e1e1e;
   --bg-activity: #333333;
   --bg-sidebar: #252526;
@@ -73,6 +74,13 @@
 .ant-modal-footer {
   border-top: 1px solid #f0f0f0;
 }
+
+/* Modal offset to keep left navigation visible */
+.ant-modal-wrap {
+  left: var(--nav-width);
+  width: calc(100% - var(--nav-width));
+}
+
 
 /* 响应式优化 */
 @media (max-width: 768px) {
@@ -296,7 +304,7 @@
 }
 
 .unified-navbar {
-  width: 64px;
+  width: var(--nav-width);
   height: 100vh;
   background: #1e1e1e;
   display: flex;

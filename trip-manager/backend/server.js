@@ -90,6 +90,13 @@ if (!groupColumns.includes('itinerary_plan_id')) {
 if (!groupColumns.includes('status')) {
   db.exec('ALTER TABLE groups ADD COLUMN status VARCHAR(20)');
 }
+if (!groupColumns.includes('accommodation')) {
+  db.exec('ALTER TABLE groups ADD COLUMN accommodation TEXT');
+}
+if (!groupColumns.includes('tags')) {
+  db.exec('ALTER TABLE groups ADD COLUMN tags TEXT');
+  db.exec("UPDATE groups SET tags = '[]' WHERE tags IS NULL");
+}
 
 const locationColumns = db.prepare("PRAGMA table_info(locations)").all().map(col => col.name);
 if (!locationColumns.includes('open_hours')) {

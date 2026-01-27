@@ -117,6 +117,7 @@ const GroupEditV2 = () => {
         contact_phone: '',
         emergency_contact: '',
         emergency_phone: '',
+        accommodation: '',
         tags: [],
         notes: '',
         members: [],
@@ -140,7 +141,8 @@ const GroupEditV2 = () => {
         contact_phone: group.contact_phone || '',
         emergency_contact: group.emergency_contact || '',
         emergency_phone: group.emergency_phone || '',
-        tags: group.tags || [],
+        accommodation: group.accommodation || '',
+        tags: Array.isArray(group.tags) ? group.tags : [],
         notes: group.notes || '',
         members: [], // TODO: 加载团员数据
         schedules: [] // TODO: 加载日程数据
@@ -221,6 +223,7 @@ const GroupEditV2 = () => {
     contact_phone: data.contact_phone,
     emergency_contact: data.emergency_contact,
     emergency_phone: data.emergency_phone,
+    accommodation: data.accommodation,
     tags: data.tags,
     notes: data.notes
   });

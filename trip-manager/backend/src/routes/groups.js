@@ -6,7 +6,7 @@ const CANCELLED_STATUS = '已取消';
 // 获取所有团组
 router.get('/', (req, res) => {
   const groups = req.db.prepare('SELECT * FROM groups ORDER BY created_at DESC').all();
-  res.json(groups);
+  res.json(groups.map(hydrateGroup));
 });
 
 // 获取单个团组
@@ -15,7 +15,7 @@ router.get('/:id', (req, res) => {
   if (!group) {
     return res.status(404).json({ error: '团组不存在' });
   }
-  res.json(group);
+  res.json(hydrateGroup(group));
 });
 
 const calculateDuration = (startDate, endDate) => {
@@ -43,6 +43,36 @@ const getRandomGroupColor = () => (
   GROUP_COLOR_PALETTE[Math.floor(Math.random() * GROUP_COLOR_PALETTE.length)] || '#1890ff'
 );
 
+const normalizeTags = (value) => {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).map(item => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(Boolean).map(item => String(item).trim()).filter(Boolean);
+      }
+    } catch (error) {
+      // ignore parse errors
+    }
+    return trimmed.split(',').map(item => item.trim()).filter(Boolean);
+  }
+  return [];
+};
+
+const serializeTags = (value) => JSON.stringify(normalizeTags(value));
+
+const hydrateGroup = (group) => {
+  if (!group) return group;
+  return {
+    ...group,
+    tags: normalizeTags(group.tags)
+  };
+};
+
 
 const normalizeGroupPayload = (payload = {}) => {
   const name = payload.name?.trim();
@@ -57,6 +87,8 @@ const normalizeGroupPayload = (payload = {}) => {
   const status = payload.status ?? null;
   const contactPerson = payload.contactPerson ?? payload.contact_person;
   const contactPhone = payload.contactPhone ?? payload.contact_phone;
+  const accommodation = payload.accommodation ?? '';
+  const tags = serializeTags(payload.tags);
   const notes = payload.notes ?? '';
 
   return {
@@ -72,6 +104,8 @@ const normalizeGroupPayload = (payload = {}) => {
     status,
     contactPerson,
     contactPhone,
+    accommodation,
+    tags,
     notes
   };
 };
@@ -88,8 +122,8 @@ router.post('/batch', requireEditLock, (req, res) => {
     INSERT INTO groups (
       name, type, student_count, teacher_count,
       start_date, end_date, duration, color, itinerary_plan_id, contact_person,
-      contact_phone, notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      contact_phone, accommodation, tags, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const selectStmt = req.db.prepare('SELECT * FROM groups WHERE id = ?');
 
@@ -115,6 +149,8 @@ router.post('/batch', requireEditLock, (req, res) => {
         normalized.itineraryPlanId,
         normalized.contactPerson,
         normalized.contactPhone,
+        normalized.accommodation,
+        normalized.tags,
         normalized.notes
       );
 
@@ -126,7 +162,7 @@ router.post('/batch', requireEditLock, (req, res) => {
 
   try {
     const createdGroups = createBatch(groups);
-    res.json({ success: true, count: createdGroups.length, groups: createdGroups });
+    res.json({ success: true, count: createdGroups.length, groups: createdGroups.map(hydrateGroup) });
   } catch (error) {
     console.error('批量创建团组失败:', error);
     res.status(400).json({ error: '批量创建团组失败', message: error.message });
@@ -147,6 +183,8 @@ router.post('/', requireEditLock, (req, res) => {
     status,
     contactPerson,
     contactPhone,
+    accommodation,
+    tags,
     notes,
     student_count,
     teacher_count,
@@ -167,6 +205,8 @@ router.post('/', requireEditLock, (req, res) => {
   const resolvedContactPerson = contactPerson ?? contact_person;
   const resolvedContactPhone = contactPhone ?? contact_phone;
   const resolvedItineraryPlanId = itineraryPlanId ?? itinerary_plan_id ?? null;
+  const resolvedAccommodation = accommodation ?? '';
+  const resolvedTags = serializeTags(tags);
 
   if (!name || !type || !resolvedStartDate || !resolvedEndDate) {
     return res.status(400).json({ 
@@ -179,16 +219,16 @@ router.post('/', requireEditLock, (req, res) => {
       INSERT INTO groups (
         name, type, student_count, teacher_count, 
         start_date, end_date, duration, color, itinerary_plan_id, status, contact_person,
-        contact_phone, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        contact_phone, accommodation, tags, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name, type, resolvedStudentCount, resolvedTeacherCount,
       resolvedStartDate, resolvedEndDate, resolvedDuration, resolvedColor, resolvedItineraryPlanId,
-      resolvedStatus, resolvedContactPerson, resolvedContactPhone, notes
+      resolvedStatus, resolvedContactPerson, resolvedContactPhone, resolvedAccommodation, resolvedTags, notes
     );
 
     const newGroup = req.db.prepare('SELECT * FROM groups WHERE id = ?').get(result.lastInsertRowid);
-    res.json({ success: true, group: newGroup });
+    res.json({ success: true, group: hydrateGroup(newGroup) });
   } catch (error) {
     console.error('创建团组失败:', error);
     res.status(500).json({ error: '创建团组失败' });
@@ -292,13 +332,17 @@ router.put('/:id', requireEditLock, (req, res) => {
   const allowedFields = [
     'name', 'type', 'student_count', 'teacher_count',
     'start_date', 'end_date', 'duration', 'color', 'contact_person',
-    'contact_phone', 'notes', 'itinerary_plan_id', 'status'
+    'contact_phone', 'accommodation', 'tags', 'notes', 'itinerary_plan_id', 'status'
   ];
 
   allowedFields.forEach(field => {
     if (req.body[field] !== undefined) {
       updates.push(`${field} = ?`);
-      values.push(req.body[field]);
+      if (field === 'tags') {
+        values.push(serializeTags(req.body[field]));
+      } else {
+        values.push(req.body[field]);
+      }
     }
   });
 
@@ -327,7 +371,7 @@ router.put('/:id', requireEditLock, (req, res) => {
       }
 
       const updatedGroup = req.db.prepare('SELECT * FROM groups WHERE id = ?').get(id);
-      return { updatedGroup };
+      return { updatedGroup: hydrateGroup(updatedGroup) };
     });
 
     const result = updateGroup();

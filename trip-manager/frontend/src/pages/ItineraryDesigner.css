@@ -708,6 +708,11 @@
 .group-calendar-drawer .ant-drawer-header {
   display: none;
 }
+.group-calendar-drawer.ant-drawer-bottom .ant-drawer-content-wrapper {
+  left: var(--nav-width) !important;
+  right: 0 !important;
+  width: calc(100vw - var(--nav-width)) !important;
+}
 .group-calendar-drawer.resizing .group-calendar-grid {
   pointer-events: none;
 }
@@ -719,9 +724,15 @@
 }
 .group-calendar-detail-wrap {
   pointer-events: none;
+  left: var(--nav-width);
+  width: calc(100% - var(--nav-width));
 }
 .group-calendar-detail-wrap .ant-modal {
   pointer-events: auto;
+}
+.itinerary-modal-wrap {
+  left: var(--nav-width);
+  width: calc(100% - var(--nav-width));
 }
 .group-calendar-detail-modal .ant-modal-content {
   padding: 0;
@@ -781,6 +792,261 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+/* Group console layout */
+.group-console {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+}
+.group-console-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: linear-gradient(90deg, #f9fafb 0%, #f3f4f6 100%);
+}
+.group-console-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.group-console-name-link {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+  cursor: pointer;
+}
+.group-console-name-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.group-console-type {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(22, 119, 255, 0.4);
+  color: var(--accent);
+  background: rgba(22, 119, 255, 0.08);
+}
+.group-console-date {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.group-console-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(22, 119, 255, 0.1);
+  padding: 4px;
+  border-radius: 999px;
+}
+.group-console-tab {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.group-console-tab.active {
+  background: #ffffff;
+  color: var(--text-strong);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.group-console-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.group-console-body {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  overflow: hidden;
+}
+.group-console-info {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 12px;
+}
+.console-info-card,
+.console-schedule-card,
+.group-console-ai {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+.console-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.console-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+}
+.console-info-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.console-info-label {
+  color: var(--text-muted);
+  min-width: 54px;
+}
+.console-info-value {
+  color: var(--text-main);
+  font-weight: 500;
+  text-align: right;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.console-info-tags-row .console-info-value {
+  white-space: normal;
+}
+.console-info-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.console-tag {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(22, 119, 255, 0.08);
+  color: var(--text-main);
+  border: 1px solid rgba(22, 119, 255, 0.2);
+}
+.console-tag-muted {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-muted);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+.console-schedule-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.console-schedule-row {
+  display: grid;
+  gap: 6px;
+}
+.console-schedule-cell {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px;
+  font-size: 11px;
+  line-height: 1.2;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+.console-schedule-cell.label {
+  justify-content: center;
+  background: #f3f4f6;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.console-schedule-cell.header {
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  background: #f8fafc;
+  color: var(--text-main);
+  font-weight: 600;
+}
+.console-schedule-cell.empty {
+  color: #b0b0b0;
+  background: #fafafa;
+}
+.console-schedule-cell.inactive {
+  color: #c0c0c0;
+  background: #f5f5f5;
+}
+.console-schedule-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.console-schedule-extra {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.console-schedule-date {
+  font-size: 11px;
+}
+.console-schedule-week {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.console-info-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: auto;
+}
+.group-console-ai {
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+.console-ai-placeholder {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.console-ai-hint {
+  color: var(--text-muted);
+}
+.console-ai-sample {
+  color: var(--text-main);
+  font-weight: 500;
+}
+@media (max-width: 1200px) {
+  .group-console-info {
+    grid-template-columns: 1fr;
+  }
+  .group-console-date {
+    display: none;
+  }
 }
 /* ========================================= */
 /* Workstation theme overrides (Itinerary) */

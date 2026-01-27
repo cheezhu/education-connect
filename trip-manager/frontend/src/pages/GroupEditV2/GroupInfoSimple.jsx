@@ -1,6 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const GroupInfoSimple = ({ groupData, itineraryPlans, onUpdate, handleAutoSave, isNew }) => {
+  const [tagInput, setTagInput] = useState('');
+  const tags = Array.isArray(groupData.tags) ? groupData.tags : [];
+
+  const handleAddTag = () => {
+    const nextTag = tagInput.trim();
+    if (!nextTag) return;
+    if (tags.includes(nextTag)) {
+      setTagInput('');
+      return;
+    }
+    const nextTags = [...tags, nextTag];
+    onUpdate('tags', nextTags);
+    handleAutoSave();
+    setTagInput('');
+  };
+
+  const handleRemoveTag = (tag) => {
+    const nextTags = tags.filter(item => item !== tag);
+    onUpdate('tags', nextTags);
+    handleAutoSave();
+  };
+
   return (
     <div className="unified-info-view">
       {/* 卡片容器 */}
@@ -185,7 +207,65 @@ const GroupInfoSimple = ({ groupData, itineraryPlans, onUpdate, handleAutoSave, 
             </div>
           </div>
 
-          {/* 第三行：备注 */}
+          {/* 住宿安排 */}
+          <div className="info-row">
+            <div className="info-item full-width">
+              <label>住宿安排</label>
+              <input
+                type="text"
+                value={groupData.accommodation || ''}
+                onChange={(e) => {
+                  onUpdate('accommodation', e.target.value);
+                  handleAutoSave();
+                }}
+                placeholder="住宿酒店或安排说明"
+              />
+            </div>
+          </div>
+
+          {/* 备注标签 */}
+          <div className="info-row">
+            <div className="info-item full-width">
+              <label>备注标签</label>
+              <div className="group-tag-input">
+                <div className="group-tag-list">
+                  {tags.length ? (
+                    tags.map(tag => (
+                      <span key={tag} className="group-tag-pill">
+                        {tag}
+                        <button type="button" onClick={() => handleRemoveTag(tag)}>×</button>
+                      </span>
+                    ))
+                  ) : (
+                    <span className="group-tag-empty">暂无标签</span>
+                  )}
+                </div>
+                <div className="group-tag-controls">
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddTag();
+                      }
+                    }}
+                    placeholder="输入标签后回车"
+                  />
+                  <button
+                    type="button"
+                    className="tag-add-btn"
+                    onClick={handleAddTag}
+                  >
+                    添加
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 备注 */}
           <div className="info-row">
             <div className="info-item full-width">
               <label>备注</label>

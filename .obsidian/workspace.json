@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "UPDATE_LOG.md",
+                "file": "README.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "UPDATE_LOG"
+              "title": "README"
             }
           }
         ]
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "UPDATE_LOG.md",
+                "file": "README.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of UPDATE_LOG"
+              "title": "Outline of README"
             }
           }
         ],
@@ -186,8 +186,9 @@
   "active": "2411584888c4ede4",
   "lastOpenFiles": [
     "trip-manager/backend/db/trip.db-journal",
-    "docs/studio-field.md",
+    "trip-manager/frontend/vite.config.js.timestamp-1769521817018-a9f113148665d.mjs",
     "UPDATE_LOG.md",
+    "docs/studio-field.md",
     "trip-manager/frontend/vite.config.js.timestamp-1769352751415-306d047be01c7.mjs",
     "trip-manager/frontend/vite.config.js.timestamp-1769352591452-99fff8a7301eb.mjs",
     "docs/calendar-sync-rules.md",

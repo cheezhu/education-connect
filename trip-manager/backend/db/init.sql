@@ -26,6 +26,8 @@ CREATE TABLE groups (
     status VARCHAR(20),
     contact_person VARCHAR(100),
     contact_phone VARCHAR(20),
+    accommodation TEXT,
+    tags TEXT,
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP

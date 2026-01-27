@@ -50,6 +50,24 @@ const GroupManagementV2 = () => {
     '已取消': 'red'
   };
 
+  const normalizeTags = (value) => {
+    if (Array.isArray(value)) return value.filter(Boolean).map(item => String(item).trim()).filter(Boolean);
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return [];
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(Boolean).map(item => String(item).trim()).filter(Boolean);
+        }
+      } catch (error) {
+        // ignore
+      }
+      return trimmed.split(',').map(item => item.trim()).filter(Boolean);
+    }
+    return [];
+  };
+
   // 加载团组数据
   const fetchGroups = async () => {
     setLoading(true);
@@ -325,6 +343,31 @@ const GroupManagementV2 = () => {
       dataIndex: 'type',
       key: 'type',
       render: (type) => (type === 'primary' ? '小学' : '中学')
+    },
+    {
+      title: '住宿安排',
+      dataIndex: 'accommodation',
+      key: 'accommodation',
+      render: (value) => value || '—'
+    },
+    {
+      title: '备注标签',
+      dataIndex: 'tags',
+      key: 'tags',
+      render: (value) => {
+        const tags = normalizeTags(value);
+        if (!tags.length) return '—';
+        const visibleTags = tags.slice(0, 2);
+        const remaining = tags.length - visibleTags.length;
+        return (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+            {visibleTags.map(tag => (
+              <Tag key={tag}>{tag}</Tag>
+            ))}
+            {remaining > 0 && <Tag>+{remaining}</Tag>}
+          </div>
+        );
+      }
     },
     {
       title: '人数',

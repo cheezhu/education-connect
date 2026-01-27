@@ -1,8 +1,7 @@
 ﻿﻿﻿﻿﻿import React, { useState, useEffect, useRef } from 'react';
-import { Card, Button, Modal, Form, Select, InputNumber, Input, message, Checkbox, Tooltip, Badge, DatePicker, Drawer, Upload, Spin } from 'antd';
+import { Card, Button, Modal, Form, Select, InputNumber, Input, message, Checkbox, Tooltip, DatePicker, Drawer, Upload, Spin } from 'antd';
 import {
   PlusOutlined,
-  EditOutlined,
   DeleteOutlined,
   LeftOutlined,
   RightOutlined,
@@ -137,6 +136,7 @@ function ItineraryDesigner() {
   const [planningImportResult, setPlanningImportResult] = useState(null);
   const [groupCalendarVisible, setGroupCalendarVisible] = useState(false);
   const [groupCalendarGroupId, setGroupCalendarGroupId] = useState(null);
+  const [groupConsoleTab, setGroupConsoleTab] = useState('info');
   const [groupCalendarDetailVisible, setGroupCalendarDetailVisible] = useState(false);
   const [groupCalendarDetailGroupId, setGroupCalendarDetailGroupId] = useState(null);
   const [groupCalendarDetailSchedules, setGroupCalendarDetailSchedules] = useState([]);
@@ -429,10 +429,10 @@ function ItineraryDesigner() {
 
   // 格式化日期
   const formatDateString = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    if (!date) return '';
+    const normalized = dayjs(date);
+    if (!normalized.isValid()) return '';
+    return normalized.format('YYYY-MM-DD');
   };
 
   const getGroupDateRange = (group) => {
@@ -454,6 +454,24 @@ function ItineraryDesigner() {
   };
 
   const getGroupDisplayName = (group) => group?.name || '未命名团组';
+
+  const normalizeGroupTags = (value) => {
+    if (Array.isArray(value)) return value.filter(Boolean).map(String);
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return [];
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(Boolean).map(String);
+        }
+      } catch (error) {
+        // ignore
+      }
+      return trimmed.split(',').map(item => item.trim()).filter(Boolean);
+    }
+    return [];
+  };
 
   const isGroupActiveOnDate = (group, date) => {
     if (!group?.start_date || !group?.end_date) return false;
@@ -662,6 +680,7 @@ function ItineraryDesigner() {
   const openGroupCalendar = (groupId) => {
     if (!groupId) return;
     setGroupCalendarGroupId(groupId);
+    setGroupConsoleTab('info');
     setGroupCalendarVisible(true);
   };
 
@@ -1970,8 +1989,7 @@ function ItineraryDesigner() {
   const groupCalendarDetailTop = 0;
   const groupCalendarSlotKeys = ['MORNING', 'AFTERNOON'];
   const groupCalendarGroup = groups.find(group => group.id === groupCalendarGroupId);
-  const groupCalendarDates = groupCalendarGroup ? getGroupDateRange(groupCalendarGroup) : [];
-  const groupCalendarSlots = timeSlots.filter(slot => groupCalendarSlotKeys.includes(slot.key));
+  const groupConsoleDates = dateRange;
   const groupCalendarActivities = groupCalendarGroup
     ? activities.filter(activity => activity.groupId === groupCalendarGroup.id)
     : [];
@@ -1987,9 +2005,41 @@ function ItineraryDesigner() {
     });
   }
   const groupCalendarLocationMap = new Map(locations.map(location => [location.id, location]));
-  const groupCalendarColumns = groupCalendarDates.length
-    ? `72px repeat(${groupCalendarDates.length}, 140px)`
-    : '72px 140px';
+  const groupConsoleTags = normalizeGroupTags(groupCalendarGroup?.tags);
+  const groupConsoleAccommodation = groupCalendarGroup?.accommodation || '';
+  const groupConsoleMemberCount = groupCalendarGroup
+    ? (groupCalendarGroup.student_count || 0) + (groupCalendarGroup.teacher_count || 0)
+    : 0;
+  const groupConsoleTypeLabel = groupCalendarGroup?.type === 'primary'
+    ? '小学'
+    : groupCalendarGroup?.type === 'secondary'
+      ? '中学'
+      : '团组';
+  const groupConsoleSchedule = groupCalendarSlotKeys.map((slotKey) => ({
+    key: slotKey,
+    label: getTimeSlotLabel(slotKey),
+    cells: groupConsoleDates.map((date) => {
+      const dateString = formatDateString(date);
+      if (!groupCalendarGroup || !isGroupActiveOnDate(groupCalendarGroup, date)) {
+        return { label: '—', status: 'inactive', extra: 0 };
+      }
+      const items = groupCalendarIndex.get(`${dateString}|${slotKey}`) || [];
+      if (!items.length) {
+        return { label: '空档', status: 'empty', extra: 0 };
+      }
+      const locationNames = items.map((activity) => (
+        groupCalendarLocationMap.get(activity.locationId)?.name || '未设置场地'
+      ));
+      return {
+        label: locationNames[0],
+        status: 'filled',
+        extra: Math.max(0, locationNames.length - 1)
+      };
+    })
+  }));
+  const groupConsoleColumns = groupConsoleDates.length
+    ? `64px repeat(${groupConsoleDates.length}, minmax(0, 1fr))`
+    : '64px 1fr';
 
   return (
     <div className="itinerary-designer">
@@ -2028,7 +2078,7 @@ function ItineraryDesigner() {
         mask={false}
         closable={false}
         bodyStyle={{ padding: 0, height: '100%' }}
-        rootClassName={`group-calendar-drawer${groupCalendarResizing ? ' resizing' : ''}`}
+        className={`group-calendar-drawer${groupCalendarResizing ? ' resizing' : ''}`}
       >
         <div
           className="group-calendar-resize-handle"
@@ -2036,22 +2086,39 @@ function ItineraryDesigner() {
           onTouchStart={handleGroupCalendarResizeStart}
         />
         {groupCalendarGroup ? (
-          <div className="group-calendar">
-            <div className="group-calendar-header">
-              <div className="group-calendar-title-row">
-                <div className="group-calendar-title">
-                  <span className="group-color-dot" style={{ backgroundColor: groupCalendarGroup.color }} />
-                  <button
-                    type="button"
-                    className="group-calendar-name-link"
-                    onClick={() => openGroupCalendarDetail(groupCalendarGroup.id)}
-                  >
-                    {groupCalendarGroup.name}
-                  </button>
-                  <span className="group-calendar-dates">
-                    {dayjs(groupCalendarGroup.start_date).format('YYYY-MM-DD')} ~ {dayjs(groupCalendarGroup.end_date).format('YYYY-MM-DD')}
-                  </span>
-                </div>
+          <div className="group-console">
+            <div className="group-console-header">
+              <div className="group-console-title">
+                <span className="group-color-dot" style={{ backgroundColor: groupCalendarGroup.color }} />
+                <button
+                  type="button"
+                  className="group-console-name-link"
+                  onClick={() => openGroupCalendarDetail(groupCalendarGroup.id)}
+                >
+                  {groupCalendarGroup.name}
+                </button>
+                <span className="group-console-type">{groupConsoleTypeLabel}</span>
+                <span className="group-console-date">
+                  {dayjs(groupCalendarGroup.start_date).format('YYYY-MM-DD')} ~ {dayjs(groupCalendarGroup.end_date).format('YYYY-MM-DD')}
+                </span>
+              </div>
+              <div className="group-console-tabs">
+                <button
+                  type="button"
+                  className={`group-console-tab ${groupConsoleTab === 'info' ? 'active' : ''}`}
+                  onClick={() => setGroupConsoleTab('info')}
+                >
+                  团组信息
+                </button>
+                <button
+                  type="button"
+                  className={`group-console-tab ${groupConsoleTab === 'ai' ? 'active' : ''}`}
+                  onClick={() => setGroupConsoleTab('ai')}
+                >
+                  AI 调度
+                </button>
+              </div>
+              <div className="group-console-actions">
                 <Button
                   type="text"
                   size="small"
@@ -2060,51 +2127,99 @@ function ItineraryDesigner() {
                 />
               </div>
             </div>
-            <div className="group-calendar-grid">
-              <div className="group-calendar-row group-calendar-header-row" style={{ gridTemplateColumns: groupCalendarColumns }}>
-                <div className="group-calendar-time-cell">{'\u65f6\u6bb5'}</div>
-                {groupCalendarDates.map((date) => (
-                  <div key={formatDateString(date)} className="group-calendar-date-cell">
-                    <div>{dayjs(date).format('MM-DD')}</div>
-                    <div>{dayjs(date).format('ddd')}</div>
-                  </div>
-                ))}
-              </div>
-              {groupCalendarSlots.map((slot) => (
-                <div key={slot.key} className="group-calendar-row" style={{ gridTemplateColumns: groupCalendarColumns }}>
-                  <div className="group-calendar-time-cell">{slot.label}</div>
-                  {groupCalendarDates.map((date) => {
-                    const dateString = formatDateString(date);
-                    const items = groupCalendarIndex.get(`${dateString}|${slot.key}`) || [];
-                    const visibleItems = items.slice(0, 2);
-                    return (
-                      <div key={`${slot.key}-${dateString}`} className="group-calendar-cell">
-                        {visibleItems.length === 0 ? (
-                          <div className="group-calendar-empty">—</div>
-                        ) : (
-                          visibleItems.map((activity) => {
-                            const location = groupCalendarLocationMap.get(activity.locationId);
-                            const title = location?.name || '\u672a\u8bbe\u7f6e\u5730\u70b9';
-                            return (
-                              <div
-                                key={activity.id}
-                                className="group-calendar-item"
-                                style={{ borderLeftColor: groupCalendarGroup.color }}
-                                title={title}
-                              >
-                                {title}
-                              </div>
-                            );
-                          })
-                        )}
-                        {items.length > visibleItems.length && (
-                          <div className="group-calendar-more">+{items.length - visibleItems.length}</div>
-                        )}
+            <div className="group-console-body">
+              {groupConsoleTab === 'info' ? (
+                <div className="group-console-info">
+                  <div className="console-info-card">
+                    <div className="console-section-title">团组信息</div>
+                    <div className="console-info-list">
+                      <div className="console-info-row">
+                        <span className="console-info-label">团期</span>
+                        <span className="console-info-value">
+                          {dayjs(groupCalendarGroup.start_date).format('YYYY-MM-DD')} ~ {dayjs(groupCalendarGroup.end_date).format('YYYY-MM-DD')}
+                        </span>
                       </div>
-                    );
-                  })}
+                      <div className="console-info-row">
+                        <span className="console-info-label">人数</span>
+                        <span className="console-info-value">
+                          {(groupCalendarGroup.student_count || 0)} 学生 / {(groupCalendarGroup.teacher_count || 0)} 教师 / {groupConsoleMemberCount} 人
+                        </span>
+                      </div>
+                      <div className="console-info-row">
+                        <span className="console-info-label">类型</span>
+                        <span className="console-info-value">{groupConsoleTypeLabel}</span>
+                      </div>
+                      <div className="console-info-row">
+                        <span className="console-info-label">住宿安排</span>
+                        <span className="console-info-value">
+                          {groupConsoleAccommodation || '—'}
+                        </span>
+                      </div>
+                      <div className="console-info-row console-info-tags-row">
+                        <span className="console-info-label">备注标签</span>
+                        <span className="console-info-value">
+                          {groupConsoleTags.length ? (
+                            <span className="console-info-tags">
+                              {groupConsoleTags.slice(0, 4).map((tag) => (
+                                <span key={tag} className="console-tag">{tag}</span>
+                              ))}
+                              {groupConsoleTags.length > 4 && (
+                                <span className="console-tag console-tag-muted">+{groupConsoleTags.length - 4}</span>
+                              )}
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="console-schedule-card">
+                    <div className="console-section-title">行程摘要（上午 / 下午）</div>
+                    <div className="console-schedule-grid">
+                      <div className="console-schedule-row console-schedule-header" style={{ gridTemplateColumns: groupConsoleColumns }}>
+                        <div className="console-schedule-cell label">时间</div>
+                        {groupConsoleDates.map((date) => (
+                          <div key={formatDateString(date)} className="console-schedule-cell header">
+                            <div className="console-schedule-date">{dayjs(date).format('MM/DD')}</div>
+                            <div className="console-schedule-week">{dayjs(date).format('ddd')}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {groupConsoleSchedule.map((slot) => (
+                        <div key={slot.key} className="console-schedule-row" style={{ gridTemplateColumns: groupConsoleColumns }}>
+                          <div className="console-schedule-cell label">{slot.label}</div>
+                          {slot.cells.map((cell, index) => (
+                            <div key={`${slot.key}-${index}`} className={`console-schedule-cell ${cell.status}`}>
+                              <span className="console-schedule-text">{cell.label}</span>
+                              {cell.extra > 0 && (
+                                <span className="console-schedule-extra">+{cell.extra}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="console-info-actions">
+                      <Button size="small" onClick={() => openGroupCalendarDetail(groupCalendarGroup.id)}>
+                        进入日历详情
+                      </Button>
+                      <Button size="small" onClick={() => refreshData()}>
+                        同步刷新
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-              ))}
+              ) : (
+                <div className="group-console-ai">
+                  <div className="console-section-title">AI 调度（即将上线）</div>
+                  <div className="console-ai-placeholder">
+                    <div className="console-ai-hint">这里将提供智能排程对话框。</div>
+                    <div className="console-ai-sample">例如：帮我把第 3 天上午科技馆调整到下午。</div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -2128,7 +2243,7 @@ function ItineraryDesigner() {
         mask={false}
         width="100%"
         className="group-calendar-detail-modal"
-        wrapClassName="group-calendar-detail-wrap"
+        wrapClassName="group-calendar-detail-wrap itinerary-modal-wrap"
         style={{ top: `${groupCalendarDetailTop}vh` }}
         styles={{ body: { padding: 0, height: `${groupCalendarDetailHeight}vh` } }}
       >
@@ -2190,6 +2305,7 @@ function ItineraryDesigner() {
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         width={800}
+        wrapClassName="itinerary-modal-wrap"
         footer={null}
       >
         <div style={{ maxHeight: '400px', overflow: 'auto' }}>
@@ -2341,6 +2457,7 @@ function ItineraryDesigner() {
         title="导入排程结果(JSON)"
         open={planningImportVisible}
         onCancel={() => setPlanningImportVisible(false)}
+        wrapClassName="itinerary-modal-wrap"
         footer={[
           <Button key="cancel" onClick={() => setPlanningImportVisible(false)}>
             取消
@@ -2507,6 +2624,7 @@ function ItineraryDesigner() {
         title="导出排程输入包(JSON)"
         open={planningExportVisible}
         onCancel={() => setPlanningExportVisible(false)}
+        wrapClassName="itinerary-modal-wrap"
         footer={[
           <Button key="cancel" onClick={() => setPlanningExportVisible(false)}>
             取消
