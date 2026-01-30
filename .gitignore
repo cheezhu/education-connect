@@ -70,3 +70,5 @@ temp/
 
 # Local SQLite database
 trip-manager/backend/db/trip.db
+trip-manager/backend/nul
+trip-manager/frontend/nul
