@@ -4,6 +4,8 @@ const router = express.Router();
 // 获取锁状态
 router.get('/status', (req, res) => {
   const lock = req.db.prepare('SELECT * FROM edit_lock WHERE id = 1').get();
+  const user = req.db.prepare('SELECT role FROM users WHERE username = ?')
+    .get(req.user);
   
   const now = new Date();
   const isExpired = lock.expires_at && new Date(lock.expires_at) < now;
@@ -18,7 +20,7 @@ router.get('/status', (req, res) => {
     
     return res.json({
       isLocked: false,
-      canEdit: req.auth.user === 'admin'
+      canEdit: user && (user.role === 'admin' || user.role === 'editor')
     });
   }
   

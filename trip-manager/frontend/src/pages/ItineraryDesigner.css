@@ -1026,24 +1026,228 @@
 }
 .group-console-ai {
   height: 100%;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+  min-height: 0;
 }
-.console-ai-placeholder {
-  font-size: 12px;
-  color: var(--text-muted);
+.ai-console-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ai-console-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.ai-console-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 240px;
+  gap: 6px;
+}
+.ai-panel {
+  background: transparent;
+  border: 1px solid #edf0f5;
+  border-radius: 2px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow: hidden;
+}
+.ai-panel-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #374151;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.ai-panel-subtitle {
+  font-size: 9px;
+  font-weight: 500;
+  color: #9ca3af;
+  letter-spacing: 0.06em;
+}
+.ai-panel-divider {
+  height: 1px;
+  background: #f1f3f7;
+  opacity: 1;
+}
+.ai-rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10px;
+}
+.ai-panel .ant-checkbox-wrapper {
+  font-size: 10px;
+}
+.ai-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+}
+.ai-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ai-chat-history {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 2px;
+}
+.ai-chat-empty {
+  font-size: 10px;
+  color: #9ca3af;
+}
+.ai-chat-bubble {
+  padding: 4px 6px;
+  border-radius: 2px;
+  font-size: 10px;
+  line-height: 1.5;
+  max-width: 92%;
+  background: transparent;
+  border-left: 1px solid #e5e7eb;
+}
+.ai-chat-bubble.ai-user {
+  align-self: flex-end;
+  border-left-color: #9ca3af;
+  color: #111827;
+}
+.ai-chat-bubble.ai-assistant {
+  align-self: flex-start;
+  border-left-color: #d1d5db;
+  color: #1f2937;
+}
+.ai-chat-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ai-hint-chip {
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  padding: 0 2px 2px 2px;
+  font-size: 10px;
+  color: #6b7280;
+  border-bottom: 1px dotted #e5e7eb;
+  cursor: pointer;
+}
+.ai-hint-chip:hover {
+  border-bottom-color: #9ca3af;
+  color: #111827;
+}
+.ai-chat-input {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.console-ai-hint {
-  color: var(--text-muted);
+.ai-chat-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
 }
-.console-ai-sample {
-  color: var(--text-main);
-  font-weight: 500;
+.ai-preview-summary {
+  font-size: 11px;
+  color: #6b7280;
+}
+.ai-preview-table {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 0;
+  border: 1px solid #edf0f5;
+  border-radius: 2px;
+  background: transparent;
+}
+.ai-preview-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1fr);
+  border-bottom: 1px solid #f1f3f7;
+}
+.ai-preview-row:last-child {
+  border-bottom: none;
+}
+.ai-preview-head {
+  background: transparent;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+}
+.ai-preview-cell {
+  padding: 5px 6px;
+  font-size: 9px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  border-right: 1px solid #f1f3f7;
+  color: #111827;
+  min-height: 34px;
+}
+.ai-preview-cell:last-child {
+  border-right: none;
+}
+.ai-preview-date {
+  font-weight: 600;
+  color: #111827;
+}
+.ai-preview-note {
+  color: #6b7280;
+}
+.ai-preview-tag {
+  border-radius: 2px;
+  padding: 0;
+  font-size: 9px;
+  background: transparent;
+  border: none;
+  color: #374151;
+}
+.ai-preview-footer {
+  font-size: 10px;
+  color: #6b7280;
+  border-top: 1px dashed #edf0f5;
+  padding-top: 4px;
+}
+.ai-panel .ant-input,
+.ai-panel .ant-input-affix-wrapper,
+.ai-panel .ant-input-textarea {
+  border-radius: 2px;
+  box-shadow: none;
+  border-color: #e5e7eb;
+  background: transparent;
+}
+.ai-panel .ant-btn {
+  border-radius: 2px;
+  height: 24px;
+  padding: 0 6px;
+  font-size: 10px;
+}
+.ai-panel .ant-btn-primary {
+  box-shadow: none;
+}
+@media (max-width: 1200px) {
+  .ai-console-layout {
+    grid-template-columns: 1fr;
+  }
+  .ai-console-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
 }
 @media (max-width: 1200px) {
   .group-console-info {
@@ -1084,6 +1288,108 @@
   display: flex;
   flex: 1;
   min-height: 0;
+}
+
+/* ============================= */
+/* Skeleton (Itinerary Designer) */
+/* ============================= */
+.itinerary-skeleton {
+  --shimmer-bg: #f5f5f5;
+  --shimmer-color: #ffffff;
+}
+
+.itinerary-skeleton .itinerary-skeleton-header {
+  height: 50px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  background: var(--bg-header);
+}
+
+.itinerary-skeleton .itinerary-skeleton-grid {
+  flex: 1;
+  min-height: 100%;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 100px repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  background: #fafafa;
+}
+
+.itinerary-skeleton .itinerary-skeleton-time {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-top: 40px;
+}
+
+.itinerary-skeleton .itinerary-skeleton-day {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+.itinerary-skeleton .skeleton {
+  background: var(--shimmer-bg);
+  background-image: linear-gradient(
+    to right,
+    var(--shimmer-bg) 0%,
+    var(--shimmer-color) 20%,
+    var(--shimmer-bg) 40%,
+    var(--shimmer-bg) 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 1000px 100%;
+  animation: shimmer 2s forwards infinite linear;
+  border-radius: 4px;
+}
+
+.itinerary-skeleton .sk-title {
+  width: 40%;
+  height: 16px;
+}
+
+.itinerary-skeleton .sk-pill {
+  width: 120px;
+  height: 24px;
+  border-radius: 12px;
+}
+
+.itinerary-skeleton .sk-col-header {
+  height: 30px;
+  margin-bottom: 10px;
+}
+
+.itinerary-skeleton .sk-time {
+  width: 30px;
+  height: 10px;
+}
+
+.itinerary-skeleton .sk-event-ghost {
+  background: rgba(240, 242, 245, 0.5);
+  border: 1px dashed #e8e8e8;
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.itinerary-skeleton .sk-event-ghost::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%);
+  animation: shimmer 1.5s infinite;
+  transform: skewX(-20deg);
 }
 .itinerary-designer .page-header.itinerary-header {
   margin-bottom: 0;

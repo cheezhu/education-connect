@@ -49,6 +49,7 @@ const GroupEditV2 = () => {
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [groupData, setGroupData] = useState(null);
   const [groupSchedules, setGroupSchedules] = useState([]);
+  const [schedulesLoading, setSchedulesLoading] = useState(false);
   const [itineraryPlans, setItineraryPlans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -191,8 +192,10 @@ const GroupEditV2 = () => {
   const fetchSchedules = async () => {
     if (isNew) {
       setGroupSchedules([]);
+      setSchedulesLoading(false);
       return;
     }
+    setSchedulesLoading(true);
     try {
       const response = await api.get(`/groups/${id}/schedules`);
       const loaded = Array.isArray(response.data) ? response.data : [];
@@ -200,6 +203,8 @@ const GroupEditV2 = () => {
     } catch (error) {
       message.error('加载日程失败');
       setGroupSchedules([]);
+    } finally {
+      setSchedulesLoading(false);
     }
   };
 
@@ -397,6 +402,7 @@ const GroupEditV2 = () => {
           <GroupInfoSimple
             groupData={groupData}
             schedules={groupSchedules}
+            loading={schedulesLoading}
             itineraryPlans={itineraryPlans}
             onUpdate={updateGroupData}
             handleAutoSave={handleAutoSave}
@@ -409,6 +415,7 @@ const GroupEditV2 = () => {
             groupId={id}
             groupData={groupData}
             schedules={groupSchedules}
+            loading={schedulesLoading}
             onUpdate={(schedules) => {
               setGroupSchedules(schedules);
             }}
@@ -423,6 +430,7 @@ const GroupEditV2 = () => {
           <ScheduleDetail
             groupData={groupData}
             schedules={groupSchedules}
+            loading={schedulesLoading}
           />
         )}
 

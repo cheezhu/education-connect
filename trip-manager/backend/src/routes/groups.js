@@ -87,6 +87,8 @@ const normalizeGroupPayload = (payload = {}) => {
   const status = payload.status ?? null;
   const contactPerson = payload.contactPerson ?? payload.contact_person;
   const contactPhone = payload.contactPhone ?? payload.contact_phone;
+  const emergencyContact = payload.emergencyContact ?? payload.emergency_contact;
+  const emergencyPhone = payload.emergencyPhone ?? payload.emergency_phone;
   const accommodation = payload.accommodation ?? '';
   const tags = serializeTags(payload.tags);
   const notes = payload.notes ?? '';
@@ -104,6 +106,8 @@ const normalizeGroupPayload = (payload = {}) => {
     status,
     contactPerson,
     contactPhone,
+    emergencyContact,
+    emergencyPhone,
     accommodation,
     tags,
     notes
@@ -122,8 +126,8 @@ router.post('/batch', requireEditLock, (req, res) => {
     INSERT INTO groups (
       name, type, student_count, teacher_count,
       start_date, end_date, duration, color, itinerary_plan_id, contact_person,
-      contact_phone, accommodation, tags, notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      contact_phone, emergency_contact, emergency_phone, accommodation, tags, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const selectStmt = req.db.prepare('SELECT * FROM groups WHERE id = ?');
 
@@ -149,6 +153,8 @@ router.post('/batch', requireEditLock, (req, res) => {
         normalized.itineraryPlanId,
         normalized.contactPerson,
         normalized.contactPhone,
+        normalized.emergencyContact,
+        normalized.emergencyPhone,
         normalized.accommodation,
         normalized.tags,
         normalized.notes
@@ -183,6 +189,8 @@ router.post('/', requireEditLock, (req, res) => {
     status,
     contactPerson,
     contactPhone,
+    emergencyContact,
+    emergencyPhone,
     accommodation,
     tags,
     notes,
@@ -192,7 +200,9 @@ router.post('/', requireEditLock, (req, res) => {
     end_date,
     itinerary_plan_id,
     contact_person,
-    contact_phone
+    contact_phone,
+    emergency_contact,
+    emergency_phone
   } = req.body;
 
   const resolvedStartDate = startDate ?? start_date;
@@ -204,6 +214,8 @@ router.post('/', requireEditLock, (req, res) => {
   const resolvedStatus = status ?? null;
   const resolvedContactPerson = contactPerson ?? contact_person;
   const resolvedContactPhone = contactPhone ?? contact_phone;
+  const resolvedEmergencyContact = emergencyContact ?? emergency_contact ?? null;
+  const resolvedEmergencyPhone = emergencyPhone ?? emergency_phone ?? null;
   const resolvedItineraryPlanId = itineraryPlanId ?? itinerary_plan_id ?? null;
   const resolvedAccommodation = accommodation ?? '';
   const resolvedTags = serializeTags(tags);
@@ -219,12 +231,13 @@ router.post('/', requireEditLock, (req, res) => {
       INSERT INTO groups (
         name, type, student_count, teacher_count, 
         start_date, end_date, duration, color, itinerary_plan_id, status, contact_person,
-        contact_phone, accommodation, tags, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        contact_phone, emergency_contact, emergency_phone, accommodation, tags, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name, type, resolvedStudentCount, resolvedTeacherCount,
       resolvedStartDate, resolvedEndDate, resolvedDuration, resolvedColor, resolvedItineraryPlanId,
-      resolvedStatus, resolvedContactPerson, resolvedContactPhone, resolvedAccommodation, resolvedTags, notes
+      resolvedStatus, resolvedContactPerson, resolvedContactPhone, resolvedEmergencyContact, resolvedEmergencyPhone,
+      resolvedAccommodation, resolvedTags, notes
     );
 
     const newGroup = req.db.prepare('SELECT * FROM groups WHERE id = ?').get(result.lastInsertRowid);
@@ -332,7 +345,8 @@ router.put('/:id', requireEditLock, (req, res) => {
   const allowedFields = [
     'name', 'type', 'student_count', 'teacher_count',
     'start_date', 'end_date', 'duration', 'color', 'contact_person',
-    'contact_phone', 'accommodation', 'tags', 'notes', 'itinerary_plan_id', 'status'
+    'contact_phone', 'emergency_contact', 'emergency_phone',
+    'accommodation', 'tags', 'notes', 'itinerary_plan_id', 'status'
   ];
 
   allowedFields.forEach(field => {

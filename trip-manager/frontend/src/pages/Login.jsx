@@ -1,0 +1,57 @@
+import React, { useEffect, useState } from 'react';
+import { Card, Form, Input, Button, message } from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+
+const Login = () => {
+  const [loading, setLoading] = useState(false);
+  const { user, login } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/groups', { replace: true });
+    }
+  }, [user, navigate]);
+
+  const handleFinish = async (values) => {
+    setLoading(true);
+    try {
+      await login(values.username, values.password);
+      message.success('登录成功');
+      navigate('/groups', { replace: true });
+    } catch (error) {
+      message.error('用户名或密码错误');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ minHeight: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <Card title="登录" style={{ width: 360 }}>
+        <Form layout="vertical" onFinish={handleFinish}>
+          <Form.Item
+            label="用户名"
+            name="username"
+            rules={[{ required: true, message: '请输入用户名' }]}
+          >
+            <Input placeholder="请输入用户名" autoComplete="username" />
+          </Form.Item>
+          <Form.Item
+            label="密码"
+            name="password"
+            rules={[{ required: true, message: '请输入密码' }]}
+          >
+            <Input.Password placeholder="请输入密码" autoComplete="current-password" />
+          </Form.Item>
+          <Button type="primary" htmlType="submit" block loading={loading}>
+            登录
+          </Button>
+        </Form>
+      </Card>
+    </div>
+  );
+};
+
+export default Login;

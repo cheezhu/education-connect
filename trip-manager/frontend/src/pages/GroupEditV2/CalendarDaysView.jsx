@@ -8,6 +8,8 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from '../../services/api';
+import SidebarContainer from './Calendar/Sidebar/SidebarContainer';
+import CalendarSkeleton from './Calendar/CalendarSkeleton';
 import './CalendarDaysView.css';
 
 const { TextArea } = Input;
@@ -50,7 +52,8 @@ const CalendarDaysView = ({
   onPlanChange,
   showResources = true,
   resourceWidth,
-  showAiRuleLink = true
+  showAiRuleLink = true,
+  loading = false
 }) => {
   const repeatableResources = useMemo(
     () => presetResourcesData.filter((resource) => !resource.isUnique),
@@ -81,6 +84,11 @@ const CalendarDaysView = ({
   const [aiHistoryVisible, setAiHistoryVisible] = useState(false);
   const [aiHistoryLoading, setAiHistoryLoading] = useState(false);
   const [aiHistory, setAiHistory] = useState([]);
+  const [aiAssistLoading, setAiAssistLoading] = useState(false);
+  const [aiMessages, setAiMessages] = useState([]);
+  const [aiPreviewItems, setAiPreviewItems] = useState([]);
+  const [aiPreviewBlocked, setAiPreviewBlocked] = useState([]);
+  const [aiPreviewSummary, setAiPreviewSummary] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingActivity, setEditingActivity] = useState(null);
@@ -101,6 +109,10 @@ const CalendarDaysView = ({
   const calendarRef = useRef(null);
   const dragPreviewRef = useRef(null);
   const resourcePanelStyle = resourceWidth ? { width: resourceWidth } : undefined;
+
+  if (loading) {
+    return <CalendarSkeleton showResources={showResources} resourceWidth={resourcePanelStyle?.width ?? 280} />;
+  }
 
   // 加载行程方案
   useEffect(() => {
@@ -319,6 +331,119 @@ const CalendarDaysView = ({
     }
   };
 
+  const appendAiMessage = useCallback((role, text) => {
+    const trimmed = String(text || '').trim();
+    if (!trimmed) return;
+    setAiMessages((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        role,
+        text: trimmed
+      }
+    ]);
+  }, []);
+
+  const handleAiSend = async (text) => {
+    const trimmed = String(text || '').trim();
+    if (!trimmed || aiAssistLoading) return;
+    if (!groupData?.id) {
+      message.error('缺少团组信息');
+      return;
+    }
+
+    appendAiMessage('user', trimmed);
+    setAiAssistLoading(true);
+    setAiPreviewItems([]);
+    setAiPreviewBlocked([]);
+    setAiPreviewSummary(null);
+
+    try {
+      const baseSlots = (aiRules?.timeSlots?.length ? aiRules.timeSlots : defaultAiRules.timeSlots) || [];
+      const timeSlots = baseSlots.filter(slot => ['MORNING', 'AFTERNOON'].includes(slot));
+      const effectiveSlots = timeSlots.length > 0 ? timeSlots : ['MORNING', 'AFTERNOON'];
+      const dateRange = groupData?.start_date && groupData?.end_date
+        ? [groupData.start_date, groupData.end_date]
+        : [];
+
+      if (dateRange.length !== 2) {
+        message.error('缺少日期范围');
+        setAiAssistLoading(false);
+        return;
+      }
+
+      const response = await api.post(
+        '/ai/assist/detail',
+        {
+          groupId: groupData.id,
+          prompt: trimmed,
+          dateRange,
+          timeSlots: effectiveSlots,
+          scheduleList: activities
+        },
+        { timeout: 60000 }
+      );
+
+      const scheduleList = Array.isArray(response.data?.scheduleList)
+        ? response.data.scheduleList
+        : [];
+      const blocked = Array.isArray(response.data?.blocked)
+        ? response.data.blocked
+        : [];
+      const summary = response.data?.summary || null;
+      const seed = Date.now();
+      const previewList = scheduleList.map((item, index) => ({
+        ...item,
+        clientId: `ai-${seed}-${index}`
+      }));
+
+      setAiPreviewItems(previewList);
+      setAiPreviewBlocked(blocked);
+      setAiPreviewSummary(summary);
+
+      if (previewList.length > 0) {
+        appendAiMessage(
+          'ai',
+          `已生成 ${previewList.length} 条可安排内容${blocked.length ? `，${blocked.length} 条未排入` : ''}。请在下方预览后应用。`
+        );
+      } else if (blocked.length > 0) {
+        appendAiMessage('ai', `没有可安排的内容，${blocked.length} 条未排入。可以尝试调整描述或时段。`);
+      } else {
+        appendAiMessage('ai', '没有生成新的安排，请尝试更具体的描述。');
+      }
+    } catch (error) {
+      if (error?.code === 'ECONNABORTED') {
+        message.error('AI生成超时，请稍后重试');
+      } else {
+        message.error('AI生成失败');
+      }
+      appendAiMessage('ai', '抱歉，生成失败，请稍后再试。');
+    } finally {
+      setAiAssistLoading(false);
+    }
+  };
+
+  const handleApplyAiPreview = () => {
+    if (aiPreviewItems.length === 0) {
+      message.info('暂无可应用内容');
+      return;
+    }
+    const merged = [...activities, ...aiPreviewItems];
+    setActivities(merged);
+    onUpdate?.(merged);
+    setAiPreviewItems([]);
+    setAiPreviewBlocked([]);
+    setAiPreviewSummary(null);
+    appendAiMessage('ai', '已应用AI建议到日历。');
+    message.success('已应用AI建议', 1);
+  };
+
+  const handleClearAiPreview = () => {
+    setAiPreviewItems([]);
+    setAiPreviewBlocked([]);
+    setAiPreviewSummary(null);
+  };
+
   // 全局拖拽结束事件监听 - 确保清理所有拖拽状态
   useEffect(() => {
     const handleGlobalDragEnd = () => {
@@ -383,6 +508,16 @@ const CalendarDaysView = ({
     }
     return activityTypes[type]?.color || '#1890ff';
   };
+
+  const getActivityIdentity = (activity) => (
+    activity
+      ? (
+        activity.id
+          ?? activity.clientId
+          ?? `${activity.date || 'date'}-${activity.startTime || 'time'}-${activity.title || activity.location || 'activity'}`
+      )
+      : null
+  );
 
   // 生成时间槽（6:00-20:45，每15分钟）
   const generateTimeSlots = () => {
@@ -846,7 +981,7 @@ const CalendarDaysView = ({
 
     // 更新活动
     const updatedActivities = activities.map(activity =>
-      activity.id === draggedActivity.id
+      getActivityIdentity(activity) === getActivityIdentity(draggedActivity)
         ? {
             ...activity,
             date: targetDate,
@@ -943,7 +1078,7 @@ const CalendarDaysView = ({
 
         // 实时更新活动时长
         const updatedActivities = latestActivities.map(act =>
-          act.id === activity.id
+          getActivityIdentity(act) === getActivityIdentity(activity)
             ? { ...act, endTime: newEndTime }
             : act
         );
@@ -1021,7 +1156,7 @@ const CalendarDaysView = ({
       let updatedActivities;
       if (editingActivity) {
         updatedActivities = activities.map(activity =>
-          activity.id === editingActivity.id ? activityData : activity
+          getActivityIdentity(activity) === getActivityIdentity(editingActivity) ? activityData : activity
         );
       } else {
         updatedActivities = [...activities, activityData];
@@ -1046,7 +1181,7 @@ const CalendarDaysView = ({
 
   // 删除活动
   const handleDeleteActivity = (activityId) => {
-    const updatedActivities = activities.filter(activity => activity.id !== activityId);
+    const updatedActivities = activities.filter(activity => getActivityIdentity(activity) !== activityId);
     setActivities(updatedActivities);
 
     // 自动保存
@@ -1062,7 +1197,7 @@ const CalendarDaysView = ({
 
   // 渲染活动卡片
   const renderActivity = (activity, dayIndex) => {
-    const isDragged = draggedActivity?.id === activity.id;
+    const isDragged = getActivityIdentity(draggedActivity) === getActivityIdentity(activity);
     const activityColor = activity.color || resolveActivityColor({
       type: activity.type,
       locationId: activity.locationId,
@@ -1086,7 +1221,7 @@ const CalendarDaysView = ({
 
     return (
       <div
-        key={activity.id}
+        key={getActivityIdentity(activity)}
         className={`calendar-activity ${activity.type} ${isDragged ? 'dragging' : ''}`}
         style={style}
         draggable={true}
@@ -1117,7 +1252,7 @@ const CalendarDaysView = ({
 
         {/* 时间调整手柄 */}
         <div
-          className={`resize-handle ${resizingActivity?.id === activity.id ? 'resizing' : ''}`}
+          className={`resize-handle ${getActivityIdentity(resizingActivity) === getActivityIdentity(activity) ? 'resizing' : ''}`}
           onMouseDown={(e) => handleResizeStart(e, activity)}
           onContextMenu={(e) => e.preventDefault()} // 禁用右键菜单
           title="拖拽调整活动时长"
@@ -1233,6 +1368,219 @@ const CalendarDaysView = ({
     );
   };
 
+  const handleResourceDrop = (e) => {
+    e.preventDefault();
+    if (draggedActivity) {
+      const resourceId = draggedActivity.resourceId || '';
+      let planResource = null;
+
+      if (typeof resourceId === 'string' && resourceId.startsWith('plan-')) {
+        planResource = planResources.find(r => r.id === resourceId) || null;
+      }
+
+      if (!planResource) {
+        const activityLocationId = Number(draggedActivity.locationId);
+        if (Number.isFinite(activityLocationId)) {
+          planResource = planResources.find(r => Number(r.locationId) === activityLocationId) || null;
+        }
+      }
+
+      if (planResource) {
+        setAvailablePlanResources(prev => {
+          if (prev.find(r => r.id === planResource.id)) {
+            return prev;
+          }
+          return [...prev, planResource].sort((a, b) => {
+            const aIndex = planResources.findIndex(r => r.id === a.id);
+            const bIndex = planResources.findIndex(r => r.id === b.id);
+            return aIndex - bIndex;
+          });
+        });
+
+        const updatedActivities = activities.filter(
+          (activity) => getActivityIdentity(activity) !== getActivityIdentity(draggedActivity)
+        );
+        setActivities(updatedActivities);
+        onUpdate(updatedActivities);
+        message.success(`🔙 ${draggedActivity.title} 已归还`, 1);
+      }
+    }
+
+    // 重置拖拽状态
+    setDraggedActivity(null);
+    setDraggedResource(null);
+    setDropIndicator(null);
+    setIsDragging(false);
+    setReturningActivity(null);
+    dragOffsetRef.current = { x: 0, y: 0 };
+  };
+
+  const handleCheckConflicts = () => {
+    const dayGroups = detectOverlaps(activities);
+    const conflictCount = Object.values(dayGroups).reduce((sum, day) => {
+      return sum + (day.overlaps?.length || 0);
+    }, 0);
+    if (conflictCount === 0) {
+      message.success('未发现时间冲突', 1);
+    } else {
+      message.warning(`发现 ${conflictCount} 处时间冲突`, 2);
+    }
+  };
+
+  const sidebarWidth = resourcePanelStyle?.width ?? 280;
+
+  const aiProps = {
+    onAutoPlan: handleAutoPlan,
+    onCheckConflicts: handleCheckConflicts,
+    onClearAndReplan: handleResetSchedules,
+    onOptimizeRoute: () => message.info('优化路线功能待接入'),
+    onSend: handleAiSend,
+    messages: aiMessages,
+    previewItems: aiPreviewItems,
+    blockedItems: aiPreviewBlocked,
+    onApplyPreview: handleApplyAiPreview,
+    onClearPreview: handleClearAiPreview,
+    loading: aiAssistLoading,
+    summary: aiPreviewSummary
+  };
+
+  const resourcePane = (
+    <div className="resource-pane-scroll">
+      <div className="resource-header">
+        <div className="resource-hint">
+          <div className="resource-hint-header">
+            <span className="resource-hint-label">行程方案</span>
+            {showAiRuleLink && (
+              <Button
+                type="link"
+                size="small"
+                className="ai-rule-link"
+                onClick={() => {
+                  const nextRules = aiRules || defaultAiRules;
+                  aiRulesForm.setFieldsValue({
+                    timeSlots: nextRules.timeSlots,
+                    requireAllPlanItems: nextRules.requireAllPlanItems,
+                    slotWindows: nextRules.slotWindows
+                  });
+                  setAiRulesVisible(true);
+                }}
+              >
+                AI规则
+              </Button>
+            )}
+          </div>
+          <Select
+            size="small"
+            allowClear
+            placeholder="请选择行程方案"
+            value={selectedPlanId ?? undefined}
+            style={{ width: '100%' }}
+            onChange={(value) => {
+              const nextPlanId = value ?? null;
+              setSelectedPlanId(nextPlanId);
+              onPlanChange?.(nextPlanId);
+            }}
+          >
+            {(itineraryPlans || []).map(plan => (
+              <Option key={plan.id} value={plan.id}>
+                {plan.name}
+              </Option>
+            ))}
+          </Select>
+        </div>
+        <div className="resource-actions">
+          <Button size="small" danger onClick={handleResetSchedules}>
+            重置行程
+          </Button>
+          <Button size="small" onClick={handleAutoPlan} loading={aiPlanning}>
+            AI行程
+          </Button>
+        </div>
+        <div className="resource-history">
+          <Button type="link" size="small" onClick={handleOpenAiHistory}>
+            AI使用记录
+          </Button>
+        </div>
+      </div>
+
+      <div className="resource-columns">
+        {/* 行程方案区域 */}
+        <div className="resource-column">
+          <div className="resource-section unique-section">
+            <div className="section-label">方案行程点</div>
+            <div className="resource-cards">
+              {availablePlanResources.length === 0 ? (
+                <div style={{ fontSize: '12px', color: '#999', padding: '8px 4px' }}>
+                  暂无可用方案行程点
+                </div>
+              ) : availablePlanResources.map(resource => (
+                <div
+                  key={resource.id}
+                  className={`resource-card ${resource.type} unique`}
+                  draggable={true}
+                  onDragStart={(e) => {
+                    setDraggedResource(resource);
+                    setIsDragging(true);
+                    e.dataTransfer.effectAllowed = 'copy';
+                    e.dataTransfer.setData('resource', JSON.stringify(resource));
+                  }}
+                  onDragEnd={() => {
+                    setDraggedResource(null);
+                    setIsDragging(false);
+                  }}
+                  style={{
+                    background: activityTypes[resource.type].color,
+                    cursor: 'grab'
+                  }}
+                  title={resource.description}
+                >
+                  <div className="resource-info">
+                    <div className="resource-name">{resource.title}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 可重复活动区域 */}
+        <div className="resource-column">
+          <div className="resource-section repeatable-section">
+            <div className="section-label">可重复活动</div>
+            <div className="resource-cards">
+              {repeatableResources.map(resource => (
+                <div
+                  key={resource.id}
+                  className={`resource-card ${resource.type} repeatable`}
+                  draggable={true}
+                  onDragStart={(e) => {
+                    setDraggedResource(resource);
+                    setIsDragging(true);
+                    e.dataTransfer.effectAllowed = 'copy';
+                    e.dataTransfer.setData('resource', JSON.stringify(resource));
+                  }}
+                  onDragEnd={() => {
+                    setDraggedResource(null);
+                    setIsDragging(false);
+                  }}
+                  style={{
+                    background: activityTypes[resource.type].color,
+                    cursor: 'grab'
+                  }}
+                  title={resource.description}
+                >
+                  <div className="resource-info">
+                    <div className="resource-name">{resource.title}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   // 拖拽预览组件
   const DragPreview = () => {
     if (!dragPreview || !isDragging) return null;
@@ -1310,195 +1658,19 @@ const CalendarDaysView = ({
           </div>
         </div>
 
-        {/* 行程资源卡片区域 */}
+        {/* 行程资源卡片区域 + AI */}
         {showResources && (
-          <div
-            className="resource-cards-container"
-            style={resourcePanelStyle}
+          <SidebarContainer
+            defaultTab="ai"
+            width={sidebarWidth}
+            resourcePane={resourcePane}
+            aiProps={aiProps}
             onDragOver={(e) => {
               e.preventDefault();
               e.dataTransfer.dropEffect = 'move';
             }}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (draggedActivity) {
-                const resourceId = draggedActivity.resourceId || '';
-                let planResource = null;
-
-                if (typeof resourceId === 'string' && resourceId.startsWith('plan-')) {
-                  planResource = planResources.find(r => r.id === resourceId) || null;
-                }
-
-                if (!planResource) {
-                  const activityLocationId = Number(draggedActivity.locationId);
-                  if (Number.isFinite(activityLocationId)) {
-                    planResource = planResources.find(r => Number(r.locationId) === activityLocationId) || null;
-                  }
-                }
-
-                if (planResource) {
-                  setAvailablePlanResources(prev => {
-                    if (prev.find(r => r.id === planResource.id)) {
-                      return prev;
-                    }
-                    return [...prev, planResource].sort((a, b) => {
-                      const aIndex = planResources.findIndex(r => r.id === a.id);
-                      const bIndex = planResources.findIndex(r => r.id === b.id);
-                      return aIndex - bIndex;
-                    });
-                  });
-
-                  const updatedActivities = activities.filter(a => a.id !== draggedActivity.id);
-                  setActivities(updatedActivities);
-                  onUpdate(updatedActivities);
-                  message.success(`?? ${draggedActivity.title} ????`, 1);
-                }
-              }
-
-              // ????????
-              setDraggedActivity(null);
-              setDraggedResource(null);
-              // dragGhost???
-              setDropIndicator(null);
-              setIsDragging(false);
-              setReturningActivity(null);
-              // ??????
-              dragOffsetRef.current = { x: 0, y: 0 };
-            }}
-        >
-          <div className="resource-header">
-            <div className="resource-hint">
-              <div className="resource-hint-header">
-                <span className="resource-hint-label">行程方案</span>
-                {showAiRuleLink && (
-                  <Button
-                    type="link"
-                    size="small"
-                    className="ai-rule-link"
-                    onClick={() => {
-                      const nextRules = aiRules || defaultAiRules;
-                      aiRulesForm.setFieldsValue({
-                        timeSlots: nextRules.timeSlots,
-                        requireAllPlanItems: nextRules.requireAllPlanItems,
-                        slotWindows: nextRules.slotWindows
-                      });
-                      setAiRulesVisible(true);
-                    }}
-                  >
-                    AI规则
-                  </Button>
-                )}
-              </div>
-              <Select
-                size="small"
-                allowClear
-                placeholder="请选择行程方案"
-                value={selectedPlanId ?? undefined}
-                style={{ width: '100%' }}
-                onChange={(value) => {
-                  const nextPlanId = value ?? null;
-                  setSelectedPlanId(nextPlanId);
-                  onPlanChange?.(nextPlanId);
-                }}
-              >
-                {(itineraryPlans || []).map(plan => (
-                  <Option key={plan.id} value={plan.id}>
-                    {plan.name}
-                  </Option>
-                ))}
-              </Select>
-            </div>
-            <div className="resource-actions">
-              <Button size="small" danger onClick={handleResetSchedules}>
-                重置行程
-              </Button>
-              <Button size="small" onClick={handleAutoPlan} loading={aiPlanning}>
-                AI行程
-              </Button>
-            </div>
-            <div className="resource-history">
-              <Button type="link" size="small" onClick={handleOpenAiHistory}>
-                AI使用记录
-              </Button>
-            </div>
-          </div>
-
-          <div className="resource-columns">
-            {/* 行程方案区域 */}
-            <div className="resource-column">
-              <div className="resource-section unique-section">
-                <div className="section-label">方案行程点</div>
-                <div className="resource-cards">
-                  {availablePlanResources.length === 0 ? (
-                    <div style={{ fontSize: '12px', color: '#999', padding: '8px 4px' }}>
-                      暂无可用方案行程点
-                    </div>
-                  ) : availablePlanResources.map(resource => (
-                    <div
-                      key={resource.id}
-                      className={`resource-card ${resource.type} unique`}
-                      draggable={true}
-                      onDragStart={(e) => {
-                        setDraggedResource(resource);
-                        setIsDragging(true);
-                        e.dataTransfer.effectAllowed = 'copy';
-                        e.dataTransfer.setData('resource', JSON.stringify(resource));
-                      }}
-                      onDragEnd={() => {
-                        setDraggedResource(null);
-                        setIsDragging(false);
-                      }}
-                      style={{
-                        background: activityTypes[resource.type].color,
-                        cursor: 'grab'
-                      }}
-                      title={resource.description}
-                    >
-                      <div className="resource-info">
-                        <div className="resource-name">{resource.title}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* 可重复活动区域 */}
-            <div className="resource-column">
-              <div className="resource-section repeatable-section">
-                <div className="section-label">可重复活动</div>
-                <div className="resource-cards">
-                  {repeatableResources.map(resource => (
-                    <div
-                      key={resource.id}
-                      className={`resource-card ${resource.type} repeatable`}
-                      draggable={true}
-                      onDragStart={(e) => {
-                        setDraggedResource(resource);
-                        setIsDragging(true);
-                        e.dataTransfer.effectAllowed = 'copy';
-                        e.dataTransfer.setData('resource', JSON.stringify(resource));
-                      }}
-                      onDragEnd={() => {
-                        setDraggedResource(null);
-                        setIsDragging(false);
-                      }}
-                      style={{
-                        background: activityTypes[resource.type].color,
-                        cursor: 'grab'
-                      }}
-                      title={resource.description}
-                    >
-                      <div className="resource-info">
-                        <div className="resource-name">{resource.title}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+            onDrop={handleResourceDrop}
+          />
         )}
       </div>
 
@@ -1612,7 +1784,7 @@ const CalendarDaysView = ({
             <Button
               danger
               onClick={() => {
-                handleDeleteActivity(editingActivity.id);
+                handleDeleteActivity(getActivityIdentity(editingActivity));
                 setModalVisible(false);
               }}
             >

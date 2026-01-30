@@ -6,7 +6,7 @@ CREATE TABLE users (
     username VARCHAR(50) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     display_name VARCHAR(100),
-    role VARCHAR(20) CHECK(role IN ('admin', 'viewer')) DEFAULT 'viewer',
+    role VARCHAR(20) CHECK(role IN ('admin', 'editor', 'viewer')) DEFAULT 'viewer',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     last_login DATETIME
 );
@@ -26,6 +26,8 @@ CREATE TABLE groups (
     status VARCHAR(20),
     contact_person VARCHAR(100),
     contact_phone VARCHAR(20),
+    emergency_contact VARCHAR(100),
+    emergency_phone VARCHAR(20),
     accommodation TEXT,
     tags TEXT,
     notes TEXT,

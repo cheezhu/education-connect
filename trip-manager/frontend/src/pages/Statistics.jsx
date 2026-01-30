@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Table, Button, DatePicker, Select, message, Statistic } from 'antd';
 import { DownloadOutlined, BarChartOutlined } from '@ant-design/icons';
 import api from '../services/api';
@@ -20,7 +20,7 @@ function Statistics() {
     setLoading(true);
     try {
       const response = await api.get('/statistics');
-      setStatistics(response.data);
+      setStatistics(response.data || {});
     } catch (error) {
       message.error('加载统计数据失败');
     } finally {
@@ -34,17 +34,16 @@ function Statistics() {
       const params = {};
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
-      
-      const response = await api.get('/activities', { params });
-      // 转换为表格数据
-      const tableData = response.data.map(event => ({
-        id: event.id,
-        date: event.start.split('T')[0],
-        timeSlot: event.extendedProps.timeSlot,
-        groupName: event.title.split(' - ')[0],
-        locationName: event.title.split(' - ')[1],
-        participantCount: event.extendedProps.participantCount,
-        capacity: event.extendedProps.capacity
+
+      const response = await api.get('/statistics/export', { params });
+      const tableData = (response.data || []).map((row, index) => ({
+        id: row.id ?? `${row.activity_date}-${row.time_slot}-${index}`,
+        date: row.activity_date,
+        timeSlot: row.time_slot,
+        groupName: row.group_name,
+        locationName: row.location_name,
+        participantCount: row.participant_count,
+        capacity: row.location_capacity
       }));
       setActivities(tableData);
     } catch (error) {
@@ -67,13 +66,13 @@ function Statistics() {
         params.endDate = dateRange[1].format('YYYY-MM-DD');
       }
 
-      const response = await api.get('/statistics/export', { 
+      const response = await api.get('/statistics/export', {
         params,
         responseType: exportFormat === 'csv' ? 'blob' : 'json'
       });
 
       if (exportFormat === 'csv') {
-        // 下载CSV文件
+        // 下载 CSV 文件
         const blob = new Blob([response.data], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -83,11 +82,12 @@ function Statistics() {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        message.success('CSV文件已下载');
+        message.success('CSV 文件已下载');
       } else {
-        // 下载JSON文件
-        const blob = new Blob([JSON.stringify(response.data, null, 2)], 
-          { type: 'application/json' });
+        // 下载 JSON 文件
+        const blob = new Blob([JSON.stringify(response.data, null, 2)], {
+          type: 'application/json'
+        });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -96,7 +96,7 @@ function Statistics() {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        message.success('JSON文件已下载');
+        message.success('JSON 文件已下载');
       }
     } catch (error) {
       message.error('导出失败');
@@ -118,12 +118,12 @@ function Statistics() {
   // 时段标签映射
   const getTimeSlotLabel = (slot) => {
     const labels = {
-      'AM': '上午',
-      'PM1': '下午1',
-      'PM2': '下午2',
-      'MORNING': '上午',
-      'AFTERNOON': '下午',
-      'EVENING': '晚上'
+      AM: '上午',
+      PM1: '下午1',
+      PM2: '下午2',
+      MORNING: '上午',
+      AFTERNOON: '下午',
+      EVENING: '晚上'
     };
     return labels[slot] || slot;
   };
@@ -239,8 +239,8 @@ function Statistics() {
       )}
 
       {/* 活动安排导出 */}
-      <Card 
-        title="活动安排导出" 
+      <Card
+        title="活动安排导出"
         extra={
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
             <RangePicker
@@ -276,7 +276,7 @@ function Statistics() {
             pageSize: 50,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
+            showTotal: (total, range) => `第${range[0]}-${range[1]}条，共${total}条`
           }}
         />
       </Card>

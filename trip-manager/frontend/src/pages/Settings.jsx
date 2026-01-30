@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Button,
@@ -14,10 +14,12 @@ import {
   Space,
   Switch,
   Tag,
-  message
+  message,
+  Result,
 } from 'antd';
 import dayjs from 'dayjs';
 import api from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 import './Settings.css';
 
 const TIME_SLOT_OPTIONS = [
@@ -39,6 +41,7 @@ const SOURCE_LABELS = {
 };
 
 function Settings() {
+  const { canAccess } = useAuth();
   const [loading, setLoading] = useState(false);
   const [savingItinerary, setSavingItinerary] = useState(false);
   const [savingAi, setSavingAi] = useState(false);
@@ -194,6 +197,15 @@ function Settings() {
     </Tag>
   );
 
+  if (!canAccess('settings')) {
+    return (
+      <Result
+        status="403"
+        title="无权限"
+        subTitle="仅管理员可访问系统设置"
+      />
+    );
+  }
   return (
     <div className="content-wrapper settings-page">
       <div
@@ -370,7 +382,7 @@ function Settings() {
               size="small"
             >
               <Form.Item
-                label="参与排期的时段"
+                label="参与排期的时间段"
                 name="timeSlots"
                 rules={[{ required: true, message: '至少选择一个时段' }]}
               >

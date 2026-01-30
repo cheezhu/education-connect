@@ -5,6 +5,7 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const bcrypt = require('bcrypt');
 const dotenv = require('dotenv');
+const { requireRole, requireAccess } = require('./src/middleware/permission');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -90,6 +91,12 @@ if (!groupColumns.includes('itinerary_plan_id')) {
 if (!groupColumns.includes('status')) {
   db.exec('ALTER TABLE groups ADD COLUMN status VARCHAR(20)');
 }
+if (!groupColumns.includes('emergency_contact')) {
+  db.exec('ALTER TABLE groups ADD COLUMN emergency_contact VARCHAR(100)');
+}
+if (!groupColumns.includes('emergency_phone')) {
+  db.exec('ALTER TABLE groups ADD COLUMN emergency_phone VARCHAR(20)');
+}
 if (!groupColumns.includes('accommodation')) {
   db.exec('ALTER TABLE groups ADD COLUMN accommodation TEXT');
 }
@@ -109,6 +116,39 @@ if (!locationColumns.includes('color')) {
   db.exec('ALTER TABLE locations ADD COLUMN color TEXT');
   db.exec("UPDATE locations SET color = '#1890ff' WHERE color IS NULL OR color = ''");
 }
+
+const ensureUserRoleConstraint = () => {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'").get();
+  if (row && row.sql && row.sql.includes("'editor'")) {
+    return;
+  }
+
+  db.exec(`
+    BEGIN TRANSACTION;
+    CREATE TABLE IF NOT EXISTS users_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username VARCHAR(50) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      display_name VARCHAR(100),
+      role VARCHAR(20) CHECK(role IN ('admin', 'editor', 'viewer')) DEFAULT 'viewer',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_login DATETIME
+    );
+    INSERT INTO users_new (id, username, password, display_name, role, created_at, last_login)
+    SELECT id, username, password, display_name, role, created_at, last_login FROM users;
+    DROP TABLE users;
+    ALTER TABLE users_new RENAME TO users;
+    COMMIT;
+  `);
+
+  const maxId = db.prepare('SELECT MAX(id) as maxId FROM users').get();
+  if (maxId && Number.isFinite(maxId.maxId)) {
+    db.prepare('UPDATE sqlite_sequence SET seq = ? WHERE name = ?')
+      .run(maxId.maxId, 'users');
+  }
+};
+
+ensureUserRoleConstraint();
 
 // 中间件
 app.use(cors());
@@ -144,17 +184,22 @@ app.use((req, res, next) => {
 });
 
 // 路由
-app.use('/api/lock', require('./src/routes/lock'));
-app.use('/api', require('./src/routes/schedules'));
-app.use('/api/groups', require('./src/routes/groups'));
-app.use('/api/locations', require('./src/routes/locations'));
-app.use('/api/activities', require('./src/routes/activities'));
-app.use('/api/statistics', require('./src/routes/statistics'));
-app.use('/api/itinerary-plans', require('./src/routes/itineraryPlans'));
-app.use('/api', require('./src/routes/members'));
-app.use('/api/ai', require('./src/routes/aiPlanner'));
-app.use('/api/config', require('./src/routes/systemConfig'));
-app.use('/api/planning', require('./src/routes/planning'));
+const readAllRoles = ['admin', 'editor', 'viewer'];
+const writeEditorRoles = ['admin', 'editor'];
+
+app.use('/api/lock', requireRole(['admin']), require('./src/routes/lock'));
+app.use('/api/activities', requireRole(['admin']), require('./src/routes/activities'));
+app.use('/api/ai', requireRole(['admin']), require('./src/routes/aiPlanner'));
+app.use('/api/planning', requireRole(['admin']), require('./src/routes/planning'));
+app.use('/api/config', requireRole(['admin']), require('./src/routes/systemConfig'));
+
+app.use('/api/users', require('./src/routes/users'));
+app.use('/api/statistics', requireAccess({ read: readAllRoles }), require('./src/routes/statistics'));
+app.use('/api/groups', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/groups'));
+app.use('/api/locations', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/locations'));
+app.use('/api/itinerary-plans', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/itineraryPlans'));
+app.use('/api', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/schedules'));
+app.use('/api', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/members'));
 
 // 错误处理
 app.use((err, req, res, next) => {

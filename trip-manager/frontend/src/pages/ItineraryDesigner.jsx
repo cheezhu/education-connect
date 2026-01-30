@@ -1,5 +1,5 @@
-﻿﻿﻿﻿﻿import React, { useState, useEffect, useRef } from 'react';
-import { Card, Button, Modal, Form, Select, InputNumber, Input, message, Checkbox, Tooltip, DatePicker, Drawer, Upload, Spin } from 'antd';
+﻿﻿﻿﻿﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Card, Button, Modal, Form, Select, InputNumber, Input, message, Checkbox, Tooltip, DatePicker, Drawer, Upload, Spin, Result } from 'antd';
 import {
   PlusOutlined,
   DeleteOutlined,
@@ -18,14 +18,17 @@ import {
   InboxOutlined
 } from '@ant-design/icons';
 import api from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 import dayjs from 'dayjs';
 import useDataSync from '../hooks/useDataSync';
 import CalendarDaysView from './GroupEditV2/CalendarDaysView';
+import ItineraryDesignerSkeleton from './ItineraryDesignerSkeleton';
 import './ItineraryDesigner.css';
 
 const { Option } = Select;
 
 function ItineraryDesigner() {
+  const { canAccess } = useAuth();
   const GROUP_CALENDAR_HEIGHT_DEFAULT = 30;
   const GROUP_CALENDAR_HEIGHT_MIN = 20;
   const GROUP_CALENDAR_HEIGHT_MAX = 70;
@@ -144,6 +147,29 @@ function ItineraryDesigner() {
   const [groupCalendarDetailResourcesVisible, setGroupCalendarDetailResourcesVisible] = useState(true);
   const groupCalendarDetailSaveTimeoutRef = useRef(null);
   const groupCalendarDetailSaveTokenRef = useRef(0);
+
+  const aiRuleFlags = {
+    onlyCurrentGroup: true,
+    noModifyConfirmed: true,
+    fillEmptyOnly: true
+  };
+  const [aiTypeFlags, setAiTypeFlags] = useState({
+    breakfast: true,
+    lunch: true,
+    dinner: true,
+    rest: true,
+    gather: true,
+    transfer: true,
+    free: false
+  });
+  const [aiRestaurantText, setAiRestaurantText] = useState('');
+  const [aiInput, setAiInput] = useState('');
+  const [aiChatHistory, setAiChatHistory] = useState([]);
+  const [aiPreviewItems, setAiPreviewItems] = useState([]);
+  const [aiPreviewBlocked, setAiPreviewBlocked] = useState([]);
+  const [aiPreviewSummary, setAiPreviewSummary] = useState({ total: 0, days: 0, counts: {}, blocked: 0 });
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiApplying, setAiApplying] = useState(false);
   
   const [groupCalendarHeight, setGroupCalendarHeight] = useState(() => getStoredGroupCalendarHeight());
   const [groupCalendarResizing, setGroupCalendarResizing] = useState(false);
@@ -172,6 +198,30 @@ function ItineraryDesigner() {
     { key: 'AFTERNOON', label: '下午', time: '12:00-18:00', color: 'transparent', borderColor: '#89d185' },
     { key: 'EVENING', label: '晚上', time: '18:00-20:45', color: 'transparent', borderColor: '#cca700' }
   ];
+  const aiSlotColumns = ['MORNING', 'AFTERNOON'];
+  const aiTypeLabels = {
+    breakfast: '早餐',
+    lunch: '午餐',
+    dinner: '晚餐',
+    rest: '休息',
+    gather: '集合',
+    transfer: '接驳',
+    free: '自由活动'
+  };
+  const aiTypeCategory = {
+    breakfast: 'meal',
+    lunch: 'meal',
+    dinner: 'meal',
+    rest: 'rest',
+    gather: 'gather',
+    transfer: 'transfer',
+    free: 'free'
+  };
+  const aiDurationLabels = {
+    rest: '30m',
+    gather: '15m',
+    transfer: '20m'
+  };
 
   const visibleTimeSlots = timeSlots.filter((slot) => enabledTimeSlots.includes(slot.key));
   const planningAvailableGroups = (planningDateRange && planningDateRange.length === 2)
@@ -457,6 +507,178 @@ function ItineraryDesigner() {
     return dates;
   };
 
+  const parseRestaurantNames = (inputText, commandText) => {
+    const splitNames = (value) => (
+      String(value || '')
+        .split(/[\/,，、|]/)
+        .map(item => item.trim())
+        .filter(Boolean)
+    );
+    const fromInput = splitNames(inputText);
+    if (fromInput.length) return fromInput;
+    const text = String(commandText || '');
+    const matches = Array.from(text.matchAll(/([^\s，,。；;]{2,20}餐厅)/g)).map(m => m[1]);
+    return matches.length ? matches : [];
+  };
+
+  const parseAiSlots = (commandText) => {
+    const text = String(commandText || '');
+    const slots = new Set();
+    if (/上午|早上|早晨/.test(text)) slots.add('MORNING');
+    if (/下午|午后/.test(text)) slots.add('AFTERNOON');
+    const hasEvening = /晚上|晚间|夜间/.test(text);
+    if (hasEvening) {
+      slots.add(aiSlotColumns.includes('EVENING') ? 'EVENING' : 'AFTERNOON');
+    }
+    const resolved = slots.size ? Array.from(slots) : aiSlotColumns;
+    return resolved.filter(slot => aiSlotColumns.includes(slot));
+  };
+
+  const parseAiTypeFlags = (commandText, fallbackFlags) => {
+    const text = String(commandText || '');
+    const has = (words) => words.some(word => text.includes(word));
+    const flags = {
+      breakfast: has(['早餐', '早饭', '早歺']),
+      lunch: has(['午餐', '午饭', '中餐']),
+      dinner: has(['晚餐', '晚饭']),
+      rest: has(['休息', '午休', '休整']),
+      gather: has(['集合', '集散', '签到']),
+      transfer: has(['接驳', '交通', '车程', '转场']),
+      free: has(['自由活动', '自由'])
+    };
+    const hasMealBundle = has(['三餐', '餐饮', '用餐', '补餐', '餐食']);
+    if (hasMealBundle) {
+      flags.breakfast = true;
+      flags.lunch = true;
+      flags.dinner = true;
+    }
+    const anyMatched = Object.values(flags).some(Boolean);
+    return anyMatched ? flags : { ...fallbackFlags };
+  };
+
+  const resolveAiTargetDates = (commandText, group) => {
+    const fallbackDates = dateRange.filter((date) => group && isGroupActiveOnDate(group, date));
+    if (!group?.start_date) return fallbackDates;
+    const start = dayjs(group.start_date);
+    const end = dayjs(group.end_date);
+    if (!start.isValid() || !end.isValid()) return fallbackDates;
+    const text = String(commandText || '');
+    const rangeMatch = text.match(/D\s*(\d+)\s*[-~—～]\s*D?\s*(\d+)/i)
+      || text.match(/第\s*(\d+)\s*[-~—～]\s*(\d+)\s*天/);
+    const singleMatches = Array.from(text.matchAll(/(?:D|第)\s*(\d+)\s*天?/gi))
+      .map(match => Number(match[1]))
+      .filter(Number.isFinite);
+    const indices = [];
+    if (rangeMatch) {
+      const startIndex = Number(rangeMatch[1]);
+      const endIndex = Number(rangeMatch[2]);
+      if (Number.isFinite(startIndex) && Number.isFinite(endIndex)) {
+        const from = Math.min(startIndex, endIndex);
+        const to = Math.max(startIndex, endIndex);
+        for (let i = from; i <= to; i += 1) indices.push(i);
+      }
+    } else if (singleMatches.length) {
+      indices.push(...new Set(singleMatches));
+    }
+    if (!indices.length) {
+      const dateMatches = Array.from(text.matchAll(/(\d{4})-(\d{1,2})-(\d{1,2})/g))
+        .map(match => dayjs(`${match[1]}-${match[2]}-${match[3]}`))
+        .filter(item => item.isValid());
+      if (!dateMatches.length) {
+        const shortMatches = Array.from(text.matchAll(/(\d{1,2})[/.](\d{1,2})/g))
+          .map(match => {
+            const year = start.year();
+            return dayjs(`${year}-${match[1]}-${match[2]}`);
+          })
+          .filter(item => item.isValid());
+        dateMatches.push(...shortMatches);
+      }
+      if (dateMatches.length) {
+        return dateMatches
+          .filter(date => date.isSame(start, 'day') || (date.isAfter(start, 'day') && date.isBefore(end, 'day')) || date.isSame(end, 'day'))
+          .map(date => date.toDate());
+      }
+      return fallbackDates;
+    }
+    const dates = indices
+      .map(index => start.add(index - 1, 'day'))
+      .filter(date => date.isValid())
+      .filter(date => date.isSame(start, 'day') || (date.isAfter(start, 'day') && date.isBefore(end, 'day')) || date.isSame(end, 'day'))
+      .map(date => date.toDate());
+    return dates.length ? dates : fallbackDates;
+  };
+
+  const buildAiSuggestions = (commandText, typeOverride) => {
+    const group = groupCalendarGroup;
+    if (!group) return { items: [], blocked: [] };
+    const targetDates = resolveAiTargetDates(commandText, group);
+    const targetSlots = parseAiSlots(commandText);
+    const effectiveTypes = typeOverride || parseAiTypeFlags(commandText, aiTypeFlags);
+    const restaurantNames = parseRestaurantNames(aiRestaurantText, commandText);
+    const mealRestaurantMap = {
+      breakfast: restaurantNames[0] || '',
+      lunch: restaurantNames[1] || restaurantNames[0] || '',
+      dinner: restaurantNames[2] || restaurantNames[0] || ''
+    };
+    const dinnerSlot = aiSlotColumns.includes('EVENING') ? 'EVENING' : 'AFTERNOON';
+    const mealSlotMap = {
+      breakfast: 'MORNING',
+      lunch: 'AFTERNOON',
+      dinner: dinnerSlot
+    };
+    const existingSlotMap = new Set(
+      activities
+        .filter(activity => activity.groupId === group.id)
+        .map(activity => `${activity.date}|${activity.timeSlot}`)
+    );
+    const items = [];
+    const blocked = [];
+    targetDates.forEach((date) => {
+      const dateString = formatDateString(date);
+      if (!dateString) return;
+      targetSlots.forEach((slot) => {
+        const slotKey = `${dateString}|${slot}`;
+        const isSlotEmpty = !existingSlotMap.has(slotKey);
+        const slotRequested = Object.entries(effectiveTypes).some(([typeKey, enabled]) => {
+          if (!enabled) return false;
+          if (mealSlotMap[typeKey]) {
+            return mealSlotMap[typeKey] === slot;
+          }
+          return true;
+        });
+        if (!slotRequested) return;
+        if (aiRuleFlags.fillEmptyOnly && !isSlotEmpty) {
+          blocked.push({ date: dateString, slot, reason: '已满' });
+          return;
+        }
+        Object.entries(effectiveTypes).forEach(([typeKey, enabled]) => {
+          if (!enabled) return;
+          if (mealSlotMap[typeKey] && mealSlotMap[typeKey] !== slot) return;
+          const label = aiTypeLabels[typeKey];
+          if (!label) return;
+          const category = aiTypeCategory[typeKey] || 'other';
+          const restaurant = mealSlotMap[typeKey] ? (mealRestaurantMap[typeKey] || '') : '';
+          const duration = aiDurationLabels[typeKey] || '';
+          const parts = [label];
+          if (restaurant) parts.push(restaurant);
+          if (!restaurant && duration) parts.push(duration);
+          if (restaurant && duration) parts.push(duration);
+          const note = parts.join(' · ');
+          items.push({
+            id: `${dateString}-${slot}-${typeKey}-${items.length}`,
+            date: dateString,
+            slot,
+            label,
+            note,
+            category,
+            typeKey
+          });
+        });
+      });
+    });
+    return { items, blocked };
+  };
+
   const getTimeSlotLabel = (slotKey) => {
     return timeSlots.find(slot => slot.key === slotKey)?.label || slotKey;
   };
@@ -668,18 +890,20 @@ function ItineraryDesigner() {
     activities.forEach((activity) => {
       if (activity.date !== dateString || activity.timeSlot !== slotKey) return;
       if (!selectedGroups.includes(activity.groupId)) return;
-      const locationId = activity.locationId ?? 'none';
-      const current = totals.get(locationId) || 0;
-      totals.set(locationId, current + (activity.participantCount || 0));
+      const locationKey = activity.locationId ?? activity.notes ?? 'none';
+      const current = totals.get(locationKey) || 0;
+      totals.set(locationKey, current + (activity.participantCount || 0));
     });
 
     return Array.from(totals.entries())
-      .map(([locationId, total]) => {
-        const location = locations.find(loc => loc.id === locationId);
+      .map(([locationKey, total]) => {
+        const location = locations.find(loc => loc.id === locationKey);
         return {
-          locationId,
+          locationId: locationKey,
           total,
-          name: location ? location.name : '未设置场地'
+          name: location
+            ? location.name
+            : (typeof locationKey === 'string' && locationKey !== 'none' ? locationKey : '未设置场地')
         };
       })
       .sort((a, b) => b.total - a.total);
@@ -756,6 +980,125 @@ function ItineraryDesigner() {
       setGroupCalendarDetailSchedules([]);
     } finally {
       setGroupCalendarDetailLoading(false);
+    }
+  };
+
+  const buildAiSummary = (items, blocked) => {
+    const counts = items.reduce((acc, item) => {
+      const key = item.category || 'other';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    const days = new Set(items.map(item => item.date)).size;
+    return {
+      total: items.length,
+      days,
+      counts,
+      blocked: blocked.length
+    };
+  };
+
+  const updateAiPreview = ({ commandText, typeOverride, userMessage }) => {
+    if (!groupCalendarGroup) {
+      message.warning('请先选择团组');
+      return;
+    }
+    setAiGenerating(true);
+    const { items, blocked } = buildAiSuggestions(commandText, typeOverride);
+    const summary = buildAiSummary(items, blocked);
+    setAiPreviewItems(items);
+    setAiPreviewBlocked(blocked);
+    setAiPreviewSummary(summary);
+    if (userMessage) {
+      setAiChatHistory((prev) => [
+        ...prev,
+        { role: 'user', content: userMessage },
+        {
+          role: 'assistant',
+          content: items.length
+            ? `已生成 ${summary.total} 项填充建议，覆盖 ${summary.days} 天。`
+            : '当前范围暂无可填空档。'
+        }
+      ]);
+    }
+    setAiGenerating(false);
+  };
+
+  const handleAiGenerate = () => {
+    const text = aiInput.trim();
+    const userMessage = text || '按默认规则填充空档';
+    updateAiPreview({ commandText: text, userMessage });
+  };
+
+  const handleAiQuickAction = (action) => {
+    const presets = {
+      meal: { breakfast: true, lunch: true, dinner: true, rest: false, gather: false, transfer: false, free: false },
+      rest: { breakfast: false, lunch: false, dinner: false, rest: true, gather: false, transfer: false, free: false },
+      transfer: { breakfast: false, lunch: false, dinner: false, rest: false, gather: false, transfer: true, free: false }
+    };
+    const typeOverride = presets[action] || null;
+    const labelMap = {
+      meal: '一键补餐',
+      rest: '一键补休息',
+      transfer: '一键补接驳'
+    };
+    updateAiPreview({
+      commandText: aiInput.trim(),
+      typeOverride,
+      userMessage: labelMap[action] || '快速填充'
+    });
+  };
+
+  const clearAiPreview = () => {
+    setAiPreviewItems([]);
+    setAiPreviewBlocked([]);
+    setAiPreviewSummary({ total: 0, days: 0, counts: {}, blocked: 0 });
+  };
+
+  const handleAiApply = async (mode) => {
+    if (!groupCalendarGroup) {
+      message.warning('请先选择团组');
+      return;
+    }
+    if (!aiPreviewItems.length) {
+      message.info('暂无可应用的方案');
+      return;
+    }
+    setAiApplying(true);
+    const targetItems = mode === 'meal'
+      ? aiPreviewItems.filter(item => item.category === 'meal')
+      : aiPreviewItems;
+    if (!targetItems.length) {
+      message.info('暂无可应用的内容');
+      setAiApplying(false);
+      return;
+    }
+    const participantCount = (groupCalendarGroup.student_count || 0) + (groupCalendarGroup.teacher_count || 0);
+    let successCount = 0;
+    let failCount = 0;
+    for (const item of targetItems) {
+      try {
+        await api.post('/activities', {
+          groupId: groupCalendarGroup.id,
+          locationId: null,
+          date: item.date,
+          timeSlot: item.slot,
+          participantCount,
+          notes: item.note
+        });
+        successCount += 1;
+      } catch (error) {
+        failCount += 1;
+      }
+    }
+    await refreshData();
+    setAiApplying(false);
+    if (successCount > 0) {
+      message.success(`已应用 ${successCount} 项`);
+      clearAiPreview();
+    }
+    if (failCount > 0) {
+      message.warning(`有 ${failCount} 项未能应用`);
     }
   };
 
@@ -1495,6 +1838,8 @@ function ItineraryDesigner() {
     const dayMarkers = [];
     if (isArrivalDay) dayMarkers.push('arrival');
     if (isDepartureDay) dayMarkers.push('departure');
+    const activityNote = activity?.notes ? String(activity.notes).trim() : '';
+    const activityDetail = location?.name || activityNote;
     const renderDayMarkers = () => (
       dayMarkers.length ? (
         <div className="activity-day-marker">
@@ -1532,7 +1877,12 @@ function ItineraryDesigner() {
         >
           {renderDayMarkers()}
           <span style={{ fontWeight: '600', color: 'var(--text-strong)' }}>{group?.name}</span>
-          {location && <span style={{ opacity: 0.7, fontSize: '10px', color: 'var(--text-muted)' }}> @{location.name}</span>}
+          {activityDetail && (
+            <span style={{ opacity: 0.7, fontSize: '10px', color: 'var(--text-muted)' }}>
+              {' '}
+              @{activityDetail}
+            </span>
+          )}
 
           {/* 悬停时显示的删除按钮 */}
           <span
@@ -1580,8 +1930,8 @@ function ItineraryDesigner() {
           >
             {renderDayMarkers()}
             <div className="activity-card-line activity-card-group">{group?.name}</div>
-            {location && (
-              <div className="activity-card-line activity-card-location">{location.name}</div>
+            {activityDetail && (
+              <div className="activity-card-line activity-card-location">{activityDetail}</div>
             )}
             <span
               className="minimal-delete-btn"
@@ -1641,7 +1991,11 @@ function ItineraryDesigner() {
               ×
             </span>
           </div>
-          {location && <div style={{ fontSize: '10px', color: 'var(--text-muted)', lineHeight: '14px' }}>{location.name}</div>}
+          {activityDetail && (
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', lineHeight: '14px' }}>
+              {activityDetail}
+            </div>
+          )}
         </div>
       );
     }
@@ -2037,7 +2391,9 @@ function ItineraryDesigner() {
         return { label: '空档', status: 'empty', extra: 0 };
       }
       const locationNames = items.map((activity) => (
-        groupCalendarLocationMap.get(activity.locationId)?.name || '未设置场地'
+        groupCalendarLocationMap.get(activity.locationId)?.name
+          || (activity?.notes ? String(activity.notes) : '')
+          || '未设置场地'
       ));
       return {
         label: locationNames[0],
@@ -2049,7 +2405,64 @@ function ItineraryDesigner() {
   const groupConsoleColumns = groupConsoleDates.length
     ? `64px repeat(${groupConsoleDates.length}, minmax(0, 1fr))`
     : '64px 1fr';
+  const aiPreviewRows = useMemo(() => {
+    if (!groupCalendarGroup) return [];
+    const rows = new Map();
+    const start = dayjs(groupCalendarGroup.start_date);
+    const ensureRow = (dateString) => {
+      if (!rows.has(dateString)) {
+        const dateObj = dayjs(dateString);
+        const index = start.isValid() ? dateObj.diff(start, 'day') + 1 : null;
+        rows.set(dateString, {
+          date: dateString,
+          label: index ? `D${index} ${dateObj.format('MM/DD')}` : dateObj.format('MM/DD'),
+          slots: {
+            MORNING: { items: [], note: '' },
+            AFTERNOON: { items: [], note: '' }
+          }
+        });
+      }
+      return rows.get(dateString);
+    };
+    aiPreviewItems.forEach((item) => {
+      if (!aiSlotColumns.includes(item.slot)) return;
+      const row = ensureRow(item.date);
+      row.slots[item.slot].items.push(item);
+    });
+    aiPreviewBlocked.forEach((item) => {
+      if (!aiSlotColumns.includes(item.slot)) return;
+      const row = ensureRow(item.date);
+      row.slots[item.slot].note = item.reason || '未能安排';
+    });
+    return Array.from(rows.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [aiPreviewItems, aiPreviewBlocked, groupCalendarGroup]);
+  const aiSummaryText = (() => {
+    if (!aiPreviewSummary.total) return '暂无方案';
+    const parts = [`新增 ${aiPreviewSummary.total} 项`, `覆盖 ${aiPreviewSummary.days} 天`];
+    const countParts = [];
+    if (aiPreviewSummary.counts?.meal) countParts.push(`餐饮 ${aiPreviewSummary.counts.meal}`);
+    if (aiPreviewSummary.counts?.rest) countParts.push(`休息 ${aiPreviewSummary.counts.rest}`);
+    if (aiPreviewSummary.counts?.gather) countParts.push(`集合 ${aiPreviewSummary.counts.gather}`);
+    if (aiPreviewSummary.counts?.transfer) countParts.push(`接驳 ${aiPreviewSummary.counts.transfer}`);
+    if (aiPreviewSummary.counts?.free) countParts.push(`自由 ${aiPreviewSummary.counts.free}`);
+    if (countParts.length) parts.push(countParts.join(' / '));
+    if (aiPreviewSummary.blocked) parts.push(`未能安排 ${aiPreviewSummary.blocked} 项`);
+    return parts.join('｜');
+  })();
 
+  if (loading && groups.length === 0 && activities.length === 0) {
+    return <ItineraryDesignerSkeleton />;
+  }
+
+  if (!canAccess('designer')) {
+    return (
+      <Result
+        status="403"
+        title="无权限"
+        subTitle="仅管理员可访问行程设计器"
+      />
+    );
+  }
   return (
     <div className="itinerary-designer" ref={designerRef}>
       {renderTimelineHeader()}
@@ -2223,10 +2636,216 @@ function ItineraryDesigner() {
                 </div>
               ) : (
                 <div className="group-console-ai">
-                  <div className="console-section-title">AI 调度（即将上线）</div>
-                  <div className="console-ai-placeholder">
-                    <div className="console-ai-hint">这里将提供智能排程对话框。</div>
-                    <div className="console-ai-sample">例如：帮我把第 3 天上午科技馆调整到下午。</div>
+                  <div className="ai-console-header">
+                    <div className="console-section-title">AI 调度（填充空档）</div>
+                    <div className="ai-console-actions">
+                      <Button
+                        type="primary"
+                        size="small"
+                        loading={aiApplying}
+                        disabled={!aiPreviewItems.length}
+                        onClick={() => handleAiApply('all')}
+                      >
+                        应用全部
+                      </Button>
+                      <Button
+                        size="small"
+                        disabled={!aiPreviewItems.length || aiApplying}
+                        onClick={() => handleAiApply('meal')}
+                      >
+                        仅应用餐饮
+                      </Button>
+                      <Button
+                        size="small"
+                        disabled={!aiPreviewItems.length && !aiInput}
+                        onClick={() => {
+                          setAiInput('');
+                          clearAiPreview();
+                        }}
+                      >
+                        全部撤销
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="ai-console-layout">
+                    <div className="ai-panel ai-rules">
+                      <div className="ai-panel-title">规则与范围</div>
+                      <div className="ai-rule-list">
+                        <Checkbox checked={aiRuleFlags.onlyCurrentGroup} disabled>只当前团组</Checkbox>
+                        <Checkbox checked={aiRuleFlags.noModifyConfirmed} disabled>不改已确认行程</Checkbox>
+                        <Checkbox checked={aiRuleFlags.fillEmptyOnly} disabled>只填空档</Checkbox>
+                      </div>
+                      <div className="ai-panel-divider" />
+                      <div className="ai-panel-subtitle">填充类型</div>
+                      <div className="ai-type-grid">
+                        <Checkbox
+                          checked={aiTypeFlags.breakfast}
+                          onChange={(event) => setAiTypeFlags(prev => ({ ...prev, breakfast: event.target.checked }))}
+                        >
+                          早餐
+                        </Checkbox>
+                        <Checkbox
+                          checked={aiTypeFlags.lunch}
+                          onChange={(event) => setAiTypeFlags(prev => ({ ...prev, lunch: event.target.checked }))}
+                        >
+                          午餐
+                        </Checkbox>
+                        <Checkbox
+                          checked={aiTypeFlags.dinner}
+                          onChange={(event) => setAiTypeFlags(prev => ({ ...prev, dinner: event.target.checked }))}
+                        >
+                          晚餐
+                        </Checkbox>
+                        <Checkbox
+                          checked={aiTypeFlags.rest}
+                          onChange={(event) => setAiTypeFlags(prev => ({ ...prev, rest: event.target.checked }))}
+                        >
+                          休息
+                        </Checkbox>
+                        <Checkbox
+                          checked={aiTypeFlags.gather}
+                          onChange={(event) => setAiTypeFlags(prev => ({ ...prev, gather: event.target.checked }))}
+                        >
+                          集合
+                        </Checkbox>
+                        <Checkbox
+                          checked={aiTypeFlags.transfer}
+                          onChange={(event) => setAiTypeFlags(prev => ({ ...prev, transfer: event.target.checked }))}
+                        >
+                          接驳
+                        </Checkbox>
+                      </div>
+                      <div className="ai-panel-divider" />
+                      <div className="ai-panel-subtitle">餐厅名称</div>
+                      <Input
+                        size="small"
+                        value={aiRestaurantText}
+                        placeholder="如：园区餐厅 / 校外餐厅"
+                        onChange={(event) => setAiRestaurantText(event.target.value)}
+                      />
+                      <div className="ai-quick-actions">
+                        <Button size="small" onClick={() => handleAiQuickAction('meal')}>
+                          一键补餐
+                        </Button>
+                        <Button size="small" onClick={() => handleAiQuickAction('rest')}>
+                          一键补休息
+                        </Button>
+                        <Button size="small" onClick={() => handleAiQuickAction('transfer')}>
+                          一键补接驳
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="ai-panel ai-chat">
+                      <div className="ai-panel-title">对话指令</div>
+                      <div className="ai-chat-history">
+                        {aiChatHistory.length ? (
+                          aiChatHistory.map((item, index) => (
+                            <div
+                              key={`${item.role}-${index}`}
+                              className={`ai-chat-bubble ${item.role === 'user' ? 'ai-user' : 'ai-assistant'}`}
+                            >
+                              {item.content}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="ai-chat-empty">暂无指令</div>
+                        )}
+                      </div>
+                      <div className="ai-chat-hints">
+                        <button
+                          type="button"
+                          className="ai-hint-chip"
+                          onClick={() => setAiInput('只补下午餐饮')}
+                        >
+                          只补下午餐饮
+                        </button>
+                        <button
+                          type="button"
+                          className="ai-hint-chip"
+                          onClick={() => setAiInput('补午餐 + 休息 30 分钟')}
+                        >
+                          补午餐 + 休息 30 分钟
+                        </button>
+                        <button
+                          type="button"
+                          className="ai-hint-chip"
+                          onClick={() => setAiInput('D4 上午安排集合 + 接驳')}
+                        >
+                          D4 上午安排集合 + 接驳
+                        </button>
+                      </div>
+                      <div className="ai-chat-input">
+                        <Input.TextArea
+                          rows={2}
+                          value={aiInput}
+                          onChange={(event) => setAiInput(event.target.value)}
+                          placeholder="输入你的指令，例如：补齐 D2–D4 的三餐，餐厅用园区餐厅。"
+                        />
+                        <div className="ai-chat-actions">
+                          <Button size="small" type="primary" loading={aiGenerating} onClick={handleAiGenerate}>
+                            生成方案
+                          </Button>
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              setAiInput('');
+                              clearAiPreview();
+                            }}
+                          >
+                            清空
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="ai-panel ai-preview">
+                      <div className="ai-panel-title">方案预览（上午 / 下午）</div>
+                      <div className="ai-preview-summary">{aiSummaryText}</div>
+                      <div className="ai-preview-table">
+                        <div className="ai-preview-row ai-preview-head">
+                          <div className="ai-preview-cell">日期</div>
+                          <div className="ai-preview-cell">上午</div>
+                          <div className="ai-preview-cell">下午</div>
+                        </div>
+                        {aiPreviewRows.length ? (
+                          aiPreviewRows.map((row) => (
+                            <div key={row.date} className="ai-preview-row">
+                              <div className="ai-preview-cell ai-preview-date">{row.label}</div>
+                              <div className="ai-preview-cell">
+                                {row.slots.MORNING.items.length ? (
+                                  row.slots.MORNING.items.map((item) => (
+                                    <span key={item.id} className="ai-preview-tag">{item.note}</span>
+                                  ))
+                                ) : row.slots.MORNING.note ? (
+                                  <span className="ai-preview-note">{row.slots.MORNING.note}</span>
+                                ) : (
+                                  <span className="ai-preview-note">—</span>
+                                )}
+                              </div>
+                              <div className="ai-preview-cell">
+                                {row.slots.AFTERNOON.items.length ? (
+                                  row.slots.AFTERNOON.items.map((item) => (
+                                    <span key={item.id} className="ai-preview-tag">{item.note}</span>
+                                  ))
+                                ) : row.slots.AFTERNOON.note ? (
+                                  <span className="ai-preview-note">{row.slots.AFTERNOON.note}</span>
+                                ) : (
+                                  <span className="ai-preview-note">—</span>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="ai-preview-row">
+                            <div className="ai-preview-cell ai-preview-date">—</div>
+                            <div className="ai-preview-cell ai-preview-note">暂无方案</div>
+                            <div className="ai-preview-cell ai-preview-note">—</div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="ai-preview-footer">可取消单条后再应用。</div>
+                    </div>
                   </div>
                 </div>
               )}

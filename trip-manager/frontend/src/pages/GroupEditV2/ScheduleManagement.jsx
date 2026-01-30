@@ -5,7 +5,7 @@ import CalendarDaysView from './CalendarDaysView';
 import api from '../../services/api';
 import './ScheduleManagement.css';
 
-const ScheduleManagement = ({ groupId, groupData, schedules, onUpdate, onPlanChange }) => {
+const ScheduleManagement = ({ groupId, groupData, schedules, onUpdate, onPlanChange, loading = false }) => {
   const [viewMode, setViewMode] = useState('calendar');
   const [localSchedules, setLocalSchedules] = useState(schedules || []);
   const saveTimeoutRef = useRef(null);
@@ -73,6 +73,7 @@ const ScheduleManagement = ({ groupId, groupData, schedules, onUpdate, onPlanCha
             schedules={localSchedules}
             onUpdate={handleScheduleUpdate}
             onPlanChange={onPlanChange}
+            loading={loading}
           />
         ) : (
           <>

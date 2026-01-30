@@ -9,6 +9,7 @@ const mapActivityRow = (row) => ({
   date: row.activity_date,
   timeSlot: row.time_slot,
   participantCount: row.participant_count,
+  notes: row.notes,
   scheduleId: row.schedule_id,
   isPlanItem: Boolean(row.is_plan_item)
 });
@@ -121,7 +122,8 @@ const syncActivityToSchedule = (db, activity, options = {}) => {
     ? db.prepare('SELECT name, address FROM locations WHERE id = ?').get(activity.location_id)
     : null;
 
-  const defaultTitle = location?.name || group?.name || '行程活动';
+  const noteTitle = activity?.notes ? String(activity.notes).trim() : '';
+  const defaultTitle = noteTitle || location?.name || group?.name || '行程活动';
   const resolvedTitle = existingSchedule?.title?.trim() ? existingSchedule.title : defaultTitle;
   const resolvedLocation = location?.name || existingSchedule?.location || '';
   const resolvedType = existingSchedule?.type || 'visit';
@@ -268,7 +270,7 @@ router.get('/', (req, res) => {
 // 获取原始活动数据（用于团组管理页面）
 router.get('/raw', (req, res) => {
   const activities = req.db.prepare(`
-    SELECT id, schedule_id, is_plan_item, group_id, location_id, activity_date, time_slot, participant_count
+    SELECT id, schedule_id, is_plan_item, group_id, location_id, activity_date, time_slot, participant_count, notes
     FROM activities
     ORDER BY activity_date, time_slot
   `).all();
@@ -278,7 +280,7 @@ router.get('/raw', (req, res) => {
 
 // 创建活动（需要编辑锁）
 router.post('/', requireEditLock, (req, res) => {
-  const { groupId, locationId, date, timeSlot, participantCount } = req.body;
+  const { groupId, locationId, date, timeSlot, participantCount, notes } = req.body;
   
   if (!groupId || !date || !timeSlot) {
     return res.status(400).json({ 
@@ -301,9 +303,9 @@ router.post('/', requireEditLock, (req, res) => {
   try {
     // 创建活动
     const result = req.db.prepare(`
-      INSERT INTO activities (group_id, location_id, activity_date, time_slot, participant_count)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(groupId, locationId ?? null, date, timeSlot, participantCount);
+      INSERT INTO activities (group_id, location_id, activity_date, time_slot, participant_count, notes)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(groupId, locationId ?? null, date, timeSlot, participantCount, notes ?? null);
 
     const activity = req.db.prepare('SELECT * FROM activities WHERE id = ?').get(result.lastInsertRowid);
     syncActivityToSchedule(req.db, activity, { reposition: true });
@@ -319,7 +321,7 @@ router.post('/', requireEditLock, (req, res) => {
 // 更新活动（需要编辑锁）
 router.put('/:id', requireEditLock, (req, res) => {
   const { id } = req.params;
-  const { locationId, date, timeSlot, participantCount } = req.body;
+  const { locationId, date, timeSlot, participantCount, notes } = req.body;
   
   // 获取当前活动信息
   const activity = req.db.prepare('SELECT * FROM activities WHERE id = ?').get(id);
@@ -363,6 +365,10 @@ router.put('/:id', requireEditLock, (req, res) => {
   if (participantCount !== undefined) {
     updates.push('participant_count = ?');
     values.push(participantCount);
+  }
+  if (notes !== undefined) {
+    updates.push('notes = ?');
+    values.push(notes ?? null);
   }
   
   if (updates.length === 0) {

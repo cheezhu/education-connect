@@ -18,7 +18,7 @@ const requireEditLock = (req, res, next) => {
   // 如果未持有锁，尝试为管理员自动获取
   if (!lockedBy) {
     const user = req.db.prepare('SELECT role FROM users WHERE username = ?').get(req.user);
-    if (user && user.role === 'admin') {
+    if (user && (user.role === 'admin' || user.role === 'editor')) {
       const newExpiry = new Date(Date.now() + 5 * 60 * 1000);
       req.db.prepare(`
         UPDATE edit_lock 
