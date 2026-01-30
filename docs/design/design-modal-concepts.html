@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EC Full Modal System</title>
+    <style>
+        :root {
+            --bg-app: #f0f2f5;
+            --accent: #1890ff;
+            --border: #e8e8e8;
+            --text: #262626;
+            --backdrop: rgba(0, 0, 0, 0.45);
+        }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-app);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 模拟背景 UI */
+        .background-ui {
+            flex: 1; padding: 20px; display: grid; grid-template-columns: 260px 1fr; gap: 20px;
+            filter: blur(0); transition: filter 0.3s;
+        }
+        .bg-sidebar { background: white; border: 1px solid var(--border); border-radius: 4px; padding: 10px; position: relative; overflow: hidden; }
+        .bg-main { background: white; border: 1px solid var(--border); border-radius: 4px; display: grid; grid-template-rows: 50px 1fr; position: relative; }
+        .bg-header { border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; font-weight: bold; color: #ccc; }
+        .bg-grid { background: #fafafa; display: grid; grid-template-columns: 60px repeat(3, 1fr); grid-template-rows: repeat(10, 40px); }
+        .grid-cell { border-right: 1px solid #eee; border-bottom: 1px solid #eee; position: relative; }
+        .grid-cell.active-spot { background: #e6f7ff; }
+
+        /* 控制台 */
+        .controls {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background: white; padding: 10px 20px; border-radius: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 2000;
+            display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+        }
+        .btn {
+            background: var(--accent); color: white; border: none; padding: 6px 14px;
+            border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 12px;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn-reset { background: #666; }
+
+        /* ========================================= */
+        /* Pattern 1: 全屏电子表格 (Full Spreadsheet) */
+        /* ========================================= */
+        .modal-xl-overlay {
+            position: fixed; inset: 0; background: var(--backdrop);
+            display: none; align-items: center; justify-content: center; z-index: 1000;
+            opacity: 0; transition: opacity 0.2s;
+        }
+        .modal-xl-overlay.visible { display: flex; opacity: 1; }
+        
+        .modal-xl {
+            width: 90vw; height: 85vh; background: white; border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2); display: flex; flex-direction: column;
+            transform: scale(0.95); transition: transform 0.2s;
+        }
+        .modal-xl-overlay.visible .modal-xl { transform: scale(1); }
+
+        .xl-header { padding: 16px 24px; border-bottom: 1px solid var(--border); font-size: 16px; font-weight: 600; display: flex; justify-content: space-between; }
+        .xl-body { flex: 1; overflow: auto; background: #f5f5f5; padding: 0; }
+        .xl-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px; }
+
+        .excel-table { width: 100%; border-collapse: collapse; background: white; }
+        .excel-table th { position: sticky; top: 0; background: #fafafa; z-index: 10; padding: 10px; text-align: left; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); font-size: 12px; color: #666; }
+        .excel-table td { border-bottom: 1px solid #eee; border-right: 1px solid #eee; padding: 0; }
+        .excel-input { width: 100%; padding: 10px; border: none; outline: none; font-size: 13px; }
+        .excel-input:focus { background: #e6f7ff; }
+
+        /* ========================================= */
+        /* Pattern 2: 侧滑抽屉 (Side Drawer)         */
+        /* ========================================= */
+        .drawer-overlay {
+            position: fixed; inset: 0; background: transparent; pointer-events: none;
+            display: none; z-index: 900;
+        }
+        .drawer-overlay.visible { display: block; pointer-events: auto; }
+        .drawer-backdrop {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.1); 
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .drawer-overlay.visible .drawer-backdrop { opacity: 1; }
+
+        .drawer {
+            position: absolute; top: 0; right: 0; bottom: 0; width: 400px;
+            background: white; box-shadow: -4px 0 16px rgba(0,0,0,0.1);
+            transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+            display: flex; flex-direction: column;
+        }
+        .drawer-overlay.visible .drawer { transform: translateX(0); }
+
+        .drawer-header { padding: 20px; border-bottom: 1px solid var(--border); font-size: 16px; font-weight: 600; display: flex; justify-content: space-between; }
+        .drawer-body { flex: 1; overflow-y: auto; padding: 24px; }
+        .drawer-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px; background: #fff; }
+        
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 12px; color: #666; }
+        .form-input { width: 100%; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; }
+
+        /* ========================================= */
+        /* Pattern 3: 底部面板 (Bottom Dock)         */
+        /* ========================================= */
+        .dock-overlay {
+            position: fixed; inset: 0; background: transparent; pointer-events: none;
+            display: none; z-index: 800;
+        }
+        .dock-overlay.visible { display: flex; align-items: flex-end; }
+
+        .dock {
+            width: 100%; height: 300px; background: white; 
+            box-shadow: 0 -4px 16px rgba(0,0,0,0.1); pointer-events: auto;
+            transform: translateY(100%); transition: transform 0.3s;
+            display: flex; flex-direction: column;
+        }
+        .dock-overlay.visible .dock { transform: translateY(0); }
+
+        .dock-header { padding: 10px 20px; background: #fafafa; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; font-weight: 600; font-size: 12px; color: #666; }
+        .dock-body { flex: 1; overflow-y: auto; padding: 0; }
+        .log-item { padding: 8px 20px; border-bottom: 1px solid #f0f0f0; font-family: monospace; font-size: 12px; display: flex; gap: 10px; }
+        .log-error { color: #ff4d4f; }
+
+        /* ========================================= */
+        /* Pattern 4: 原地气泡 (Inline Popover)      */
+        /* ========================================= */
+        .popover {
+            position: absolute; width: 300px; background: white; 
+            border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+            display: none; z-index: 500; border: 1px solid #f0f0f0;
+            top: 150px; left: 400px; /* Demo Position */
+            animation: popIn 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+        .popover.visible { display: block; }
+        
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.9) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .popover-arrow {
+            position: absolute; top: 20px; left: -6px; width: 12px; height: 12px;
+            background: white; transform: rotate(45deg); border-left: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0;
+        }
+        .popover-body { padding: 16px; }
+        .type-select { display: flex; gap: 8px; margin-bottom: 12px; }
+        .type-opt { font-size: 18px; padding: 4px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; opacity: 0.5; }
+        .type-opt.active { opacity: 1; background: #e6f7ff; border-color: #1890ff; }
+
+        /* ========================================= */
+        /* Pattern 5: 左侧面板 (Resource Drawer)     */
+        /* ========================================= */
+        .res-drawer {
+            position: absolute; top: 0; left: 0; bottom: 0; width: 100%; /* Cover sidebar */
+            background: #fafafa; 
+            transform: translateX(-100%); transition: transform 0.3s;
+            z-index: 600; display: flex; flex-direction: column;
+        }
+        .res-drawer.visible { transform: translateX(0); }
+        
+        .res-header { padding: 12px 16px; font-weight: 600; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; background: #fff; font-size: 13px; }
+        .res-body { padding: 16px; flex: 1; overflow-y: auto; }
+
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <button class="btn" onclick="openModal('xl')">1. 批量表格 (Full)</button>
+        <button class="btn" onclick="openModal('drawer')">2. 编辑抽屉 (Right)</button>
+        <button class="btn" onclick="openModal('dock')">3. 底部面板 (Bottom)</button>
+        <button class="btn" onclick="openModal('popover')">4. 原地气泡 (Inline)</button>
+        <button class="btn" onclick="openModal('resDrawer')">5. 资源录入 (Left)</button>
+        <button class="btn btn-reset" onclick="closeAll()">关闭所有</button>
+    </div>
+
+    <!-- 背景模拟 -->
+    <div class="background-ui">
+        <div class="bg-sidebar">
+            <div style="font-weight:bold; color:#ccc; margin-bottom:10px">RESOURCE LIBRARY</div>
+            <div style="height:30px; background:#f5f5f5; margin-bottom:8px"></div>
+            <div style="height:30px; background:#f5f5f5; margin-bottom:8px"></div>
+            
+            <!-- 5. Resource Drawer (Inside Sidebar) -->
+            <div id="resDrawer" class="res-drawer">
+                <div class="res-header">
+                    添加新资源
+                    <span style="cursor:pointer; color:#999" onclick="closeAll()">✕</span>
+                </div>
+                <div class="res-body">
+                    <div class="form-group">
+                        <label class="form-label">资源名称</label>
+                        <input class="form-input" placeholder="例如：香港历史博物馆">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">类型</label>
+                        <select class="form-input"><option>参观点 (Visit)</option></select>
+                    </div>
+                    <button class="btn" style="width:100%">保存资源</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-main">
+            <div class="bg-header">Calendar / Week 2</div>
+            <div class="bg-grid">
+                <!-- 4. Popover Container -->
+                <div id="popover" class="popover">
+                    <div class="popover-arrow"></div>
+                    <div class="popover-body">
+                        <div style="font-size:12px; font-weight:600; margin-bottom:12px">添加活动 @ 09:00</div>
+                        <div class="type-select">
+                            <div class="type-opt active">🏛️</div><div class="type-opt">🍽️</div><div class="type-opt">🚌</div>
+                        </div>
+                        <input class="form-input" placeholder="输入名称..." autofocus style="margin-bottom:8px">
+                        <div style="text-align:right"><button class="btn" style="padding:4px 12px">Create</button></div>
+                    </div>
+                </div>
+                
+                <!-- Grid Cells -->
+                <script>
+                    for(let i=0; i<40; i++) document.write('<div class="grid-cell"></div>');
+                </script>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. Modal XL -->
+    <div id="modal-xl" class="modal-xl-overlay">
+        <div class="modal-xl">
+            <div class="xl-header">批量创建团组 <span style="cursor:pointer" onclick="closeAll()">✕</span></div>
+            <div class="xl-body">
+                <table class="excel-table">
+                    <thead><tr><th>#</th><th>名称</th><th>类型</th><th>日期</th><th>人数</th></tr></thead>
+                    <tbody>
+                        <tr><td>1</td><td><input class="excel-input" value="示例团组"></td><td><input class="excel-input"></td><td><input class="excel-input"></td><td><input class="excel-input"></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="xl-footer"><button class="btn">保存</button></div>
+        </div>
+    </div>
+
+    <!-- 2. Drawer -->
+    <div id="modal-drawer" class="drawer-overlay">
+        <div class="drawer-backdrop" onclick="closeAll()"></div>
+        <div class="drawer">
+            <div class="drawer-header">编辑活动详情 <span style="cursor:pointer; float:right" onclick="closeAll()">✕</span></div>
+            <div class="drawer-body">
+                <div class="form-group"><label class="form-label">活动名称</label><input class="form-input" value="香港科学馆"></div>
+                <div class="form-group"><label class="form-label">时间</label><input class="form-input" value="09:00 - 11:30"></div>
+            </div>
+            <div class="drawer-footer"><button class="btn">保存修改</button></div>
+        </div>
+    </div>
+
+    <!-- 3. Dock -->
+    <div id="modal-dock" class="dock-overlay">
+        <div class="dock">
+            <div class="dock-header">系统日志 <span style="cursor:pointer" onclick="closeAll()">✕</span></div>
+            <div class="dock-body">
+                <div class="log-item"><span class="log-error">[Error]</span> Capacity exceeded</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function closeAll() {
+            document.querySelectorAll('.modal-xl-overlay, .drawer-overlay, .dock-overlay, .popover, .res-drawer').forEach(el => el.classList.remove('visible'));
+        }
+
+        function openModal(type) {
+            closeAll();
+            const el = type === 'popover' ? document.getElementById('popover') 
+                     : type === 'resDrawer' ? document.getElementById('resDrawer')
+                     : document.getElementById('modal-' + type);
+            if(el) el.classList.add('visible');
+        }
+    </script>
+
+</body>
+</html>

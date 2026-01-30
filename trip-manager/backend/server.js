@@ -189,7 +189,6 @@ const writeEditorRoles = ['admin', 'editor'];
 
 app.use('/api/lock', requireRole(['admin']), require('./src/routes/lock'));
 app.use('/api/activities', requireRole(['admin']), require('./src/routes/activities'));
-app.use('/api/ai', requireRole(['admin']), require('./src/routes/aiPlanner'));
 app.use('/api/planning', requireRole(['admin']), require('./src/routes/planning'));
 app.use('/api/config', requireRole(['admin']), require('./src/routes/systemConfig'));
 

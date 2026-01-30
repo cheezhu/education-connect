@@ -5,20 +5,23 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 /* 日历容器 */
-.calendar-container {
+.schedule-management .calendar-container {
   background: white;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid #f0f0f0;
+  height: 100%;
 }
 
 /* 滚动包装器 */
-.calendar-scroll-wrapper {
+.schedule-management .calendar-scroll-wrapper {
   overflow: auto;
-  max-height: 600px;
+  max-height: none;
+  height: 100%;
   position: relative;
 }
 

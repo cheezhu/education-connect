@@ -1,6 +1,12 @@
 ﻿import React from 'react';
 
-const TabBar = ({ activeTab, onTabChange, isSidebarCollapsed, onExpandSidebar }) => {
+const TabBar = ({
+  activeTab,
+  onTabChange,
+  isSidebarCollapsed,
+  onExpandSidebar,
+  onCollapseSidebar
+}) => {
   return (
     <div className="tab-container">
       <span
@@ -8,6 +14,12 @@ const TabBar = ({ activeTab, onTabChange, isSidebarCollapsed, onExpandSidebar })
         onClick={onExpandSidebar}
       >
         ← 列表
+      </span>
+      <span
+        className={`collapse-btn ${!isSidebarCollapsed ? 'visible' : ''}`}
+        onClick={onCollapseSidebar}
+      >
+        隐藏列表 →
       </span>
       <div
         className={`tab-item ${activeTab === 'profile' ? 'active' : ''}`}

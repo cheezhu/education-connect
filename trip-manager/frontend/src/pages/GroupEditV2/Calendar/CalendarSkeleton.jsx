@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 
-const CalendarSkeleton = ({ showResources = true, resourceWidth = 280 }) => {
+const CalendarSkeleton = ({ showResources = true, resourceWidth = 260 }) => {
   const dayColumns = Array.from({ length: 7 });
   const timeRows = Array.from({ length: 4 });
   const ghostEvents = [
@@ -10,7 +10,7 @@ const CalendarSkeleton = ({ showResources = true, resourceWidth = 280 }) => {
   ];
 
   return (
-    <div className="calendar-days-view calendar-skeleton">
+    <div className="calendar-days-view calendar-skeleton calendar-workshop">
       <div className="calendar-layout">
         <div className="calendar-container">
           <div className="calendar-scroll-wrapper">

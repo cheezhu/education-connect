@@ -154,15 +154,14 @@ const GroupManagementV2 = () => {
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    if (tab === 'schedule') {
-      setIsSidebarCollapsed(true);
-    } else {
-      setIsSidebarCollapsed(false);
-    }
   };
 
   const handleExpandSidebar = () => {
     setIsSidebarCollapsed(false);
+  };
+
+  const handleCollapseSidebar = () => {
+    setIsSidebarCollapsed(true);
   };
 
   const buildUpdatePayload = (group) => ({
@@ -349,6 +348,7 @@ const GroupManagementV2 = () => {
               onTabChange={handleTabChange}
               isSidebarCollapsed={isSidebarCollapsed}
               onExpandSidebar={handleExpandSidebar}
+              onCollapseSidebar={handleCollapseSidebar}
             />
 
             <div className="tab-content">

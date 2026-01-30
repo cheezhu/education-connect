@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EC Google Calendar - With Delete Action</title>
+    <style>
+        :root {
+            --bg-app: #f0f2f5;
+            --accent: #1890ff;
+            --shadow: 0 6px 16px -8px rgba(0,0,0,0.08), 0 9px 28px 0 rgba(0,0,0,0.05), 0 12px 48px 16px rgba(0,0,0,0.03);
+            --border: #e8eaed;
+            --text: #3c4043;
+            --danger: #d93025; /* Google Red */
+        }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #e6e6e6; 
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .calendar-bg {
+            width: 95vw; height: 90vh; background: white; border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative;
+            background-image: linear-gradient(#f5f5f5 1px, transparent 1px), linear-gradient(90deg, #f5f5f5 1px, transparent 1px);
+            background-size: 100% 50px, calc(100% / 7) 100%;
+            cursor: crosshair;
+        }
+        
+        .event-chip {
+            position: absolute; width: calc(95vw / 7 - 10px); height: 90px;
+            background: #1890ff; color: white; border-radius: 4px; padding: 8px; font-size: 12px;
+            cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        /* --- Smart Popover --- */
+        .g-popover {
+            position: fixed;
+            width: 420px; background: white; border-radius: 8px;
+            box-shadow: var(--shadow); z-index: 1000;
+            display: none; flex-direction: column;
+            animation: popFade 0.1s cubic-bezier(0.0, 0.0, 0.2, 1);
+        }
+        .g-popover.visible { display: flex; }
+        
+        /* Popover Header */
+        .pop-header {
+            padding: 8px 12px; display: flex; justify-content: flex-end; gap: 4px;
+            background: #f8f9fa; border-radius: 8px 8px 0 0;
+        }
+        .icon-btn {
+            width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; color: #5f6368;
+            font-size: 16px;
+        }
+        .icon-btn:hover { background: #e8eaed; color: #202124; }
+        .icon-btn.danger:hover { color: var(--danger); background: #fce8e6; }
+
+        .pop-body { padding: 16px 20px; }
+        .title-input { width: 100%; border: none; border-bottom: 1px solid var(--border); font-size: 20px; padding: 8px 0; outline: none; margin-bottom: 16px; color: var(--text); }
+        .title-input:focus { border-bottom: 2px solid var(--accent); }
+
+        .link-section { background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 16px; border: 1px solid var(--border); }
+        .link-header { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: #5f6368; text-transform: uppercase; margin-bottom: 8px; }
+        .link-toggle { color: var(--accent); cursor: pointer; }
+        .plan-select { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; }
+
+        .field-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: 13px; }
+        .mini-input { padding: 6px; border-radius: 4px; font-size: 13px; background: #f1f3f4; border: none; flex: 1; }
+
+        /* Footer */
+        .pop-footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+        .btn-text-danger { background: transparent; border: none; color: var(--danger); font-size: 13px; cursor: pointer; font-weight: 500; padding: 8px; margin-right: auto; }
+        .btn-text-danger:hover { background: #fce8e6; border-radius: 4px; }
+        .btn-save { background: #1a73e8; color: white; padding: 8px 24px; border-radius: 4px; border: none; cursor: pointer; font-weight: 600; }
+
+        /* Hide logic */
+        .mode-manual .plan-only { display: none; }
+        .mode-linked .manual-only { display: none; }
+    </style>
+</head>
+<body onclick="hidePopover()">
+
+    <div class="calendar-bg" id="calendar" onclick="handleGridClick(event)">
+        
+        <div class="event-chip" style="top: 100px; left: 20px;" onclick="handleEventClick(event, 'linked')">
+            <div>09:00 - 11:00</div>
+            <div style="font-weight:bold">点击我查看删除按钮</div>
+            <div style="font-size:10px; margin-top:4px">🔗 方案点</div>
+        </div>
+
+        <!-- 智能弹窗 -->
+        <div id="popover" class="g-popover" onclick="event.stopPropagation()">
+            <!-- Header with Quick Delete -->
+            <div class="pop-header">
+                <button class="icon-btn danger" title="删除" onclick="handleDelete()">🗑️</button>
+                <button class="icon-btn" title="关闭" onclick="hidePopover()">✕</button>
+            </div>
+
+            <div class="pop-body">
+                <input class="title-input" id="inpTitle" placeholder="添加标题" value="已有的行程活动">
+                
+                <div class="link-section">
+                    <div class="link-header">
+                        <span>数据来源</span>
+                        <span class="link-toggle" onclick="toggleMode()">切换至 <span id="switchLabel">行程点</span></span>
+                    </div>
+                    <div class="plan-only">
+                        <select class="plan-select"><option>香港科学馆</option></select>
+                    </div>
+                    <div class="manual-only" style="font-size:12px; color:#666">自定义活动</div>
+                </div>
+
+                <div class="field-row">🕒 <div class="mini-input">2025-09-12 09:00 - 11:00</div></div>
+                <div class="field-row">📍 <input class="mini-input" value="香港科学馆"></div>
+            </div>
+
+            <div class="pop-footer">
+                <!-- Bottom Left Delete -->
+                <button class="btn-text-danger" onclick="handleDelete()">删除活动</button>
+                <button class="btn-save" onclick="hidePopover()">保存</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let currentMode = 'linked';
+
+        function handleDelete() {
+            if(confirm('确定要删除这个活动吗？')) {
+                hidePopover();
+                alert('活动已移除');
+            }
+        }
+
+        function handleEventClick(e, mode) {
+            e.stopPropagation();
+            const rect = e.currentTarget.getBoundingClientRect();
+            showPopover(rect, mode);
+        }
+
+        function handleGridClick(e) {
+            if (e.target.id !== 'calendar') return;
+            const rect = { top: e.clientY - 25, left: e.clientX };
+            showPopover({ top: rect.top, right: e.clientX + 50, left: e.clientX - 50, bottom: e.clientY + 25 }, 'manual');
+        }
+
+        function showPopover(anchorRect, mode) {
+            const pop = document.getElementById('popover');
+            pop.classList.remove('visible');
+            setMode(mode);
+            setTimeout(() => {
+                pop.classList.add('visible');
+                // Positioning logic
+                let left = anchorRect.right + 10;
+                if (left + 420 > window.innerWidth) left = anchorRect.left - 430;
+                pop.style.left = left + 'px';
+                pop.style.top = Math.max(20, Math.min(anchorRect.top, window.innerHeight - pop.offsetHeight - 20)) + 'px';
+            }, 0);
+        }
+
+        function hidePopover() { document.getElementById('popover').classList.remove('visible'); }
+
+        function setMode(mode) {
+            currentMode = mode;
+            const pop = document.getElementById('popover');
+            const label = document.getElementById('switchLabel');
+            if (mode === 'linked') {
+                pop.classList.add('mode-linked'); pop.classList.remove('mode-manual');
+                label.innerText = '自定义活动';
+            } else {
+                pop.classList.add('mode-manual'); pop.classList.remove('mode-linked');
+                label.innerText = '行程点项目';
+            }
+        }
+
+        function toggleMode() { setMode(currentMode === 'manual' ? 'linked' : 'manual'); }
+    </script>
+
+</body>
+</html>
