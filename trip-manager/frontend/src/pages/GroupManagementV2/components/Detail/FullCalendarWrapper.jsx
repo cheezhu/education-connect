@@ -1,7 +1,7 @@
 ﻿import React from 'react';
 import ScheduleManagement from '../../../GroupEditV2/ScheduleManagement';
 
-const FullCalendarWrapper = ({ group, schedules, onSchedulesUpdate }) => {
+const FullCalendarWrapper = ({ group, schedules, onSchedulesUpdate, resourceWidth }) => {
   if (!group) {
     return <div className="calendar-fullscreen">请选择团组</div>;
   }
@@ -12,6 +12,7 @@ const FullCalendarWrapper = ({ group, schedules, onSchedulesUpdate }) => {
       groupData={group}
       schedules={schedules}
       onUpdate={onSchedulesUpdate}
+      resourceWidth={resourceWidth}
     />
   );
 };

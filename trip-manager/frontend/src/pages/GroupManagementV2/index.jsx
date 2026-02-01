@@ -7,6 +7,7 @@ import GroupList from './components/Sidebar/GroupList';
 import TabBar from './components/Detail/TabBar';
 import ProfileView from './components/Detail/ProfileView';
 import FullCalendarWrapper from './components/Detail/FullCalendarWrapper';
+import LogisticsView from './components/Detail/Logistics/LogisticsView';
 import BulkCreateModal from './components/Modals/BulkCreateModal';
 import MemberManagement from '../GroupEditV2/MemberManagement';
 import GroupCommandCenterSkeleton from './components/GroupCommandCenterSkeleton';
@@ -23,6 +24,7 @@ const GroupManagementV2 = () => {
   const [groupSchedules, setGroupSchedules] = useState([]);
   const [hasMembers, setHasMembers] = useState(false);
   const [itineraryPlans, setItineraryPlans] = useState([]);
+  const [rightPanelWidth, setRightPanelWidth] = useState(260);
 
   const [filters, setFilters] = useState({
     searchText: '',
@@ -197,9 +199,17 @@ const GroupManagementV2 = () => {
         const payload = buildUpdatePayload(updatedGroup);
         const response = await api.put(`/groups/${updatedGroup.id}`, payload);
         if (response.data?.group) {
-          setGroups(prev => prev.map(group => (
-            group.id === updatedGroup.id ? { ...group, ...response.data.group } : group
-          )));
+          setGroups(prev => prev.map(group => {
+            if (group.id !== updatedGroup.id) return group;
+            const preservedProps = updatedGroup.properties ?? group.properties;
+            const preservedLogistics = updatedGroup.logistics ?? group.logistics;
+            return {
+              ...group,
+              ...response.data.group,
+              properties: preservedProps,
+              logistics: preservedLogistics
+            };
+          }));
         }
       } catch (error) {
         message.error('保存失败');
@@ -360,6 +370,16 @@ const GroupManagementV2 = () => {
                   itineraryPlans={itineraryPlans}
                   onUpdate={handleGroupUpdate}
                   onDelete={handleDeleteGroup}
+                  rightPanelWidth={rightPanelWidth}
+                  onResizeRightPanel={setRightPanelWidth}
+                />
+              </div>
+
+              <div className={`content-pane ${activeTab === 'logistics' ? 'active' : ''}`}>
+                <LogisticsView
+                  group={activeGroup}
+                  schedules={groupSchedules}
+                  onUpdate={handleGroupUpdate}
                 />
               </div>
 
@@ -368,6 +388,7 @@ const GroupManagementV2 = () => {
                   group={activeGroup}
                   schedules={groupSchedules}
                   onSchedulesUpdate={handleScheduleUpdate}
+                  resourceWidth={rightPanelWidth}
                 />
               </div>
 

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EC Logistics - Full Context</title>
+    <style>
+        :root {
+            --bg-app: #f0f2f5;
+            --accent: #1890ff;
+            --border: #e8e8e8;
+            --text: #262626;
+            --text-mute: #8c8c8c;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-app);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .view-container { flex: 1; overflow-y: auto; padding: 30px; display: flex; justify-content: center; }
+        .logistics-list { width: 100%; max-width: 900px; display: flex; flex-direction: column; gap: 24px; }
+        
+        .day-card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; border: 1px solid var(--border); overflow: hidden; }
+        
+        /* 1. Left Sidebar (Date & City) */
+        .day-context { width: 140px; background: #fafafa; border-right: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .date-large { font-size: 20px; font-weight: 700; color: #333; margin-bottom: 4px; }
+        .date-week { font-size: 12px; color: #999; font-weight: 600; text-transform: uppercase; margin-bottom: 16px; }
+        
+        /* City Tag in Context */
+        .city-box { 
+            width: 100%; margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .city-label { font-size: 10px; font-weight: 700; color: #bbb; text-transform: uppercase; }
+        .city-input { border: none; background: transparent; text-align: center; font-weight: 600; color: var(--accent); font-size: 13px; outline: none; width: 100%; }
+        .city-input:focus { color: #333; background: #fff; border-radius: 4px; box-shadow: 0 0 0 1px #eee; }
+
+        .day-form { flex: 1; padding: 20px 24px; display: flex; flex-direction: column; gap: 20px; position: relative; }
+        .day-actions { position: absolute; top: 16px; right: 20px; }
+        .btn-link { font-size: 12px; color: var(--accent); cursor: pointer; background: transparent; border: none; padding: 0; }
+
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 32px; }
+        .input-group { display: flex; flex-direction: column; gap: 6px; position: relative; }
+        .label { font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; }
+        .input-box { width: 100%; padding: 8px 10px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 13px; color: #333; transition: all 0.2s; }
+        .input-box:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(24,144,255,0.1); outline: none; }
+
+        /* Mega Meal Section */
+        .meal-section { background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .meal-row { display: flex; align-items: center; gap: 12px; }
+        .meal-label-box { width: 80px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #389e0d; }
+        .meal-input { flex: 1; padding: 8px 12px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 13px; background: white; }
+        .meal-input:focus { border-color: #52c41a; box-shadow: 0 0 0 2px rgba(82,196,26,0.1); outline: none; }
+
+    </style>
+</head>
+<body>
+
+    <div class="view-container active">
+        <div class="logistics-list">
+            
+            <!-- Day 1 Card -->
+            <div class="day-card">
+                <div class="day-context">
+                    <div class="date-large">12</div>
+                    <div class="date-week">Mon / Sep</div>
+                    
+                    <!-- NEW: City Context -->
+                    <div class="city-box">
+                        <div class="city-label">📍 所在城市</div>
+                        <input class="city-input" value="香港" placeholder="输入城市...">
+                    </div>
+
+                    <div style="margin-top:20px; font-size:10px; color:#999; text-align:left; width:100%">
+                        <div style="font-weight:bold; margin-bottom:4px">行程参考:</div>
+                        <div style="color:#666">09:00 科技馆</div>
+                        <div style="color:#666">14:00 创客课程</div>
+                    </div>
+                </div>
+                
+                <div class="day-form">
+                    <div class="day-actions"><button class="btn-link">📋 复制上一天</button></div>
+
+                    <!-- Row 1 -->
+                    <div class="form-grid">
+                        <div class="input-group">
+                            <label class="label">🏨 住宿酒店</label>
+                            <input class="input-box" value="专家公寓 A栋">
+                        </div>
+                        <div class="input-group">
+                            <label class="label">🚌 车辆调度</label>
+                            <input class="input-box" value="王师傅 - 粤B·12345">
+                        </div>
+                    </div>
+
+                    <!-- Row 2 -->
+                    <div class="form-grid">
+                        <div class="input-group"><label class="label">🚩 随团导游</label><input class="input-box" value="张小导"></div>
+                        <div class="input-group"><label class="label">🛡️ 安全员</label><input class="input-box" placeholder="点击选择..."></div>
+                    </div>
+
+                    <!-- Row 3: Meals -->
+                    <div class="meal-section">
+                        <div class="meal-row">
+                            <div class="meal-label-box">🌅 早餐</div>
+                            <input class="meal-input" value="自理">
+                        </div>
+                        <div class="meal-row">
+                            <div class="meal-label-box">☀️ 午餐</div>
+                            <input class="meal-input" value="基地围餐 (30元/人)">
+                        </div>
+                        <div class="meal-row">
+                            <div class="meal-label-box">🌙 晚餐</div>
+                            <input class="meal-input" value="酒店自助">
+                        </div>
+                    </div>
+
+                    <!-- Row 4: Note -->
+                    <div class="input-group">
+                        <input class="input-box" style="background:#fafafa; border:none" placeholder="📝 添加当日特殊备注...">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>

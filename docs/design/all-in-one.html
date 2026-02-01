@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EC Group Center - All-in-One Doc</title>
+    <style>
+        :root {
+            --bg-app: #ffffff;
+            --text-main: #37352f;
+            --text-mute: #9b9a97;
+            --accent: #2383e2;
+            --hover: #f5f5f5;
+            --line: #e9e9e8;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+            background: var(--bg-app);
+            color: var(--text-main);
+            font-size: 16px;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .nav-sidebar { width: 240px; background: #f7f7f5; border-right: 1px solid var(--line); display: flex; flex-direction: column; flex-shrink: 0; }
+        .nav-header { padding: 16px; font-weight: 600; color: var(--text-mute); font-size: 12px; }
+        .nav-item { padding: 6px 16px; cursor: pointer; font-size: 14px; color: #5f5e5b; display: flex; align-items: center; gap: 8px; }
+        .nav-item:hover { background: #e9e9e8; }
+        .nav-item.active { background: #e9e9e8; font-weight: 500; color: var(--text-main); }
+
+        /* Main Doc Container */
+        .doc-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .doc-actions { height: 44px; display: flex; align-items: center; padding: 0 12px; gap: 12px; position: sticky; top: 0; background: rgba(255,255,255,0.9); backdrop-filter: blur(4px); z-index: 10; }
+        .breadcrumb { font-size: 13px; color: var(--text-mute); }
+
+        .doc-content { 
+            flex: 1; overflow-y: auto; padding: 40px 96px 100px;
+            max-width: 900px; margin: 0 auto; width: 100%;
+        }
+
+        /* Header */
+        .doc-icon { font-size: 78px; margin-bottom: 20px; }
+        .doc-title { font-size: 40px; font-weight: 700; border: none; width: 100%; outline: none; line-height: 1.2; margin-bottom: 24px; color: var(--text-main); }
+        
+        /* Properties */
+        .prop-grid { display: flex; flex-direction: column; margin-bottom: 40px; border-bottom: 1px solid var(--line); padding-bottom: 24px; }
+        .prop-row { display: flex; padding: 6px 0; align-items: flex-start; }
+        .prop-key { width: 160px; color: var(--text-mute); display: flex; align-items: center; gap: 6px; font-size: 14px; }
+        .prop-icon { width: 20px; text-align: center; }
+        .prop-val { flex: 1; }
+        .prop-input { width: 100%; border: none; font-size: 14px; outline: none; background: transparent; }
+        .prop-tag { background: rgba(235, 236, 237, 0.6); padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #444; }
+
+        /* Sections */
+        .block-h1 { font-size: 24px; font-weight: 600; margin-top: 40px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+        .block-h2 { font-size: 18px; font-weight: 600; margin-top: 24px; margin-bottom: 8px; color: var(--text-main); }
+        
+        .schedule-row { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 12px; }
+        .schedule-card { 
+            min-width: 240px; border: 1px solid var(--line); border-radius: 6px; padding: 16px; 
+            background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: all 0.2s;
+        }
+        .schedule-card:hover { background: #fbfbfa; }
+        .sc-time { font-size: 12px; color: var(--text-mute); font-weight: 600; margin-bottom: 4px; }
+        .sc-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+        .sc-loc { font-size: 13px; color: #666; }
+
+        .logistics-area { background: #f9f9f8; padding: 16px; border-radius: 6px; margin-top: 16px; }
+        .logistics-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+        .logistics-table th { text-align: left; color: var(--text-mute); font-weight: 400; padding: 8px; border-bottom: 1px solid var(--line); font-size: 12px; }
+        .logistics-table td { padding: 8px; border-bottom: 1px solid var(--line); }
+        
+        .toc { position: fixed; right: 20px; top: 100px; width: 150px; color: var(--text-mute); font-size: 12px; display: none; }
+        @media (min-width: 1400px) { .toc { display: block; } }
+        .toc-item { padding: 4px 0; cursor: pointer; }
+        .toc-item:hover { color: var(--text-main); }
+
+    </style>
+</head>
+<body>
+
+    <div class="nav-sidebar">
+        <div class="nav-header">Workspaces</div>
+        <div class="nav-item active">📄 深圳实验中学</div>
+        <div class="nav-item">📄 广州天河小学</div>
+    </div>
+
+    <div class="doc-container">
+        <div class="doc-actions">
+            <span class="breadcrumb">团组管理 / 深圳实验中学</span>
+        </div>
+
+        <div class="doc-content">
+            <div class="doc-icon">🏫</div>
+            <input class="doc-title" value="深圳实验中学 (高二)">
+
+            <div class="prop-grid">
+                <div class="prop-row">
+                    <div class="prop-key"><span class="prop-icon">🗓️</span> Date</div>
+                    <div class="prop-val"><input class="prop-input" value="Sep 12, 2025 → Sep 18, 2025"></div>
+                </div>
+                <div class="prop-row">
+                    <div class="prop-key"><span class="prop-icon">👤</span> Contact</div>
+                    <div class="prop-val"><input class="prop-input" value="张老师 (13800138000)"></div>
+                </div>
+                <div class="prop-row">
+                    <div class="prop-key"><span class="prop-icon">🏷️</span> Tags</div>
+                    <div class="prop-val"><span class="prop-tag">进行中</span> <span class="prop-tag">中学团</span></div>
+                </div>
+            </div>
+
+            <div class="block-h1">📅 行程概览</div>
+            
+            <!-- Day 1 -->
+            <div class="block-h2">Day 1: 09-12 (周一)</div>
+            <div class="schedule-row">
+                <div class="schedule-card">
+                    <div class="sc-time">09:00 - 12:00</div>
+                    <div class="sc-title">科技馆A厅主题参观</div>
+                    <div class="sc-loc">📍 广东省科技馆</div>
+                </div>
+                <div class="schedule-card">
+                    <div class="sc-time">12:00 - 13:30</div>
+                    <div class="sc-title">基地特色午餐</div>
+                    <div class="sc-loc">🍽️ 园区二号餐厅</div>
+                </div>
+            </div>
+            
+            <div class="logistics-area">
+                <div style="font-weight:600; font-size:12px; color:#666; margin-bottom:8px">🚌 当日资源配置</div>
+                <table class="logistics-table">
+                    <thead><tr><th>车辆</th><th>导游</th><th>住宿</th></tr></thead>
+                    <tbody><tr><td>粤B·12345 (王师傅)</td><td>张小导 (138...)</td><td>专家公寓 A栋</td></tr></tbody>
+                </table>
+            </div>
+
+            <!-- Day 2 -->
+            <div class="block-h2" style="margin-top:40px">Day 2: 09-13 (周二)</div>
+            <div class="schedule-row">
+                <div class="schedule-card">
+                    <div class="sc-time">09:00 - 17:00</div>
+                    <div class="sc-title">华南植物园自然笔记</div>
+                    <div class="sc-loc">📍 华南植物园</div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="toc">
+            <div style="font-weight:600; margin-bottom:8px">TABLE OF CONTENTS</div>
+            <div class="toc-item">Properties</div>
+            <div class="toc-item">Day 1: 09-12</div>
+            <div class="toc-item">Day 2: 09-13</div>
+        </div>
+    </div>
+
+</body>
+</html>

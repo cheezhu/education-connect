@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EC Group Command Center - Final Fix</title>
+    <title>EC Group Center - Full Fidelity Profile</title>
     <style>
         :root {
             --bg-app: #f0f2f5;
@@ -15,8 +15,7 @@
             --accent: #1890ff;
             --hover: #f5f5f5;
             --selected: #e6f7ff;
-            --color-danger: #ff4d4f;
-            --trans-speed: 0.3s;
+            --trans-speed: 0.2s;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -29,96 +28,72 @@
             display: flex;
         }
 
-        /* Activity Bar */
+        /* 1. Shell Elements */
         .activity-bar { width: 44px; background: #001529; display: flex; flex-direction: column; align-items: center; padding-top: 10px; flex-shrink: 0; }
         .activity-icon { font-size: 18px; color: rgba(255,255,255,0.65); margin-bottom: 18px; cursor: pointer; }
-        .activity-icon.active { color: white; border-left: 2px solid white; width: 100%; text-align: center; }
+        .group-list { width: 240px; border-right: 1px solid var(--border); background: #fbfbfb; flex-shrink: 0; display: flex; flex-direction: column; height: 100%; }
+        .list-header { padding: 12px; border-bottom: 1px solid var(--border); font-weight: bold; color: #888; font-size: 10px; text-transform: uppercase; }
+        .list-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .list-item.active { background: #fff; border-right: 2px solid var(--accent); box-shadow: -2px 0 5px rgba(0,0,0,0.02); }
 
-        /* Main Layout */
-        .layout { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100%; }
-
-        .content-split { flex: 1; display: flex; overflow: hidden; position: relative; height: 100%; }
-
-        /* Left Group List */
-        .group-list { 
-            width: 260px; border-right: 1px solid var(--border); background: #fff; flex-shrink: 0; 
-            display: flex; flex-direction: column; height: 100%; transition: width var(--trans-speed);
-        }
-        .group-list.collapsed { width: 0; border-right: none; overflow: hidden; }
-        
-        .sidebar-header { padding: 12px 16px; border-bottom: 1px solid var(--border); background: #fafafa; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; height: 45px; }
-        .sidebar-title { font-weight: 700; color: #595959; font-size: 12px; }
-        .btn-icon-add { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; background: var(--accent); color: white; border-radius: 4px; cursor: pointer; font-weight: bold; }
-
-        .sidebar-search { padding: 8px 12px; border-bottom: 1px solid var(--border); background: #fff; display: flex; gap: 6px; flex-shrink: 0; height: 45px; }
-        .search-input { flex: 1; background: #f5f5f5; border: 1px solid transparent; border-radius: 4px; padding: 4px 8px; font-size: 12px; outline: none; }
-        .btn-filter { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border: 1px solid #d9d9d9; border-radius: 4px; cursor: pointer; }
-
-        .list-content { flex: 1; overflow-y: auto; min-height: 0; }
-        .list-item { padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; }
-        .list-item.active { background: var(--selected); border-right: 3px solid var(--accent); }
-        .item-name { font-weight: 600; font-size: 13px; color: var(--text); margin-bottom: 4px; }
-        .item-meta { font-size: 11px; color: var(--text-mute); }
-
-        .sidebar-footer { padding: 8px 12px; border-top: 1px solid var(--border); background: #fafafa; flex-shrink: 0; height: 45px; display: flex; align-items: center; }
-        .btn-bulk { width: 100%; border: 1px dashed #d9d9d9; background: #fff; color: #666; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 11px; }
-
-        /* Detail View */
-        .detail-view { flex: 1; background: #fff; display: flex; flex-direction: column; overflow: hidden; height: 100%; }
-        
-        .tab-container { background: #fff; border-bottom: 1px solid var(--border); display: flex; padding: 0 16px; height: 45px; align-items: center; gap: 20px; flex-shrink: 0; }
-        .expand-btn { display: none; padding: 2px 8px; background: var(--accent); border-radius: 2px; color: white; cursor: pointer; font-size: 11px; margin-right: 10px; }
+        .layout { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #fff; height: 100%; }
+        .tab-container { background: #fff; border-bottom: 1px solid var(--border); display: flex; padding: 0 20px; height: 40px; align-items: center; gap: 24px; flex-shrink: 0; }
         .tab-item { font-size: 12px; color: var(--text-mute); cursor: pointer; height: 100%; display: flex; align-items: center; position: relative; }
         .tab-item.active { color: var(--accent); font-weight: 600; }
         .tab-item.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: var(--accent); }
 
         .tab-content { flex: 1; overflow: hidden; position: relative; height: 100%; }
-        .content-pane { display: none; height: 100%; width: 100%; flex-direction: column; }
-        .content-pane.active { display: flex; } /* Changed to flex */
+        .content-pane { display: none; height: 100%; width: 100%; }
+        .content-pane.active { display: flex; animation: fadeIn 0.2s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Profile Layout */
-        .profile-layout { display: flex; height: 100%; width: 100%; overflow: hidden; }
-        .profile-sidebar { width: 450px; padding: 20px; overflow-y: auto; border-right: 1px solid var(--border); background: #fff; flex-shrink: 0; height: 100%; }
-        .profile-main { flex: 1; padding: 20px 30px; overflow-y: auto; background: #fff; height: 100%; }
-
-        /* Props */
-        .prop-section { margin-bottom: 24px; }
-        .prop-section-title { font-size: 11px; font-weight: bold; color: var(--text-mute); border-bottom: 1px solid #f0f0f0; padding-bottom: 4px; margin-bottom: 12px; }
-        .prop-grid { display: grid; grid-template-columns: 90px 1fr; gap: 10px 16px; align-items: center; }
-        .prop-label { color: var(--text-mute); font-size: 11px; }
-        .prop-input { padding: 5px 8px; border: 1px solid #d9d9d9; border-radius: 3px; font-size: 12px; width: 100%; }
-        .prop-input:disabled { background: #f5f5f5; color: #999; cursor: not-allowed; }
+        /* --- TAB 1: Profile View --- */
+        .profile-layout { display: flex; height: 100%; width: 100%; }
         
-        .compact-row { display: flex; gap: 10px; align-items: center; }
-        .sync-badge { font-size: 10px; color: var(--accent); background: #e6f7ff; border: 1px solid #91d5ff; padding: 1px 4px; border-radius: 2px; margin-left: 4px; cursor: help; }
+        /* Profile Sidebar (Middle Area - NOW FLEXIBLE) */
+        .profile-sidebar { 
+            flex: 1; /* Takes remaining center space */
+            padding: 24px 40px; 
+            overflow-y: auto; 
+            border-right: 1px solid var(--border); 
+            background: #fff; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 24px;
+        }
 
-        /* Timeline */
-        .timeline-stream { position: relative; padding-left: 16px; }
-        .timeline-stream::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: #eee; }
-        .day-block { margin-bottom: 24px; position: relative; }
-        .day-dot { position: absolute; left: -20px; top: 2px; width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); }
-        .day-title { font-size: 12px; font-weight: bold; color: #555; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-        .event-item { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid #f5f5f5; align-items: baseline; }
-        .event-time { font-family: monospace; color: #888; width: 85px; flex-shrink: 0; }
+        /* Profile Main (Right Area - NOW FIXED 240px) */
+        .profile-main { 
+            width: 240px; /* Same as left group-list */
+            padding: 20px 12px; 
+            overflow-y: auto; 
+            background: #f7f8fa; 
+            flex-shrink: 0;
+        }
 
-        .btn-save-fixed { position: sticky; bottom: 0; background: #fff; padding-top: 12px; border-top: 1px solid var(--border); margin-top: 12px; display: flex; gap: 10px; }
-        .btn-save { flex: 1; background: var(--accent); border: none; color: white; padding: 8px; border-radius: 3px; cursor: pointer; font-weight: 600; }
-        .btn-delete { background: #fff1f0; border: 1px solid #ffa39e; color: var(--color-danger); padding: 8px 16px; border-radius: 3px; cursor: pointer; }
+        /* Adjustments for the new flexible center */
+        .master-card {
+            max-width: 800px; /* Prevent over-stretching on huge monitors */
+        }
+        .prop-section {
+            max-width: 800px;
+        }
 
-        /* Modal */
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-overlay.visible { display: flex; }
-        .modal-box { background: white; width: 850px; height: 500px; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; flex-direction: column; }
-        .modal-header { padding: 12px 20px; border-bottom: 1px solid var(--border); font-weight: 600; display: flex; justify-content: space-between; }
-        .modal-body { flex: 1; overflow: auto; }
-        .bulk-table { width: 100%; border-collapse: collapse; }
-        .bulk-table th { background: #fafafa; padding: 8px; text-align: left; border-bottom: 1px solid var(--border); font-size: 11px; }
-        .bulk-input { border: none; width: 100%; padding: 6px; font-size: 12px; outline: none; }
-        .filter-popover { position: absolute; left: 12px; top: 80px; width: 200px; background: #fff; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 4px; padding: 8px; z-index: 100; display: none; }
-        .filter-popover.visible { display: block; }
-        
-        /* Calendar Mock */
-        .calendar-fullscreen { height: 100%; display: flex; align-items: center; justify-content: center; color: #999; font-size: 14px; background: #fbfbfb; width: 100%; }
+        /* Timeline Stream (Compact for 240px) */
+        .timeline-stream { position: relative; padding-left: 12px; }
+        .timeline-stream::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: #e8e8e8; }
+        .day-block { margin-bottom: 20px; position: relative; }
+        .day-dot { position: absolute; left: -17px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); }
+        .day-header { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
+        .event-card { 
+            background: #fff; border: 1px solid #e8e8e8; border-left: 2px solid var(--accent);
+            padding: 8px 10px; border-radius: 4px; margin-bottom: 6px; 
+            display: flex; flex-direction: column; gap: 2px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02); 
+        }
+        .event-time { font-family: monospace; color: #999; font-weight: 600; font-size: 10px; }
+        .event-title { font-weight: 500; font-size: 12px; color: #333; }
+
     </style>
 </head>
 <body>
@@ -126,161 +101,112 @@
     <div class="activity-bar">
         <div class="activity-icon">📄</div>
         <div class="activity-icon active">👥</div>
-        <div class="activity-icon">📦</div>
+    </div>
+
+    <div class="group-list">
+        <div class="list-header">活跃团组</div>
+        <div class="list-item active">深圳实验中学</div>
+        <div class="list-item">广州天河小学</div>
     </div>
 
     <div class="layout">
-        <div class="content-split">
-            <!-- Left Group List -->
-            <div class="group-list" id="sidebar">
-                <div class="sidebar-header">
-                    <span class="sidebar-title">GROUPS (3)</span>
-                    <div class="btn-icon-add" onclick="createNewGroup()">＋</div>
-                </div>
-                
-                <div class="sidebar-search">
-                    <input type="text" class="search-input" placeholder="Search...">
-                    <div class="btn-filter" onclick="toggleFilter()">▼</div>
-                </div>
-                
-                <div id="filterMenu" class="filter-popover">
-                    <label style="display:block; padding:4px;"><input type="checkbox" checked> Active</label>
-                    <label style="display:block; padding:4px;"><input type="checkbox" checked> Prep</label>
-                </div>
+        <div class="tab-container">
+            <div class="tab-item active">团组信息</div>
+            <div class="tab-item">旅行资源</div>
+            <div class="tab-item">人员信息</div>
+        </div>
 
-                <div class="list-content">
-                    <div class="list-item active" onclick="loadGroup('G1')">
-                        <div class="item-name">深圳实验中学</div>
-                        <div class="item-meta">G-20250912-01 • 48人</div>
-                    </div>
-                    <div class="list-item" onclick="loadGroup('G2')">
-                        <div class="item-name">广州天河小学</div>
-                        <div class="item-meta">G-20250915-02 • 32人</div>
-                    </div>
-                    <div class="list-item">
-                        <div class="item-name">武汉华中附中</div>
-                        <div class="item-meta">G-20250801-09 • 50人</div>
-                    </div>
-                </div>
-
-                <div class="sidebar-footer">
-                    <button class="btn-bulk" onclick="openBulkModal()">Batch Create...</button>
-                </div>
-            </div>
-
-            <!-- Detail -->
-            <div class="detail-view">
-                <div class="tab-container">
-                    <span id="expandBtn" class="expand-btn" onclick="toggleSidebar(true)">← 列表</span>
-                    <div class="tab-item active" onclick="switchTab('profile', this)">团组信息</div>
-                    <div class="tab-item" onclick="switchTab('schedule', this)">日历详情</div>
-                    <div class="tab-item" onclick="switchTab('members', this)">人员信息</div>
-                </div>
-
-                <div class="tab-content">
-                    <!-- Profile -->
-                    <div id="pane-profile" class="content-pane active">
-                        <div class="profile-layout">
-                            <div class="profile-sidebar">
-                                <div class="prop-section">
-                                    <div class="prop-section-title">基本信息</div>
-                                    <div class="prop-grid">
-                                        <div class="prop-label">团组名称</div>
-                                        <input class="prop-input" value="深圳实验中学" id="inputName">
-                                        <div class="prop-label">团组类型</div>
-                                        <select class="prop-input"><option>中学</option><option>小学</option></select>
-                                        <div class="prop-label">起止日期</div>
-                                        <div class="compact-row">
-                                            <input class="prop-input" type="date" value="2025-09-12">
-                                            <span>-</span>
-                                            <input class="prop-input" type="date" value="2025-09-18">
-                                        </div>
-                                        
-                                        <div class="prop-label">
-                                            人数信息
-                                            <span class="sync-badge" title="数据来源于人员名单，自动计算">🔗 Auto</span>
-                                        </div>
-                                        <div class="compact-row">
-                                            <div style="flex:1; position:relative">
-                                                <input class="prop-input" type="number" value="45" disabled style="padding-left:20px">
-                                                <span style="position:absolute; left:6px; top:5px; color:#999; font-size:10px">生</span>
-                                            </div>
-                                            <div style="flex:1; position:relative">
-                                                <input class="prop-input" type="number" value="3" disabled style="padding-left:20px">
-                                                <span style="position:absolute; left:6px; top:5px; color:#999; font-size:10px">师</span>
-                                            </div>
-                                            <div style="width:40px; text-align:right; font-weight:bold; color:#1890ff">48</div>
-                                        </div>
-                                    </div>
+        <div class="tab-content">
+            
+            <div id="pane-profile" class="content-pane active">
+                <div class="profile-layout">
+                    <!-- Left sidebar with Rich Media Card -->
+                    <div class="profile-sidebar">
+                        
+                        <!-- THE RICH MEDIA CARD (Summary View) -->
+                        <div class="master-card">
+                            <div class="mc-header">
+                                <h3 class="mc-title">深圳实验中学</h3>
+                                <span class="mc-status">● 进行中</span>
+                            </div>
+                            <div class="mc-grid">
+                                <div class="mc-item">
+                                    <span class="mc-lbl">团组类型</span>
+                                    <span class="mc-val">🧑 中学团组</span>
                                 </div>
-                                <div class="prop-section">
-                                    <div class="prop-section-title">联系信息</div>
-                                    <div class="prop-grid">
-                                        <div class="prop-label">联系人</div><input class="prop-input" value="张老师">
-                                        <div class="prop-label">电话</div><input class="prop-input" value="13800138000">
-                                    </div>
+                                <div class="mc-item">
+                                    <span class="mc-lbl">师生人数</span>
+                                    <span class="mc-val">45 👦 / 3 🧑 (48)</span>
                                 </div>
-                                <div class="btn-save-fixed">
-                                    <button class="btn-delete" onclick="deleteGroup()">删除</button>
-                                    <button class="btn-save">保存修改</button>
+                                <div class="mc-item">
+                                    <span class="mc-lbl">行程日期</span>
+                                    <span class="mc-val">09-12 至 09-18</span>
+                                </div>
+                                <div class="mc-item">
+                                    <span class="mc-lbl">行程时长</span>
+                                    <span class="mc-val">5 天</span>
                                 </div>
                             </div>
+                        </div>
 
-                            <div class="profile-main">
-                                <div class="timeline-stream">
-                                    <div class="day-block">
-                                        <div class="day-dot"></div>
-                                        <div class="day-title">09-12 周一</div>
-                                        <div class="event-item"><span class="event-time">09:00</span><span>科技馆A厅主题参观</span></div>
-                                        <div class="event-item"><span class="event-time">14:00</span><span>创客工作室</span></div>
-                                    </div>
-                                    <div class="day-block">
-                                        <div class="day-dot" style="border-color:#52c41a"></div>
-                                        <div class="day-title">09-13 周二</div>
-                                        <div class="event-item"><span class="event-time">09:00</span><span>华南植物园自然笔记</span></div>
-                                    </div>
+                        <!-- Editable Fields (1:1 with Project) -->
+                        <div class="prop-section">
+                            <div class="prop-title">联系人信息 (Contacts)</div>
+                            <div class="prop-grid">
+                                <div class="prop-lbl">主联系人</div>
+                                <input class="smart-input" value="张老师">
+                                <div class="prop-lbl">联系电话</div>
+                                <input class="smart-input" value="13800138000">
+                                <div class="prop-lbl">紧急联系人</div>
+                                <input class="smart-input" value="李校长">
+                            </div>
+                        </div>
+
+                        <div class="prop-section">
+                            <div class="prop-title">后勤保障 (Logistics)</div>
+                            <div class="prop-grid">
+                                <div class="prop-lbl">住宿安排</div>
+                                <input class="smart-input" value="园区专家公寓 A栋">
+                                <div class="prop-lbl">行程方案</div>
+                                <select class="smart-input">
+                                    <option>科技研学标准版 A款</option>
+                                </select>
+                                <div class="prop-lbl">备注标签</div>
+                                <div>
+                                    <span class="tag-pill">大型团组</span>
+                                    <span class="tag-pill">9月出行</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="prop-section" style="border:none">
+                            <div class="prop-title">备注说明 (Notes)</div>
+                            <textarea class="smart-input" rows="3" style="resize:none">需要清真餐食，学生有2人过敏。</textarea>
+                        </div>
+
+                        <button style="margin-top:auto; padding:10px; background:var(--accent); color:white; border:none; border-radius:6px; font-weight:700; cursor:pointer">保存所有修改</button>
+                    </div>
+
+                    <!-- Right Timeline Stream -->
+                    <div class="profile-main">
+                        <div class="timeline-stream">
+                            <div class="day-block">
+                                <div class="day-dot"></div>
+                                <div class="day-header">09月12日 周一</div>
+                                <div class="event-card">
+                                    <span class="event-time">09:00</span> 科技馆主题参观
+                                </div>
+                                <div class="event-card">
+                                    <span class="event-time">14:00</span> 创客工作室课程
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    <div id="pane-schedule" class="content-pane"><div class="calendar-fullscreen">Calendar View</div></div>
-                    <div id="pane-members" class="content-pane"><div style="padding:40px; text-align:center; color:#999">Members Table</div></div>
                 </div>
             </div>
+
         </div>
     </div>
 
-    <!-- Modal -->
-    <div id="bulkModal" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-header"><span>批量创建团组</span><span style="cursor:pointer" onclick="closeBulkModal()">✕</span></div>
-            <div class="modal-body">
-                <table class="bulk-table">
-                    <thead><tr><th>#</th><th>团组名称</th><th>类型</th><th>日期</th><th>人数</th></tr></thead>
-                    <tbody><tr><td>1</td><td><input class="bulk-input"></td><td><input class="bulk-input"></td><td><input class="bulk-input" type="date"></td><td><input class="bulk-input"></td></tr></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        function toggleFilter() { document.getElementById('filterMenu').classList.toggle('visible'); }
-        function openBulkModal() { document.getElementById('bulkModal').classList.add('visible'); }
-        function closeBulkModal() { document.getElementById('bulkModal').classList.remove('visible'); }
-        function switchTab(paneId, el) {
-            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-            el.classList.add('active');
-            document.querySelectorAll('.content-pane').forEach(p => p.classList.remove('active'));
-            document.getElementById('pane-' + paneId).classList.add('active');
-            const sidebar = document.getElementById('sidebar');
-            const expandBtn = document.getElementById('expandBtn');
-            if (paneId === 'schedule') { sidebar.classList.add('collapsed'); expandBtn.style.display = 'inline-block'; }
-            else { sidebar.classList.remove('collapsed'); expandBtn.style.display = 'none'; }
-        }
-        function toggleSidebar(show) { document.getElementById('sidebar').classList.remove('collapsed'); document.getElementById('expandBtn').style.display = 'none'; switchTab('profile', document.querySelectorAll('.tab-item')[0]); }
-        function createNewGroup() { alert('New Group'); }
-        function deleteGroup() { confirm('Delete?'); }
-    </script>
 </body>
 </html>

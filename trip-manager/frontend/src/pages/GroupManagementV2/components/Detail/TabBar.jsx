@@ -28,6 +28,12 @@ const TabBar = ({
         团组信息
       </div>
       <div
+        className={`tab-item ${activeTab === 'logistics' ? 'active' : ''}`}
+        onClick={() => onTabChange('logistics')}
+      >
+        旅行资源
+      </div>
+      <div
         className={`tab-item ${activeTab === 'schedule' ? 'active' : ''}`}
         onClick={() => onTabChange('schedule')}
       >
