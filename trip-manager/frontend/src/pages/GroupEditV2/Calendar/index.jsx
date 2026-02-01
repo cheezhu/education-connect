@@ -1,5 +1,5 @@
 ﻿
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect } from 'react';
 import { Modal, Select, Button, message } from 'antd';
 import dayjs from 'dayjs';
 import api from '../../../services/api';
@@ -18,6 +18,7 @@ const END_HOUR = 20;
 const SLOT_MINUTES = 15;
 const HEADER_HEIGHT = 30;
 const SLOT_HEIGHT = 10;
+const MIN_SLOT_HEIGHT = 8;
 const SLOTS_PER_HOUR = Math.max(1, Math.round(60 / SLOT_MINUTES));
 
 const presetResourcesData = [
@@ -67,6 +68,8 @@ const CalendarWorkshop = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const calendarRef = useRef(null);
+  const scrollWrapperRef = useRef(null);
+  const [slotHeight, setSlotHeight] = useState(SLOT_HEIGHT);
   const [popoverState, setPopoverState] = useState({
     isOpen: false,
     mode: 'create',
@@ -323,6 +326,40 @@ const CalendarWorkshop = ({
   const days = calculateDays();
   const timeSlots = generateTimeSlots();
 
+  useLayoutEffect(() => {
+    const wrapper = scrollWrapperRef.current;
+    if (!wrapper || !timeSlots.length) return;
+
+    let frame = null;
+    const updateSlotHeight = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const height = wrapper.clientHeight;
+        if (!height) return;
+        const available = Math.max(0, height - HEADER_HEIGHT);
+        if (!available) return;
+        const rawHeight = available / timeSlots.length;
+        const nextHeight = Math.max(MIN_SLOT_HEIGHT, rawHeight);
+        setSlotHeight(prev => (Math.abs(prev - nextHeight) < 0.1 ? prev : nextHeight));
+      });
+    };
+
+    updateSlotHeight();
+
+    let observer = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(updateSlotHeight);
+      observer.observe(wrapper);
+    }
+    window.addEventListener('resize', updateSlotHeight);
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener('resize', updateSlotHeight);
+      if (observer) observer.disconnect();
+    };
+  }, [timeSlots.length]);
+
   const timeToGridRow = (time) => {
     const [hour, minute] = time.split(':').map(Number);
     const totalMinutes = (hour - START_HOUR) * 60 + minute;
@@ -474,7 +511,7 @@ const CalendarWorkshop = ({
     if (adjustedY < 0) {
       targetSlotIndex = 0;
     } else {
-      targetSlotIndex = Math.round(adjustedY / SLOT_HEIGHT);
+      targetSlotIndex = Math.round(adjustedY / slotHeight);
     }
 
     const originalStart = timeToGridRow(draggedActivity.startTime);
@@ -612,7 +649,7 @@ const CalendarWorkshop = ({
     if (adjustedY < 0) {
       targetSlotIndex = 0;
     } else {
-      targetSlotIndex = Math.round(adjustedY / SLOT_HEIGHT);
+      targetSlotIndex = Math.round(adjustedY / slotHeight);
     }
 
     const maxStartIndex = Math.max(0, timeSlots.length - duration - 1);
@@ -682,7 +719,7 @@ const CalendarWorkshop = ({
       const relativeY = moveEvent.clientY - wrapperRect.top + scrollTop;
 
       const adjustedY = relativeY - HEADER_HEIGHT;
-      const slotIndex = Math.max(0, Math.round(adjustedY / SLOT_HEIGHT));
+      const slotIndex = Math.max(0, Math.round(adjustedY / slotHeight));
 
       const maxSlots = timeSlots.length - 1;
       const constrainedSlotIndex = Math.min(slotIndex, maxSlots);
@@ -858,7 +895,7 @@ const CalendarWorkshop = ({
       gridColumn: dayIndex + 2,
       gridRow: `${startRow} / ${endRow}`,
       zIndex: isDragged ? 1 : 20,
-      '--activity-height': `${durationRows * SLOT_HEIGHT}px`,
+      '--activity-height': `${durationRows * slotHeight}px`,
       backgroundColor: activityColor
     };
 
@@ -1073,15 +1110,15 @@ const CalendarWorkshop = ({
     <div
       className={`calendar-days-view calendar-workshop${showResources ? '' : ' calendar-only'}`}
       ref={calendarRef}
-      style={{ '--slot-height': `${SLOT_HEIGHT}px` }}
+      style={{ '--slot-height': `${slotHeight}px` }}
     >
       <div className={`calendar-layout${showResources ? '' : ' calendar-only'}`}>
         <div className="calendar-container">
-          <div className="calendar-scroll-wrapper">
+          <div className="calendar-scroll-wrapper" ref={scrollWrapperRef}>
             <CalendarGrid
               days={days}
               timeSlots={timeSlots}
-              slotHeight={SLOT_HEIGHT}
+              slotHeight={slotHeight}
               slotsPerHour={SLOTS_PER_HOUR}
               activities={activities}
               onSlotClick={handleSlotClick}

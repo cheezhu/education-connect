@@ -299,6 +299,10 @@
 .app-content--full {
   padding: 0;
   background: #f5f7fa;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .unified-navbar {

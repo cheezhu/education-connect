@@ -8,7 +8,9 @@
 }
 
 .calendar-workshop {
-  height: 100vh;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;

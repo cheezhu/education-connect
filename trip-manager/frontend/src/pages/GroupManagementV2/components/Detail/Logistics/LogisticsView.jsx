@@ -19,14 +19,39 @@ const buildDateRange = (startDate, endDate) => {
 const normalizeLogisticsRow = (date, source = {}) => ({
   date,
   city: source.city || '',
+  departure_city: source.departure_city || source.departureCity || '',
+  arrival_city: source.arrival_city || source.arrivalCity || '',
   hotel: source.hotel || '',
+  hotel_address: source.hotel_address || source.hotelAddress || '',
+  pickup: {
+    time: source.pickup?.time || source.pickup_time || '',
+    location: source.pickup?.location || source.pickup_location || '',
+    contact: source.pickup?.contact || source.pickup_contact || '',
+    flight_no: source.pickup?.flight_no || source.pickup?.flightNo || source.pickup_flight_no || '',
+    airline: source.pickup?.airline || source.pickup_airline || '',
+    terminal: source.pickup?.terminal || source.pickup_terminal || ''
+  },
+  dropoff: {
+    time: source.dropoff?.time || source.dropoff_time || '',
+    location: source.dropoff?.location || source.dropoff_location || '',
+    contact: source.dropoff?.contact || source.dropoff_contact || '',
+    flight_no: source.dropoff?.flight_no || source.dropoff?.flightNo || source.dropoff_flight_no || '',
+    airline: source.dropoff?.airline || source.dropoff_airline || '',
+    terminal: source.dropoff?.terminal || source.dropoff_terminal || ''
+  },
   meals: {
     breakfast: source.meals?.breakfast || source.meals?.b || source.breakfast || '',
+    breakfast_place: source.meals?.breakfast_place || source.meals?.breakfast_address || source.breakfast_place || '',
+    breakfast_disabled: source.meals?.breakfast_disabled || source.meals?.breakfastDisabled || false,
     lunch: source.meals?.lunch || source.meals?.l || source.lunch || '',
-    dinner: source.meals?.dinner || source.meals?.d || source.dinner || ''
+    lunch_place: source.meals?.lunch_place || source.meals?.lunch_address || source.lunch_place || '',
+    lunch_disabled: source.meals?.lunch_disabled || source.meals?.lunchDisabled || false,
+    dinner: source.meals?.dinner || source.meals?.d || source.dinner || '',
+    dinner_place: source.meals?.dinner_place || source.meals?.dinner_address || source.dinner_place || '',
+    dinner_disabled: source.meals?.dinner_disabled || source.meals?.dinnerDisabled || false
   },
   vehicle: {
-    name: source.vehicle?.name || '',
+    driver: source.vehicle?.driver || source.vehicle?.name || '',
     plate: source.vehicle?.plate || '',
     phone: source.vehicle?.phone || ''
   },
@@ -44,7 +69,12 @@ const normalizeLogisticsRow = (date, source = {}) => ({
 const cloneRowValues = (date, source) => ({
   date,
   city: source.city || '',
+  departure_city: source.departure_city || source.departureCity || '',
+  arrival_city: source.arrival_city || source.arrivalCity || '',
   hotel: source.hotel || '',
+  hotel_address: source.hotel_address || source.hotelAddress || '',
+  pickup: { ...(source.pickup || {}) },
+  dropoff: { ...(source.dropoff || {}) },
   meals: { ...(source.meals || {}) },
   vehicle: { ...(source.vehicle || {}) },
   guide: { ...(source.guide || {}) },
@@ -93,6 +123,9 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
   }, [group?.id, dateRange]);
 
   const scheduleMap = useMemo(() => buildScheduleMap(schedules), [schedules]);
+  const groupSize = useMemo(() => (
+    (group?.student_count || 0) + (group?.teacher_count || 0)
+  ), [group?.student_count, group?.teacher_count]);
 
   const handleUpdateDay = useCallback((date, updates) => {
     setRows((prev) => prev.map((row) => (
@@ -144,18 +177,6 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
     <div className="logistics-layout">
       <div className="view-container">
         <div className="logistics-panel">
-          <div className="logistics-header">
-            <div className="logistics-title">每日资源分配</div>
-            <div className="logistics-actions">
-              <button className="logistics-btn" onClick={handleCopyFirstDay}>
-                复制首日到全部
-              </button>
-              <button className="logistics-btn primary" onClick={handleSave}>
-                保存修改
-              </button>
-            </div>
-          </div>
-
           <LogisticsMatrix
             rows={rows}
             scheduleMap={scheduleMap}
@@ -163,10 +184,11 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
             onCopyPrevDay={handleCopyPrevDay}
             hotelOptions={hotelOptions}
             vehicleOptions={vehicleOptions}
-            guideOptions={guideOptions}
-            securityOptions={securityOptions}
-            mealOptions={mealOptions}
-          />
+          guideOptions={guideOptions}
+          securityOptions={securityOptions}
+          mealOptions={mealOptions}
+          groupSize={groupSize}
+        />
         </div>
       </div>
     </div>
@@ -174,6 +196,7 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
 };
 
 export default LogisticsView;
+
 
 
 

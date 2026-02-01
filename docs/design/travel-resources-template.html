@@ -1,0 +1,348 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>旅行资源 - 录入工作区模板</title>
+  <style>
+    :root {
+      --bg: #f5f6f2;
+      --panel: #ffffff;
+      --muted: #6f7a74;
+      --text: #1f2a24;
+      --line: #e6e8e3;
+      --accent: #1f6f5c;
+      --accent-soft: #e3f0ea;
+      --warn: #b7782a;
+      --ok: #2f7d4f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .page {
+      padding: 20px 24px 48px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(620px, 1fr) 320px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .section {
+      padding: 12px 0;
+      border-top: 1px solid var(--line);
+    }
+    .section:first-child {
+      border-top: none;
+      padding-top: 0;
+    }
+    .section h3 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 14px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .input, .select, .textarea {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: #fff;
+      font-size: 13px;
+    }
+    .textarea {
+      min-height: 72px;
+      resize: vertical;
+    }
+
+    .chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+    .chip {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .summary {
+      position: sticky;
+      top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .summary h4 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .status-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 6px 0;
+      border-top: 1px dashed var(--line);
+    }
+    .status-item:first-child { border-top: none; }
+    .status-ok { color: var(--ok); font-weight: 600; }
+    .status-warn { color: var(--warn); font-weight: 600; }
+
+    .slot {
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: #fafbfa;
+    }
+    .slot-title {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .slot-main {
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .slot-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .anchor {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 8px 0 4px;
+    }
+    .anchor a {
+      font-size: 11px;
+      color: var(--accent);
+      text-decoration: none;
+      background: var(--accent-soft);
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    @media (max-width: 980px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+      .summary {
+        position: static;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div>
+        <div class="title">旅行资源 · 录入工作区</div>
+        <div class="meta">07-01 Tue · D3 · 48人 · 深圳 → 香港</div>
+      </div>
+      <div class="meta">自动保存：开启</div>
+    </div>
+
+    <div class="layout">
+      <div class="panel">
+        <div class="anchor">
+          <a href="#hotel">住宿酒店</a>
+          <a href="#vehicle">车辆调度</a>
+          <a href="#guide">随团导游</a>
+          <a href="#security">安保人员</a>
+          <a href="#ticket">票务/预约</a>
+          <a href="#meal">餐饮安排</a>
+          <a href="#note">特殊备注</a>
+        </div>
+
+        <div id="hotel" class="section">
+          <h3>住宿酒店</h3>
+          <div class="grid-2">
+            <div class="field">
+              <div class="label">酒店名称 *</div>
+              <input class="input" placeholder="输入酒店名称" />
+            </div>
+            <div class="field">
+              <div class="label">联系人 / 电话</div>
+              <input class="input" placeholder="联系人 / 电话" />
+            </div>
+            <div class="field">
+              <div class="label">地址（可选）</div>
+              <input class="input" placeholder="酒店地址" />
+            </div>
+          </div>
+        </div>
+
+        <div id="vehicle" class="section">
+          <h3>车辆调度</h3>
+          <div class="grid-2">
+            <div class="field">
+              <div class="label">车牌 / 车型 *</div>
+              <input class="input" placeholder="粤B·12345 / 45座" />
+            </div>
+            <div class="field">
+              <div class="label">司机姓名 / 电话 *</div>
+              <input class="input" placeholder="司机姓名 / 电话" />
+            </div>
+          </div>
+        </div>
+
+        <div id="guide" class="section">
+          <h3>随团导游</h3>
+          <div class="grid-2">
+            <div class="field">
+              <div class="label">导游姓名 *</div>
+              <input class="input" placeholder="导游姓名" />
+            </div>
+            <div class="field">
+              <div class="label">联系电话 *</div>
+              <input class="input" placeholder="联系电话" />
+            </div>
+          </div>
+        </div>
+
+        <div id="security" class="section">
+          <h3>安保人员</h3>
+          <div class="grid-2">
+            <div class="field">
+              <div class="label">安保姓名</div>
+              <input class="input" placeholder="安保姓名" />
+            </div>
+            <div class="field">
+              <div class="label">联系电话</div>
+              <input class="input" placeholder="联系电话" />
+            </div>
+          </div>
+        </div>
+
+        <div id="ticket" class="section">
+          <h3>票务 / 预约状态</h3>
+          <div class="field">
+            <div class="label">状态</div>
+            <select class="select">
+              <option>已确认</option>
+              <option>待确认</option>
+              <option>未设置</option>
+            </select>
+          </div>
+          <div class="chips">
+            <div class="chip">西九文化区 · 待确认</div>
+            <div class="chip">香港大学 · 已确认</div>
+          </div>
+        </div>
+
+        <div id="meal" class="section">
+          <h3>餐饮安排</h3>
+          <div class="grid-2">
+            <div class="field">
+              <div class="label">早餐</div>
+              <input class="input" placeholder="餐厅名称 / 人数" />
+            </div>
+            <div class="field">
+              <div class="label">午餐</div>
+              <input class="input" placeholder="餐厅名称 / 人数" />
+            </div>
+            <div class="field">
+              <div class="label">晚餐</div>
+              <input class="input" placeholder="餐厅名称 / 人数" />
+            </div>
+          </div>
+        </div>
+
+        <div id="note" class="section">
+          <h3>当日特殊备注</h3>
+          <textarea class="textarea" placeholder="添加当日特殊备注..."></textarea>
+        </div>
+      </div>
+
+      <div class="summary">
+        <div class="panel">
+          <h4>当日行程摘要</h4>
+          <div class="slot">
+            <div class="slot-title">上午</div>
+            <div class="slot-main">香港大学 · 校园参访</div>
+            <div class="slot-sub">48人</div>
+          </div>
+          <div class="slot">
+            <div class="slot-title">下午</div>
+            <div class="slot-main">西九文化区 · 参观</div>
+            <div class="slot-sub">48人</div>
+          </div>
+          <div class="slot">
+            <div class="slot-title">晚上</div>
+            <div class="slot-main">未安排</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h4>录入状态</h4>
+          <div class="status-item">
+            <span>住宿酒店</span>
+            <span class="status-ok">已填</span>
+          </div>
+          <div class="status-item">
+            <span>车辆调度</span>
+            <span class="status-ok">已填</span>
+          </div>
+          <div class="status-item">
+            <span>导游</span>
+            <span class="status-warn">未填</span>
+          </div>
+          <div class="status-item">
+            <span>餐饮安排</span>
+            <span class="status-warn">部分未填</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -31,7 +31,7 @@ const TabBar = ({
         className={`tab-item ${activeTab === 'logistics' ? 'active' : ''}`}
         onClick={() => onTabChange('logistics')}
       >
-        旅行资源
+        每日卡片
       </div>
       <div
         className={`tab-item ${activeTab === 'schedule' ? 'active' : ''}`}

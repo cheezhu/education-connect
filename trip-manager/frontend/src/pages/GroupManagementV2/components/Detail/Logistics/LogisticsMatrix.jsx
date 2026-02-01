@@ -10,7 +10,8 @@ const LogisticsMatrix = ({
   vehicleOptions,
   guideOptions,
   securityOptions,
-  mealOptions
+  mealOptions,
+  groupSize = 0
 }) => {
   if (!rows.length) {
     return <div className="empty-state">暂无资源安排</div>;
@@ -31,6 +32,9 @@ const LogisticsMatrix = ({
           guideOptions={guideOptions}
           securityOptions={securityOptions}
           mealOptions={mealOptions}
+          groupSize={groupSize}
+          isFirstDay={index === 0}
+          isLastDay={index === rows.length - 1}
         />
       ))}
     </div>

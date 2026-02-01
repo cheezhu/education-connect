@@ -56,6 +56,8 @@ function ProtectedRoute({ permission, action = 'read', children }) {
 function AppLayout() {
   const location = useLocation();
   const isDesigner = location.pathname.startsWith('/designer');
+  const isGroupManager = location.pathname === '/groups' || location.pathname === '/groups/v2';
+  const isFullBleed = isDesigner || isGroupManager;
   const isLogin = location.pathname.startsWith('/login');
   const { canAccess } = useAuth();
 
@@ -63,7 +65,7 @@ function AppLayout() {
     <Layout className="app-shell">
       {!isLogin && <UnifiedNavbar />}
       <Layout className="app-main">
-        <Content className={`app-content${isDesigner ? ' app-content--full' : ''}`}>
+        <Content className={`app-content${isFullBleed ? ' app-content--full' : ''}`}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route
