@@ -6,6 +6,23 @@ const PADDING = 16;
 
 const resolveMode = (mode) => (mode === 'edit' ? 'edit' : 'create');
 
+const parseDailyType = (resourceId) => {
+  if (!resourceId || typeof resourceId !== 'string') return '';
+  if (!resourceId.startsWith('daily:')) return '';
+  const parts = resourceId.split(':');
+  const category = parts[2];
+  if (category === 'meal') {
+    const mealKey = parts[3];
+    if (mealKey === 'breakfast') return '早餐';
+    if (mealKey === 'lunch') return '午餐';
+    if (mealKey === 'dinner') return '晚餐';
+    return '餐饮';
+  }
+  if (category === 'pickup') return '接站';
+  if (category === 'dropoff') return '送站';
+  return '每日卡片';
+};
+
 const ActivityPopover = ({
   anchorRect,
   isOpen,
@@ -27,8 +44,11 @@ const ActivityPopover = ({
     location: '',
     planItemId: ''
   });
+  const [sourceCategory, setSourceCategory] = useState('custom');
 
   const isEditMode = resolveMode(mode) === 'edit';
+  const resourceId = activity?.resourceId ?? activity?.resource_id ?? '';
+  const isDaily = typeof resourceId === 'string' && resourceId.startsWith('daily:');
 
   useEffect(() => {
     if (!activity || !isOpen) return;
@@ -44,6 +64,13 @@ const ActivityPopover = ({
       location: activity.location || '',
       planItemId: derivedPlanId || ''
     });
+    if (typeof resourceId === 'string' && resourceId.startsWith('daily:')) {
+      setSourceCategory('daily');
+    } else if (derivedPlanId) {
+      setSourceCategory('plan');
+    } else {
+      setSourceCategory('custom');
+    }
   }, [activity, isOpen]);
 
   useEffect(() => {
@@ -57,6 +84,11 @@ const ActivityPopover = ({
         location: initialValues?.location || '',
         planItemId: initialValues?.planItemId || ''
       });
+      if (initialValues?.planItemId) {
+        setSourceCategory('plan');
+      } else {
+        setSourceCategory('custom');
+      }
     }
   }, [isOpen, activity, initialValues]);
 
@@ -65,6 +97,21 @@ const ActivityPopover = ({
   ), [planItems]);
 
   const selectedPlan = resolvedPlanItems.find((item) => String(item.id) === String(formState.planItemId));
+
+  const sourceMeta = useMemo(() => {
+    if (isDaily || sourceCategory === 'daily') {
+      return {
+        kind: 'daily',
+        label: '每日卡片',
+        detail: parseDailyType(resourceId)
+      };
+    }
+    const kind = sourceCategory === 'plan' ? 'plan' : 'custom';
+    return {
+      kind,
+      label: kind === 'plan' ? '行程点' : '自定义'
+    };
+  }, [isDaily, resourceId, sourceCategory]);
 
   const linkMode = formState.planItemId ? 'linked' : 'manual';
 
@@ -77,6 +124,29 @@ const ActivityPopover = ({
       location: selectedPlan.location || prev.location
     }));
   }, [formState.planItemId, selectedPlan]);
+
+  useEffect(() => {
+    if (isDaily) return;
+    if (formState.planItemId) {
+      setSourceCategory('plan');
+    }
+  }, [formState.planItemId, isDaily]);
+
+  const handleSourceToggle = (category) => {
+    if (category === 'daily') {
+      if (isDaily) {
+        setSourceCategory('daily');
+      }
+      return;
+    }
+    if (isDaily) return;
+    if (category === 'plan') {
+      setSourceCategory('plan');
+      return;
+    }
+    setSourceCategory('custom');
+    updateField('planItemId', '');
+  };
 
   useLayoutEffect(() => {
     if (!isOpen || !anchorRect || !popoverRef.current) return;
@@ -153,20 +223,56 @@ const ActivityPopover = ({
         <div className="link-section">
           <div className="link-header">
             <span>数据来源</span>
+            <span className={`source-pill ${sourceMeta.kind}`}>
+              {sourceMeta.label}{sourceMeta.detail ? ` · ${sourceMeta.detail}` : ''}
+            </span>
           </div>
-          <select
-            className="plan-select"
-            value={formState.planItemId}
-            onChange={(event) => updateField('planItemId', event.target.value)}
-          >
-            <option value="">自定义活动</option>
-            {resolvedPlanItems.map((item) => (
-              <option key={item.id} value={item.id}>{item.title || item.name}</option>
-            ))}
-          </select>
-          {!formState.planItemId && (
-            <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>
-              未选择行程点，将保存为自定义项目
+          <div className="source-toggle">
+            <button
+              type="button"
+              className={`source-toggle-btn ${sourceCategory === 'plan' ? 'active' : ''}`}
+              onClick={() => handleSourceToggle('plan')}
+              disabled={isDaily}
+            >
+              行程点
+            </button>
+            <button
+              type="button"
+              className={`source-toggle-btn ${sourceCategory === 'daily' || isDaily ? 'active' : ''} ${!isDaily ? 'disabled' : ''}`}
+              onClick={() => handleSourceToggle('daily')}
+              disabled={!isDaily}
+            >
+              每日卡片
+            </button>
+            <button
+              type="button"
+              className={`source-toggle-btn ${sourceCategory === 'custom' ? 'active' : ''}`}
+              onClick={() => handleSourceToggle('custom')}
+              disabled={isDaily}
+            >
+              自定义
+            </button>
+          </div>
+          {sourceMeta.kind === 'daily' ? (
+            <div className="source-readonly">
+              该活动来自每日卡片，类型已锁定为 {sourceMeta.detail || '每日卡片'}。
+            </div>
+          ) : sourceCategory === 'plan' ? (
+            <>
+              <select
+                className="plan-select"
+                value={formState.planItemId}
+                onChange={(event) => updateField('planItemId', event.target.value)}
+              >
+                <option value="">自定义活动</option>
+                {resolvedPlanItems.map((item) => (
+                  <option key={item.id} value={item.id}>{item.title || item.name}</option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <div style={{ fontSize: 12, color: '#666' }}>
+              该活动将保存为自定义项目
             </div>
           )}
         </div>

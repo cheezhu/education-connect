@@ -12,16 +12,25 @@ const ScheduleManagement = ({
   onUpdate,
   onPlanChange,
   loading = false,
-  resourceWidth
+  resourceWidth,
+  scheduleRevision = 0,
+  onRevisionChange,
+  onRevisionConflict
 }) => {
   const [viewMode, setViewMode] = useState('calendar');
   const [localSchedules, setLocalSchedules] = useState(schedules || []);
   const saveTimeoutRef = useRef(null);
+  const saveTokenRef = useRef(0);
   const onUpdateRef = useRef(onUpdate);
+  const scheduleRevisionRef = useRef(scheduleRevision);
 
   useEffect(() => {
     onUpdateRef.current = onUpdate;
   }, [onUpdate]);
+
+  useEffect(() => {
+    scheduleRevisionRef.current = scheduleRevision;
+  }, [scheduleRevision]);
 
   useEffect(() => {
     setLocalSchedules(schedules || []);
@@ -39,16 +48,39 @@ const ScheduleManagement = ({
     onUpdateRef.current?.(updatedSchedules);
 
     clearTimeout(saveTimeoutRef.current);
+    saveTokenRef.current += 1;
+    const saveToken = saveTokenRef.current;
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         const response = await api.post(`/groups/${groupId}/schedules/batch`, {
-          scheduleList: updatedSchedules
+          scheduleList: updatedSchedules,
+          revision: scheduleRevisionRef.current ?? 0
         });
+        if (saveToken !== saveTokenRef.current) {
+          return;
+        }
         const saved = Array.isArray(response.data) ? response.data : updatedSchedules;
+        const revisionHeader = response.headers?.['x-schedule-revision'];
+        const nextRevision = Number(revisionHeader);
+        if (Number.isFinite(nextRevision)) {
+          scheduleRevisionRef.current = nextRevision;
+          onRevisionChange?.(nextRevision);
+        }
         setLocalSchedules(saved);
         onUpdateRef.current?.(saved);
       } catch (error) {
-        message.error('保存日程失败');
+        if (error?.response?.status === 409) {
+          const revisionHeader = error.response?.headers?.['x-schedule-revision'];
+          const nextRevision = Number(revisionHeader);
+          if (Number.isFinite(nextRevision)) {
+            scheduleRevisionRef.current = nextRevision;
+            onRevisionChange?.(nextRevision);
+          }
+          message.warning('检测到排期冲突，已刷新版本，请重试');
+          onRevisionConflict?.();
+          return;
+        }
+        message.error('保存失败，请稍后重试');
       }
     }, 500);
   };
@@ -58,7 +90,7 @@ const ScheduleManagement = ({
       {viewMode === 'demo' && (
         <Alert
           message="Google Calendar 风格日程管理"
-          description="V2版本核心功能已实现！支持拖拽创建活动、调整时间、冲突检测等专业功能。"
+          description="V2 版本核心功能已实现！支持拖拽创建活动、调整时间、冲突检测等专业功能。"
           type="success"
           icon={<InfoCircleOutlined />}
           showIcon

@@ -13,13 +13,466 @@ import MemberManagement from '../GroupEditV2/MemberManagement';
 import GroupCommandCenterSkeleton from './components/GroupCommandCenterSkeleton';
 import './GroupCommandCenter.css';
 
+const DAILY_MEAL_DEFAULTS = {
+  breakfast: { start: '07:30', end: '08:30' },
+  lunch: { start: '12:00', end: '13:00' },
+  dinner: { start: '18:00', end: '19:00' }
+};
+
+const MEAL_LABELS = {
+  breakfast: '早餐',
+  lunch: '午餐',
+  dinner: '晚餐'
+};
+
+const buildDailyResourceId = (date, category, key) => {
+  if (!date) return '';
+  if (category === 'meal') {
+    return `daily:${date}:meal:${key}`;
+  }
+  return `daily:${date}:${category}`;
+};
+
+const parseDailyResourceId = (resourceId) => {
+  if (typeof resourceId !== 'string') return null;
+  if (!resourceId.startsWith('daily:')) return null;
+  const parts = resourceId.split(':');
+  const date = parts[1];
+  const category = parts[2];
+  const key = parts[3];
+  if (!date || !category) return null;
+  return { date, category, key };
+};
+
+const collectDailyResourceIds = (schedules = []) => {
+  const set = new Set();
+  schedules.forEach((schedule) => {
+    const resourceId = getResourceId(schedule);
+    if (isDailyResourceId(resourceId)) {
+      set.add(resourceId);
+    }
+  });
+  return set;
+};
+
+const clearDailyResourceFields = (logistics = [], removedIds = []) => {
+  if (!Array.isArray(logistics) || removedIds.length === 0) return logistics;
+  const parsed = removedIds.map(parseDailyResourceId).filter(Boolean);
+  if (parsed.length === 0) return logistics;
+  const byDate = new Map();
+  parsed.forEach((item) => {
+    if (!byDate.has(item.date)) byDate.set(item.date, []);
+    byDate.get(item.date).push(item);
+  });
+
+  return logistics.map((row) => {
+    const changes = byDate.get(row.date);
+    if (!changes) return row;
+    const meals = { ...(row.meals || {}) };
+    const pickup = { ...(row.pickup || {}) };
+    const dropoff = { ...(row.dropoff || {}) };
+
+    changes.forEach((item) => {
+      if (item.category === 'meal' && item.key) {
+        meals[item.key] = '';
+        meals[`${item.key}_place`] = '';
+        meals[`${item.key}_time`] = '';
+        meals[`${item.key}_end`] = '';
+        meals[`${item.key}_detached`] = false;
+        meals[`${item.key}_disabled`] = false;
+        return;
+      }
+      if (item.category === 'pickup') {
+        pickup.time = '';
+        pickup.end_time = '';
+        pickup.location = '';
+        pickup.contact = '';
+        pickup.flight_no = '';
+        pickup.airline = '';
+        pickup.terminal = '';
+        pickup.detached = false;
+        pickup.disabled = false;
+        return;
+      }
+      if (item.category === 'dropoff') {
+        dropoff.time = '';
+        dropoff.end_time = '';
+        dropoff.location = '';
+        dropoff.contact = '';
+        dropoff.flight_no = '';
+        dropoff.airline = '';
+        dropoff.terminal = '';
+        dropoff.detached = false;
+        dropoff.disabled = false;
+      }
+    });
+
+    return {
+      ...row,
+      meals,
+      pickup,
+      dropoff
+    };
+  });
+};
+
+const toMinutes = (timeValue) => {
+  if (!timeValue) return null;
+  const [hourStr, minuteStr] = String(timeValue).split(':');
+  const hour = Number(hourStr);
+  const minute = Number(minuteStr);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+};
+
+const calcDurationMinutes = (startTime, endTime) => {
+  const start = toMinutes(startTime);
+  const end = toMinutes(endTime);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  const diff = end - start;
+  return diff > 0 ? diff : null;
+};
+
+const hashString = (input) => {
+  let hash = 5381;
+  const str = String(input);
+  for (let i = 0; i < str.length; i += 1) {
+    hash = ((hash << 5) + hash) + str.charCodeAt(i);
+    hash &= 0xffffffff;
+  }
+  return (hash >>> 0).toString(16);
+};
+
+const getResourceId = (schedule) => (
+  schedule?.resourceId ?? schedule?.resource_id ?? ''
+);
+
+const isDailyResourceId = (resourceId) => (
+  typeof resourceId === 'string' && resourceId.startsWith('daily:')
+);
+
+const isPlanResourceId = (resourceId) => (
+  typeof resourceId === 'string' && resourceId.startsWith('plan-')
+);
+
+const isMealFilled = (meals, key) => {
+  if (!meals || meals[`${key}_disabled`]) return false;
+  return Boolean(meals[key] || meals[`${key}_place`]);
+};
+
+const hasPickupContent = (pickup) => {
+  if (!pickup || pickup.disabled) return false;
+  return Boolean(
+    pickup.time ||
+    pickup.end_time ||
+    pickup.location ||
+    pickup.contact ||
+    pickup.flight_no ||
+    pickup.airline ||
+    pickup.terminal
+  );
+};
+
+const buildFlightDescription = (pickup) => (
+  [
+    pickup.flight_no && `航班 ${pickup.flight_no}`,
+    pickup.airline && pickup.airline,
+    pickup.terminal && pickup.terminal
+  ].filter(Boolean).join(' / ')
+);
+
+const buildCustomResource = (schedule) => {
+  const startTime = schedule?.startTime || schedule?.start_time || '';
+  const endTime = schedule?.endTime || schedule?.end_time || '';
+  const durationMinutes = calcDurationMinutes(startTime, endTime) || 60;
+  const durationHours = Math.max(0.5, durationMinutes / 60);
+  const title = schedule?.title || schedule?.location || '自定义活动';
+  const type = schedule?.type || 'activity';
+  const hash = hashString(`${type}|${title}|${durationMinutes}`);
+
+  return {
+    id: `custom:${hash}`,
+    type,
+    title,
+    duration: durationHours,
+    description: schedule?.description || '',
+    locationName: schedule?.location || title,
+    isUnique: false
+  };
+};
+
+const mergeCustomResources = (existing = [], schedules = []) => {
+  const map = new Map();
+  existing.forEach((item) => {
+    if (item?.id) {
+      map.set(item.id, item);
+    }
+  });
+
+  schedules.forEach((schedule) => {
+    const resourceId = getResourceId(schedule);
+    if (resourceId && (isDailyResourceId(resourceId) || isPlanResourceId(resourceId))) return;
+
+    const resource = buildCustomResource(schedule);
+    if (!map.has(resource.id)) {
+      map.set(resource.id, resource);
+    }
+  });
+
+  return Array.from(map.values());
+};
+
+const buildScheduleSignature = (schedules = []) => (
+  schedules
+    .map((schedule) => {
+      const resourceId = getResourceId(schedule);
+      return [
+        resourceId,
+        schedule.date || schedule.activity_date || '',
+        schedule.startTime || schedule.start_time || '',
+        schedule.endTime || schedule.end_time || '',
+        schedule.type || '',
+        schedule.title || '',
+        schedule.location || '',
+        schedule.description || ''
+      ].join('|');
+    })
+    .sort()
+    .join('||')
+);
+
+const syncLogisticsFromSchedules = (logistics = [], schedules = []) => {
+  if (!Array.isArray(logistics) || logistics.length === 0) return logistics;
+
+  const scheduleMap = new Map();
+  schedules.forEach((schedule) => {
+    const resourceId = getResourceId(schedule);
+    if (isDailyResourceId(resourceId)) {
+      scheduleMap.set(resourceId, schedule);
+    }
+  });
+
+  return logistics.map((row) => {
+    const meals = { ...(row.meals || {}) };
+    const pickup = { ...(row.pickup || {}) };
+    const dropoff = { ...(row.dropoff || {}) };
+
+    ['breakfast', 'lunch', 'dinner'].forEach((key) => {
+      const resourceId = buildDailyResourceId(row.date, 'meal', key);
+      const schedule = scheduleMap.get(resourceId);
+      if (schedule) {
+        meals[`${key}_time`] = schedule.startTime || schedule.start_time || '';
+        meals[`${key}_end`] = schedule.endTime || schedule.end_time || '';
+        meals[`${key}_detached`] = false;
+      } else if (isMealFilled(meals, key)) {
+        meals[`${key}_detached`] = true;
+      } else {
+        meals[`${key}_detached`] = false;
+      }
+    });
+
+    const pickupId = buildDailyResourceId(row.date, 'pickup');
+    const pickupSchedule = scheduleMap.get(pickupId);
+    if (pickupSchedule) {
+      pickup.time = pickupSchedule.startTime || pickupSchedule.start_time || '';
+      pickup.end_time = pickupSchedule.endTime || pickupSchedule.end_time || '';
+      pickup.detached = false;
+    } else if (hasPickupContent(pickup)) {
+      pickup.detached = true;
+    } else {
+      pickup.detached = false;
+    }
+
+    const dropoffId = buildDailyResourceId(row.date, 'dropoff');
+    const dropoffSchedule = scheduleMap.get(dropoffId);
+    if (dropoffSchedule) {
+      dropoff.time = dropoffSchedule.startTime || dropoffSchedule.start_time || '';
+      dropoff.end_time = dropoffSchedule.endTime || dropoffSchedule.end_time || '';
+      dropoff.detached = false;
+    } else if (hasPickupContent(dropoff)) {
+      dropoff.detached = true;
+    } else {
+      dropoff.detached = false;
+    }
+
+    return {
+      ...row,
+      meals,
+      pickup,
+      dropoff
+    };
+  });
+};
+
+const mergeSchedulesWithLogistics = (schedules = [], logistics = [], groupId) => {
+  if (!groupId || !Array.isArray(logistics)) return schedules || [];
+  const nextSchedules = (schedules || []).map((item) => ({ ...item }));
+  const scheduleByResource = new Map();
+  nextSchedules.forEach((schedule) => {
+    const resourceId = getResourceId(schedule);
+    if (resourceId) {
+      scheduleByResource.set(resourceId, schedule);
+    }
+  });
+
+  const toRemove = new Set();
+
+  const removeByResource = (resourceId) => {
+    const existing = scheduleByResource.get(resourceId);
+    if (existing) {
+      toRemove.add(existing);
+    }
+  };
+
+  const upsertSchedule = (resourceId, payload, allowCreate = false) => {
+    const existing = scheduleByResource.get(resourceId);
+    if (existing) {
+      Object.assign(existing, payload);
+      return;
+    }
+    if (!allowCreate) return;
+    const newSchedule = {
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      ...payload,
+      resourceId,
+      isFromResource: true
+    };
+    nextSchedules.push(newSchedule);
+    scheduleByResource.set(resourceId, newSchedule);
+  };
+
+  logistics.forEach((row) => {
+    const date = row.date;
+    const meals = row.meals || {};
+    const pickup = row.pickup || {};
+    const dropoff = row.dropoff || {};
+
+    ['breakfast', 'lunch', 'dinner'].forEach((key) => {
+      const resourceId = buildDailyResourceId(date, 'meal', key);
+      if (!isMealFilled(meals, key)) {
+        removeByResource(resourceId);
+        return;
+      }
+
+      const existing = scheduleByResource.get(resourceId);
+      const location = meals[`${key}_place`] || '';
+      const description = meals[key] || '';
+      const basePayload = {
+        groupId,
+        date,
+        type: 'meal',
+        title: MEAL_LABELS[key],
+        location,
+        description,
+        resourceId,
+        isFromResource: true
+      };
+
+      if (existing) {
+        upsertSchedule(resourceId, basePayload);
+        return;
+      }
+
+      if (meals[`${key}_detached`]) {
+        return;
+      }
+
+      const defaultTime = DAILY_MEAL_DEFAULTS[key] || {};
+      const startTime = meals[`${key}_time`] || defaultTime.start;
+      const endTime = meals[`${key}_end`] || defaultTime.end;
+      if (!startTime || !endTime) return;
+
+      upsertSchedule(resourceId, {
+        ...basePayload,
+        startTime,
+        endTime
+      }, true);
+    });
+
+    const handleTransfer = (key, label, data) => {
+      const resourceId = buildDailyResourceId(date, key);
+      if (!hasPickupContent(data)) {
+        removeByResource(resourceId);
+        return;
+      }
+
+      const hasTimeRange = data.time && data.end_time;
+      const basePayload = {
+        groupId,
+        date,
+        type: 'transport',
+        title: label,
+        location: data.location || '',
+        description: buildFlightDescription(data),
+        resourceId,
+        isFromResource: true
+      };
+
+      const existing = scheduleByResource.get(resourceId);
+      if (existing) {
+        if (!hasTimeRange) {
+          removeByResource(resourceId);
+          return;
+        }
+        upsertSchedule(resourceId, {
+          ...basePayload,
+          startTime: data.time,
+          endTime: data.end_time
+        });
+        return;
+      }
+
+      if (!hasTimeRange || data.detached) return;
+
+      upsertSchedule(resourceId, {
+        ...basePayload,
+        startTime: data.time,
+        endTime: data.end_time
+      }, true);
+    };
+
+    handleTransfer('pickup', '接站', pickup);
+    handleTransfer('dropoff', '送站', dropoff);
+  });
+
+  return nextSchedules.filter((item) => !toRemove.has(item));
+};
+
+class TabErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, info) {
+    if (this.props.onError) {
+      this.props.onError(error, info);
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="empty-state">
+          {this.props.fallback || '当前标签页渲染失败，请检查控制台错误。'}
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const GroupManagementV2 = () => {
   const navigate = useNavigate();
   const [groups, setGroups] = useState([]);
   const [filteredGroups, setFilteredGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeGroupId, setActiveGroupId] = useState(null);
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState('schedule');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [groupSchedules, setGroupSchedules] = useState([]);
   const [hasMembers, setHasMembers] = useState(false);
@@ -46,6 +499,13 @@ const GroupManagementV2 = () => {
   const [bulkErrors, setBulkErrors] = useState({});
 
   const saveRef = useRef(null);
+  const scheduleSaveRef = useRef(null);
+  const scheduleSaveTokenRef = useRef(0);
+  const logisticsSaveRef = useRef(null);
+  const logisticsSaveTokenRef = useRef(0);
+  const scheduleSignatureRef = useRef('');
+  const scheduleSnapshotRef = useRef([]);
+  const scheduleRevisionRef = useRef({});
 
   const calculateStatus = (group) => {
     if (group.status === '已取消') return '已取消';
@@ -81,10 +541,28 @@ const GroupManagementV2 = () => {
     }
     try {
       const response = await api.get(`/groups/${groupId}/schedules`);
-      setGroupSchedules(Array.isArray(response.data) ? response.data : []);
+      const nextSchedules = Array.isArray(response.data) ? response.data : [];
+      const revisionHeader = response.headers?.['x-schedule-revision'];
+      const nextRevision = Number(revisionHeader);
+      scheduleRevisionRef.current[groupId] = Number.isFinite(nextRevision) ? nextRevision : 0;
+      handleScheduleUpdate(nextSchedules);
     } catch (error) {
       message.error('加载日程失败');
       setGroupSchedules([]);
+      scheduleRevisionRef.current[groupId] = 0;
+    }
+  };
+
+  const fetchLogistics = async (groupId) => {
+    if (!groupId) return;
+    try {
+      const response = await api.get(`/groups/${groupId}/logistics`);
+      const logistics = Array.isArray(response.data) ? response.data : [];
+      setGroups(prev => prev.map(group => (
+        group.id === groupId ? { ...group, logistics } : group
+      )));
+    } catch (error) {
+      message.error('加载每日卡片失败');
     }
   };
 
@@ -146,8 +624,17 @@ const GroupManagementV2 = () => {
   }, [filteredGroups, activeGroupId]);
 
   useEffect(() => {
-    fetchSchedules(activeGroupId);
-    fetchMemberCount(activeGroupId);
+    if (!activeGroupId) return;
+    const loadAll = async () => {
+      await fetchLogistics(activeGroupId);
+      await fetchSchedules(activeGroupId);
+      fetchMemberCount(activeGroupId);
+    };
+    loadAll();
+  }, [activeGroupId]);
+
+  useEffect(() => {
+    scheduleSnapshotRef.current = [];
   }, [activeGroupId]);
 
   const activeGroup = useMemo(() => (
@@ -186,6 +673,61 @@ const GroupManagementV2 = () => {
     status: group.status
   });
 
+  const queueLogisticsSave = useCallback((groupId, logisticsList) => {
+    if (!groupId) return;
+    clearTimeout(logisticsSaveRef.current);
+    logisticsSaveTokenRef.current += 1;
+    const saveToken = logisticsSaveTokenRef.current;
+    logisticsSaveRef.current = setTimeout(async () => {
+      try {
+        const response = await api.post(`/groups/${groupId}/logistics`, {
+          logistics: logisticsList
+        });
+        if (saveToken !== logisticsSaveTokenRef.current) {
+          return;
+        }
+        const saved = Array.isArray(response.data) ? response.data : logisticsList;
+        if (activeGroupId === groupId) {
+          setGroups(prev => prev.map(group => (
+            group.id === groupId ? { ...group, logistics: saved } : group
+          )));
+        }
+      } catch (error) {
+        message.error('保存每日卡片失败');
+      }
+    }, 400);
+  }, [activeGroupId]);
+
+  const applyScheduleSync = useCallback((schedules) => {
+    const previousSchedules = scheduleSnapshotRef.current || [];
+    const prevDaily = collectDailyResourceIds(previousSchedules);
+    const nextDaily = collectDailyResourceIds(schedules);
+    const removedDailyIds = Array.from(prevDaily).filter(id => !nextDaily.has(id));
+
+    setGroupSchedules(schedules);
+    scheduleSignatureRef.current = buildScheduleSignature(schedules);
+    scheduleSnapshotRef.current = schedules;
+    if (!activeGroupId) return;
+    let nextLogisticsSnapshot = null;
+    setGroups(prev => prev.map(group => {
+      if (group.id !== activeGroupId) return group;
+      let nextLogistics = syncLogisticsFromSchedules(group.logistics || [], schedules);
+      if (removedDailyIds.length) {
+        nextLogistics = clearDailyResourceFields(nextLogistics, removedDailyIds);
+      }
+      nextLogisticsSnapshot = nextLogistics;
+      const nextCustomResources = mergeCustomResources(group.customResources || [], schedules);
+      return {
+        ...group,
+        logistics: nextLogistics,
+        customResources: nextCustomResources
+      };
+    }));
+    if (nextLogisticsSnapshot) {
+      queueLogisticsSave(activeGroupId, nextLogisticsSnapshot);
+    }
+  }, [activeGroupId, queueLogisticsSave]);
+
   const handleGroupUpdate = useCallback((updatedGroup) => {
     if (!updatedGroup?.id) return;
 
@@ -217,6 +759,70 @@ const GroupManagementV2 = () => {
     }, 0);
   }, []);
 
+  const queueScheduleSave = useCallback((groupId, scheduleList) => {
+    clearTimeout(scheduleSaveRef.current);
+    scheduleSaveTokenRef.current += 1;
+    const saveToken = scheduleSaveTokenRef.current;
+    scheduleSaveRef.current = setTimeout(async () => {
+      try {
+        const response = await api.post(`/groups/${groupId}/schedules/batch`, {
+          scheduleList,
+          revision: scheduleRevisionRef.current[groupId] ?? 0
+        });
+        if (saveToken !== scheduleSaveTokenRef.current) {
+          return;
+        }
+        const saved = Array.isArray(response.data) ? response.data : scheduleList;
+        const revisionHeader = response.headers?.['x-schedule-revision'];
+        const nextRevision = Number(revisionHeader);
+        if (Number.isFinite(nextRevision)) {
+          scheduleRevisionRef.current[groupId] = nextRevision;
+        }
+        if (activeGroupId === groupId) {
+          applyScheduleSync(saved);
+        }
+      } catch (error) {
+        if (error?.response?.status === 409) {
+          const revisionHeader = error.response?.headers?.['x-schedule-revision'];
+          const nextRevision = Number(revisionHeader);
+          if (Number.isFinite(nextRevision)) {
+            scheduleRevisionRef.current[groupId] = nextRevision;
+          }
+          message.warning('日程已被其他人修改，请刷新后再试');
+          fetchSchedules(groupId);
+          return;
+        }
+        message.error('保存日程失败');
+      }
+    }, 400);
+  }, [activeGroupId, applyScheduleSync, fetchSchedules]);
+
+  const handleLogisticsChange = useCallback((updatedGroup) => {
+    if (!updatedGroup?.id) return;
+
+    setGroupSchedules((prev) => {
+      const merged = mergeSchedulesWithLogistics(prev, updatedGroup.logistics || [], updatedGroup.id);
+      const syncedLogistics = syncLogisticsFromSchedules(updatedGroup.logistics || [], merged);
+      setGroups(prevGroups => prevGroups.map(group => (
+        group.id === updatedGroup.id
+          ? { ...group, ...updatedGroup, logistics: syncedLogistics }
+          : group
+      )));
+      queueLogisticsSave(updatedGroup.id, syncedLogistics);
+      const nextSignature = buildScheduleSignature(merged);
+      if (nextSignature !== scheduleSignatureRef.current) {
+        scheduleSignatureRef.current = nextSignature;
+        queueScheduleSave(updatedGroup.id, merged);
+        return merged;
+      }
+      return prev;
+    });
+  }, [queueScheduleSave, queueLogisticsSave]);
+
+  const handleScheduleUpdate = useCallback((updatedSchedules) => {
+    applyScheduleSync(updatedSchedules);
+  }, [applyScheduleSync]);
+
   const handleDeleteGroup = async () => {
     if (!activeGroup) return;
     try {
@@ -226,10 +832,6 @@ const GroupManagementV2 = () => {
     } catch (error) {
       message.error('删除失败');
     }
-  };
-
-  const handleScheduleUpdate = (updatedSchedules) => {
-    setGroupSchedules(updatedSchedules);
   };
 
   const updateSearch = (value) => {
@@ -335,6 +937,54 @@ const GroupManagementV2 = () => {
     return <GroupCommandCenterSkeleton />;
   }
 
+  const renderActiveTab = () => {
+    switch (activeTab) {
+      case 'profile':
+        return (
+          <ProfileView
+            group={activeGroup}
+            schedules={groupSchedules}
+            hasMembers={hasMembers}
+            itineraryPlans={itineraryPlans}
+            onUpdate={handleGroupUpdate}
+            onDelete={handleDeleteGroup}
+            rightPanelWidth={rightPanelWidth}
+            onResizeRightPanel={setRightPanelWidth}
+            onNavigateTab={setActiveTab}
+          />
+        );
+      case 'logistics':
+        return (
+          <LogisticsView
+            group={activeGroup}
+            schedules={groupSchedules}
+            onUpdate={handleLogisticsChange}
+          />
+        );
+      case 'schedule':
+        return (
+          <FullCalendarWrapper
+            group={activeGroup}
+            schedules={groupSchedules}
+            onSchedulesUpdate={handleScheduleUpdate}
+            resourceWidth={rightPanelWidth}
+          />
+        );
+      case 'members':
+        return (
+          <div className="members-pane">
+            {activeGroup ? (
+              <MemberManagement groupId={activeGroup.id} />
+            ) : (
+              <div className="empty-state">请选择团组</div>
+            )}
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="group-command-center">
       <div className="layout">
@@ -362,44 +1012,12 @@ const GroupManagementV2 = () => {
             />
 
             <div className="tab-content">
-              <div className={`content-pane ${activeTab === 'profile' ? 'active' : ''}`}>
-                <ProfileView
-                  group={activeGroup}
-                  schedules={groupSchedules}
-                  hasMembers={hasMembers}
-                  itineraryPlans={itineraryPlans}
-                  onUpdate={handleGroupUpdate}
-                  onDelete={handleDeleteGroup}
-                  rightPanelWidth={rightPanelWidth}
-                  onResizeRightPanel={setRightPanelWidth}
-                />
-              </div>
-
-              <div className={`content-pane ${activeTab === 'logistics' ? 'active' : ''}`}>
-                <LogisticsView
-                  group={activeGroup}
-                  schedules={groupSchedules}
-                  onUpdate={handleGroupUpdate}
-                />
-              </div>
-
-              <div className={`content-pane ${activeTab === 'schedule' ? 'active' : ''}`}>
-                <FullCalendarWrapper
-                  group={activeGroup}
-                  schedules={groupSchedules}
-                  onSchedulesUpdate={handleScheduleUpdate}
-                  resourceWidth={rightPanelWidth}
-                />
-              </div>
-
-              <div className={`content-pane ${activeTab === 'members' ? 'active' : ''}`}>
-                <div className="members-pane">
-                  {activeGroup ? (
-                    <MemberManagement groupId={activeGroup.id} />
-                  ) : (
-                    <div className="empty-state">请选择团组</div>
-                  )}
-                </div>
+              <div className="content-pane active">
+                <TabErrorBoundary
+                  fallback="当前标签页渲染失败，请检查控制台错误。"
+                >
+                  {renderActiveTab()}
+                </TabErrorBoundary>
               </div>
             </div>
           </div>

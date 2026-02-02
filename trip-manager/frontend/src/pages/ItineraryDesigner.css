@@ -4,7 +4,7 @@
   display: flex;
   flex-direction: column;
   background: var(--bg-editor);
-  overflow: visible;
+  overflow: hidden;
   position: relative;
 }
 /* 时间轴网格 */
@@ -25,10 +25,13 @@
   flex-direction: column;
   min-width: 0;
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 .timeline-wrapper {
   flex: 1;
   min-height: 0;
+  overflow: auto;
 }
 .daily-focus-row {
   display: grid;
@@ -1072,12 +1075,14 @@
   background: var(--bg-app);
   color: var(--text-main);
   height: 100%;
-  min-height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 .itinerary-body {
   display: flex;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 /* ============================= */
@@ -1351,6 +1356,9 @@
   border: none;
   border-radius: 0;
   box-shadow: none;
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
 }
 .itinerary-designer .timeline-header {
   border-bottom: 1px solid var(--border-color);

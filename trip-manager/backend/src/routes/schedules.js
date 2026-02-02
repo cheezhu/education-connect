@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const requireEditLock = require('../middleware/editLock');
+const { getScheduleRevision, bumpScheduleRevision } = require('../utils/scheduleRevision');
 
 const toMinutes = (timeValue) => {
   if (!timeValue) return null;
@@ -147,6 +148,14 @@ const mapScheduleRow = (row) => ({
   locationId: row.location_id
 });
 
+const normalizeScheduleId = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+  return Math.floor(parsed);
+};
+
 // 获取指定团组的日程详情
 router.get('/groups/:groupId/schedules', (req, res) => {
   const groupId = Number(req.params.groupId);
@@ -162,6 +171,7 @@ router.get('/groups/:groupId/schedules', (req, res) => {
     ORDER BY activity_date, start_time, id
   `).all(groupId);
 
+  res.setHeader('x-schedule-revision', getScheduleRevision(req.db, groupId));
   res.json(rows.map(mapScheduleRow));
 });
 
@@ -182,6 +192,16 @@ router.post('/groups/:groupId/schedules/batch', requireEditLock, (req, res) => {
   const groupId = Number(req.params.groupId);
   if (!Number.isFinite(groupId)) {
     return res.status(400).json({ error: '无效团组ID' });
+  }
+
+  const currentRevision = getScheduleRevision(req.db, groupId);
+  const clientRevision = Number(req.body?.revision);
+  if (!Number.isFinite(clientRevision) || clientRevision !== currentRevision) {
+    res.setHeader('x-schedule-revision', currentRevision);
+    return res.status(409).json({
+      error: 'Schedule revision mismatch',
+      currentRevision
+    });
   }
 
   const scheduleList = Array.isArray(req.body.scheduleList) ? req.body.scheduleList : [];
@@ -208,7 +228,7 @@ router.post('/groups/:groupId/schedules/batch', requireEditLock, (req, res) => {
 
     items.forEach((item) => {
       insert.run({
-        id: item.id ?? null,
+        id: normalizeScheduleId(item.id),
         groupId,
         date: item.date,
         startTime: item.startTime,
@@ -229,6 +249,7 @@ router.post('/groups/:groupId/schedules/batch', requireEditLock, (req, res) => {
     replaceAll(scheduleList);
 
     syncSchedulesToActivities(req.db, groupId);
+    const nextRevision = bumpScheduleRevision(req.db, groupId);
 
     const rows = req.db.prepare(`
       SELECT id, group_id, activity_date, start_time, end_time, type,
@@ -238,6 +259,7 @@ router.post('/groups/:groupId/schedules/batch', requireEditLock, (req, res) => {
       ORDER BY activity_date, start_time, id
     `).all(groupId);
 
+    res.setHeader('x-schedule-revision', nextRevision);
     res.json(rows.map(mapScheduleRow));
   } catch (error) {
     console.error('批量保存日程失败:', error);

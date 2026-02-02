@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const requireEditLock = require('../middleware/editLock');
+const { bumpScheduleRevision } = require('../utils/scheduleRevision');
 
 const mapActivityRow = (row) => ({
   id: row.id,
@@ -309,6 +310,7 @@ router.post('/', requireEditLock, (req, res) => {
 
     const activity = req.db.prepare('SELECT * FROM activities WHERE id = ?').get(result.lastInsertRowid);
     syncActivityToSchedule(req.db, activity, { reposition: true });
+    bumpScheduleRevision(req.db, activity.group_id);
 
     const updated = req.db.prepare('SELECT * FROM activities WHERE id = ?').get(result.lastInsertRowid);
     res.json(mapActivityRow(updated));
@@ -388,6 +390,7 @@ router.put('/:id', requireEditLock, (req, res) => {
     const updatedActivity = req.db.prepare('SELECT * FROM activities WHERE id = ?').get(id);
     const shouldReposition = date !== undefined || timeSlot !== undefined;
     syncActivityToSchedule(req.db, updatedActivity, { reposition: shouldReposition || !updatedActivity.schedule_id });
+    bumpScheduleRevision(req.db, updatedActivity.group_id);
 
     const syncedActivity = req.db.prepare('SELECT * FROM activities WHERE id = ?').get(id);
     res.json(mapActivityRow(syncedActivity));
@@ -400,11 +403,12 @@ router.put('/:id', requireEditLock, (req, res) => {
 // 删除活动（需要编辑锁）
 router.delete('/:id', requireEditLock, (req, res) => {
   try {
-    const activity = req.db.prepare('SELECT schedule_id FROM activities WHERE id = ?').get(req.params.id);
+    const activity = req.db.prepare('SELECT schedule_id, group_id FROM activities WHERE id = ?').get(req.params.id);
     const result = req.db.prepare('DELETE FROM activities WHERE id = ?').run(req.params.id);
 
     if (activity?.schedule_id) {
       req.db.prepare('DELETE FROM schedules WHERE id = ?').run(activity.schedule_id);
+      bumpScheduleRevision(req.db, activity.group_id);
     }
 
     res.json({ 

@@ -62,6 +62,50 @@
                       │ value                   │             │
                       │ description             │             │
                       └─────────────────────────┘             │
+
+      ┌─────────────────────────┐
+      │ group_logistics_days    │
+      ├─────────────────────────┤
+      │ id                      │
+      │ group_id                │◄────────────── groups.id
+      │ activity_date           │
+      │ hotel/vehicle/guide...  │
+      └────────┬────────────────┘
+               │
+      ┌────────▼────────────────┐        ┌─────────────────────────┐
+      │ group_logistics_meals   │        │ group_logistics_transfers│
+      ├─────────────────────────┤        ├─────────────────────────┤
+      │ day_id                  │◄───────┤ day_id                  │
+      │ meal_type               │        │ transfer_type           │
+      │ resource_id             │        │ resource_id             │
+      │ schedule_id (nullable)  │──────► │ schedule_id (nullable)  │──────► schedules.id
+      └─────────────────────────┘        └─────────────────────────┘
+
+      ┌─────────────────────────┐
+      │ group_schedule_templates│
+      ├─────────────────────────┤
+      │ group_id                │◄────────────── groups.id
+      │ template_hash           │
+      │ type/title/duration     │
+      └─────────────────────────┘
+
+      ┌─────────────────────────┐
+      │ resource_people         │
+      ├─────────────────────────┤
+      │ role/name/phone         │
+      └─────────────────────────┘
+
+      ┌─────────────────────────┐
+      │ resource_hotels         │
+      ├─────────────────────────┤
+      │ name/address/city       │
+      └─────────────────────────┘
+
+      ┌─────────────────────────┐
+      │ resource_vehicles       │
+      ├─────────────────────────┤
+      │ plate/brand/model       │
+      └─────────────────────────┘
 ```
 
 ---
@@ -78,7 +122,7 @@
 | username | VARCHAR(50) | UNIQUE, NOT NULL | - | 用户名 |
 | password | VARCHAR(255) | NOT NULL | - |  bcrypt加密密码 |
 | display_name | VARCHAR(100) | - | - | 显示名称 |
-| role | VARCHAR(20) | CHECK | 'viewer' | 角色: admin / viewer |
+| role | VARCHAR(20) | CHECK | 'viewer' | 角色: admin / editor / viewer |
 | created_at | DATETIME | - | CURRENT_TIMESTAMP | 创建时间 |
 | last_login | DATETIME | - | - | 最后登录时间 |
 
@@ -104,8 +148,13 @@
 | duration | INTEGER | CHECK | 5 | 行程天数 |
 | color | VARCHAR(7) | - | '#1890ff' | 日历显示颜色 |
 | itinerary_plan_id | INTEGER | REFERENCES itinerary_plans(id) | - | 绑定的行程方案 |
+| status | VARCHAR(20) | - | - | 团组状态 |
 | contact_person | VARCHAR(100) | - | - | 联系人 |
 | contact_phone | VARCHAR(20) | - | - | 联系电话 |
+| emergency_contact | VARCHAR(100) | - | - | 紧急联系人 |
+| emergency_phone | VARCHAR(20) | - | - | 紧急联系电话 |
+| accommodation | TEXT | - | - | 住宿信息 |
+| tags | TEXT | - | - | 标签(JSON) |
 | notes | TEXT | - | - | 备注 |
 | created_at | DATETIME | - | CURRENT_TIMESTAMP | 创建时间 |
 | updated_at | DATETIME | - | CURRENT_TIMESTAMP | 更新时间 |
@@ -209,6 +258,164 @@
 
 **索引**:
 - `idx_schedules_group_date` ON (group_id, activity_date)
+
+---
+
+### 5.1 group_logistics_days - 每日卡片主表
+
+存储团组每日卡片的结构化信息（酒店/车辆/导游/安保/城市等）。
+
+| 字段 | 类型 | 约束 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | - | 日卡ID |
+| group_id | INTEGER | NOT NULL, REFERENCES groups(id) | - | 团组ID |
+| activity_date | DATE | NOT NULL | - | 日期 |
+| city | TEXT | - | - | 所在城市 |
+| departure_city | TEXT | - | - | 出发城市 |
+| arrival_city | TEXT | - | - | 抵达城市 |
+| hotel_name | TEXT | - | - | 酒店名称 |
+| hotel_address | TEXT | - | - | 酒店地址 |
+| hotel_disabled | BOOLEAN | - | 0 | 酒店不安排 |
+| vehicle_driver | TEXT | - | - | 司机 |
+| vehicle_plate | TEXT | - | - | 车牌 |
+| vehicle_phone | TEXT | - | - | 司机电话 |
+| vehicle_disabled | BOOLEAN | - | 0 | 车辆不安排 |
+| guide_name | TEXT | - | - | 导游 |
+| guide_phone | TEXT | - | - | 导游电话 |
+| guide_disabled | BOOLEAN | - | 0 | 导游不安排 |
+| security_name | TEXT | - | - | 安保 |
+| security_phone | TEXT | - | - | 安保电话 |
+| security_disabled | BOOLEAN | - | 0 | 安保不安排 |
+| note | TEXT | - | - | 备注 |
+| created_at | DATETIME | - | CURRENT_TIMESTAMP | 创建时间 |
+| updated_at | DATETIME | - | CURRENT_TIMESTAMP | 更新时间 |
+
+**约束**:
+- `UNIQUE(group_id, activity_date)`
+
+---
+
+### 5.2 group_logistics_meals - 餐饮子表
+
+存储每日三餐（早餐/午餐/晚餐）配置与时间回写。
+
+| 字段 | 类型 | 约束 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | - | 记录ID |
+| day_id | INTEGER | NOT NULL, REFERENCES group_logistics_days(id) | - | 日卡ID |
+| meal_type | TEXT | CHECK | - | breakfast/lunch/dinner |
+| place | TEXT | - | - | 用餐地点 |
+| arrangement | TEXT | - | - | 用餐安排 |
+| disabled | BOOLEAN | - | 0 | 不安排 |
+| start_time | TEXT | - | - | 开始时间 |
+| end_time | TEXT | - | - | 结束时间 |
+| detached | BOOLEAN | - | 0 | 日历删除后回资源库 |
+| resource_id | TEXT | - | - | daily:YYYY-MM-DD:meal:* |
+| schedule_id | INTEGER | REFERENCES schedules(id) | - | 关联日历 |
+| created_at | DATETIME | - | CURRENT_TIMESTAMP | 创建时间 |
+| updated_at | DATETIME | - | CURRENT_TIMESTAMP | 更新时间 |
+
+---
+
+### 5.3 group_logistics_transfers - 接送站子表
+
+存储接站/送站信息与时间回写。
+
+| 字段 | 类型 | 约束 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | - | 记录ID |
+| day_id | INTEGER | NOT NULL, REFERENCES group_logistics_days(id) | - | 日卡ID |
+| transfer_type | TEXT | CHECK | - | pickup/dropoff |
+| start_time | TEXT | - | - | 开始时间 |
+| end_time | TEXT | - | - | 结束时间 |
+| location | TEXT | - | - | 接送地点 |
+| contact | TEXT | - | - | 负责人 |
+| flight_no | TEXT | - | - | 航班号 |
+| airline | TEXT | - | - | 航司 |
+| terminal | TEXT | - | - | 航站楼 |
+| disabled | BOOLEAN | - | 0 | 不安排 |
+| detached | BOOLEAN | - | 0 | 日历删除后回资源库 |
+| resource_id | TEXT | - | - | daily:YYYY-MM-DD:pickup|dropoff |
+| schedule_id | INTEGER | REFERENCES schedules(id) | - | 关联日历 |
+| created_at | DATETIME | - | CURRENT_TIMESTAMP | 创建时间 |
+| updated_at | DATETIME | - | CURRENT_TIMESTAMP | 更新时间 |
+
+---
+
+### 5.4 group_schedule_templates - 自定义资源模板
+
+存储日历中“其他/自定义”资源库模板。
+
+| 字段 | 类型 | 约束 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | - | 模板ID |
+| group_id | INTEGER | NOT NULL, REFERENCES groups(id) | - | 团组ID |
+| template_hash | TEXT | NOT NULL | - | type|title|duration 哈希 |
+| type | TEXT | - | - | 资源类型 |
+| title | TEXT | - | - | 标题 |
+| duration_minutes | INTEGER | - | - | 时长（分钟） |
+| description | TEXT | - | - | 描述 |
+| location_name | TEXT | - | - | 地点 |
+| created_at | DATETIME | - | CURRENT_TIMESTAMP | 创建时间 |
+
+**约束**:
+- `UNIQUE(group_id, template_hash)`
+
+---
+
+### 5.5 resource_people - 人员资源
+
+存储司机/导游/安保等人员信息。
+
+| 字段 | 类型 | 约束 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | - | 记录ID |
+| role | TEXT | CHECK | - | driver/guide/security |
+| name | TEXT | NOT NULL | - | 姓名 |
+| phone | TEXT | - | - | 联系方式 |
+| notes | TEXT | - | - | 备注 |
+| is_active | BOOLEAN | - | 1 | 是否启用 |
+| created_at | DATETIME | - | CURRENT_TIMESTAMP | 创建时间 |
+| updated_at | DATETIME | - | CURRENT_TIMESTAMP | 更新时间 |
+
+---
+
+### 5.6 resource_hotels - 住宿资源
+
+存储酒店与地址等信息。
+
+| 字段 | 类型 | 约束 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | - | 记录ID |
+| name | TEXT | NOT NULL | - | 酒店名称 |
+| address | TEXT | - | - | 地址 |
+| city | TEXT | - | - | 城市 |
+| star | INTEGER | - | - | 星级 |
+| price | TEXT | - | - | 价格/档位 |
+| contact_person | TEXT | - | - | 联系人 |
+| contact_phone | TEXT | - | - | 联系电话 |
+| notes | TEXT | - | - | 备注 |
+| is_active | BOOLEAN | - | 1 | 是否启用 |
+| created_at | DATETIME | - | CURRENT_TIMESTAMP | 创建时间 |
+| updated_at | DATETIME | - | CURRENT_TIMESTAMP | 更新时间 |
+
+---
+
+### 5.7 resource_vehicles - 车辆资源
+
+存储车辆信息与车牌。
+
+| 字段 | 类型 | 约束 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | - | 记录ID |
+| plate | TEXT | NOT NULL | - | 车牌 |
+| brand | TEXT | - | - | 品牌 |
+| model | TEXT | - | - | 型号 |
+| seats | INTEGER | - | - | 座位数 |
+| notes | TEXT | - | - | 备注 |
+| is_active | BOOLEAN | - | 1 | 是否启用 |
+| created_at | DATETIME | - | CURRENT_TIMESTAMP | 创建时间 |
+| updated_at | DATETIME | - | CURRENT_TIMESTAMP | 更新时间 |
 
 ---
 

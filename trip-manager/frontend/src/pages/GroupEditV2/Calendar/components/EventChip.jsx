@@ -13,6 +13,21 @@ const EventChip = ({
   onResizeStart,
   isResizing
 }) => {
+  const resolveSource = () => {
+    const resourceId = activity?.resourceId ?? activity?.resource_id ?? '';
+    if (typeof resourceId === 'string') {
+      if (resourceId.startsWith('plan-')) {
+        return { label: '行程点', className: 'source-plan' };
+      }
+      if (resourceId.startsWith('daily:')) {
+        return { label: '每日卡片', className: 'source-daily' };
+      }
+    }
+    return { label: '自定义', className: 'source-custom' };
+  };
+
+  const sourceMeta = resolveSource();
+
   const handleClick = (event) => {
     if (onClick) {
       onClick(event, activity, event.currentTarget.getBoundingClientRect());
@@ -43,6 +58,11 @@ const EventChip = ({
           {activity.startTime}-{activity.endTime}
         </div>
         <div className="activity-title">{activity.location || activity.title || '未命名'}</div>
+        <div className="activity-meta">
+          <span className={`activity-source-badge ${sourceMeta.className}`}>
+            数据来源：{sourceMeta.label}
+          </span>
+        </div>
       </div>
 
       <div

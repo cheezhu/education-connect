@@ -9,7 +9,7 @@ const ResourceSidebar = ({
   onDrop,
   show = true
 }) => {
-  const [activeTab, setActiveTab] = useState('ai');
+  const [activeTab, setActiveTab] = useState('resources');
   const [isDragOver, setIsDragOver] = useState(false);
 
   if (!show) {

@@ -49,6 +49,7 @@ const GroupEditV2 = () => {
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [groupData, setGroupData] = useState(null);
   const [groupSchedules, setGroupSchedules] = useState([]);
+  const [scheduleRevision, setScheduleRevision] = useState(0);
   const [schedulesLoading, setSchedulesLoading] = useState(false);
   const [itineraryPlans, setItineraryPlans] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -192,6 +193,7 @@ const GroupEditV2 = () => {
   const fetchSchedules = async () => {
     if (isNew) {
       setGroupSchedules([]);
+      setScheduleRevision(0);
       setSchedulesLoading(false);
       return;
     }
@@ -199,10 +201,14 @@ const GroupEditV2 = () => {
     try {
       const response = await api.get(`/groups/${id}/schedules`);
       const loaded = Array.isArray(response.data) ? response.data : [];
+      const revisionHeader = response.headers?.['x-schedule-revision'];
+      const nextRevision = Number(revisionHeader);
+      setScheduleRevision(Number.isFinite(nextRevision) ? nextRevision : 0);
       setGroupSchedules(loaded);
     } catch (error) {
       message.error('加载日程失败');
       setGroupSchedules([]);
+      setScheduleRevision(0);
     } finally {
       setSchedulesLoading(false);
     }
@@ -416,6 +422,9 @@ const GroupEditV2 = () => {
             groupData={groupData}
             schedules={groupSchedules}
             loading={schedulesLoading}
+            scheduleRevision={scheduleRevision}
+            onRevisionChange={setScheduleRevision}
+            onRevisionConflict={fetchSchedules}
             onUpdate={(schedules) => {
               setGroupSchedules(schedules);
             }}

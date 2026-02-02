@@ -28,6 +28,7 @@
   border-left: 1px solid var(--border);
   background: #fff;
   height: 100%;
+  min-height: 0;
 }
 
 .calendar-workshop .calendar-container {
@@ -66,6 +67,15 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
+}
+
+.sidebar-pane {
+  min-height: 0;
+}
+
+.resource-pane-scroll {
+  min-height: 0;
 }
 
 .ai-chat-area {
@@ -256,6 +266,80 @@
   color: #5f6368;
   text-transform: uppercase;
   margin-bottom: 8px;
+}
+
+.source-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.source-toggle-btn {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #5f6368;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.source-toggle-btn:hover {
+  border-color: #cbd5f5;
+  color: #1d4ed8;
+}
+
+.source-toggle-btn.active {
+  background: #e8f0fe;
+  border-color: #d2e3fc;
+  color: #1a73e8;
+}
+
+.source-toggle-btn:disabled,
+.source-toggle-btn.disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  background: #f5f5f5;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+}
+
+.source-pill {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: #e8f0fe;
+  color: #1a73e8;
+  border: 1px solid #d2e3fc;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.source-pill.plan {
+  background: #e8f0fe;
+  color: #1a73e8;
+  border-color: #d2e3fc;
+}
+
+.source-pill.daily {
+  background: #fff7e6;
+  color: #d46b08;
+  border-color: #ffe7ba;
+}
+
+.source-pill.custom {
+  background: #f0f5ff;
+  color: #2f54eb;
+  border-color: #d6e4ff;
+}
+
+.source-readonly {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.4;
 }
 
 .link-toggle {

@@ -10,6 +10,25 @@ const resolveEventTitle = (event) => {
   return event?.title || event?.location || event?.description || '未命名活动';
 };
 
+const toPlainText = (value) => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string' || typeof value === 'number') {
+    const text = String(value).trim();
+    if (!text || text === '[object Object]' || text === 'undefined' || text === 'null') {
+      return '';
+    }
+    return text;
+  }
+  if (typeof value === 'object') {
+    if (typeof value.name === 'string') return value.name;
+    if (typeof value.label === 'string') return value.label;
+    if (typeof value.value === 'string' || typeof value.value === 'number') {
+      return String(value.value);
+    }
+  }
+  return '';
+};
+
 const isItineraryItem = (item) => {
   const type = (item?.type || '').toString().toLowerCase();
   if (!type) return true;
@@ -56,6 +75,25 @@ const buildSlotList = (items = []) => {
   }).filter(Boolean);
 };
 
+const formatWeatherTime = (value) => {
+  if (!value) return '';
+  const parsed = dayjs(value);
+  if (!parsed.isValid()) return value;
+  return parsed.format('MM-DD HH:mm');
+};
+
+const downloadJson = (filename, payload) => {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
 const DayLogisticsCard = ({
   day,
   scheduleItems = [],
@@ -69,28 +107,50 @@ const DayLogisticsCard = ({
   mealOptions = [],
   groupSize = 0,
   isFirstDay = false,
-  isLastDay = false
+  isLastDay = false,
+  weatherData
 }) => {
   const id = useId();
   const meals = day.meals || {};
   const vehicle = day.vehicle || {};
   const guide = day.guide || {};
   const security = day.security || {};
-  const pickup = day.pickup || {};
-  const dropoff = day.dropoff || {};
+  const vehicleDriver = toPlainText(vehicle.driver || vehicle.name);
+  const guideName = toPlainText(guide.name);
+  const securityName = toPlainText(security.name);
+  const hotelDisabled = !!day.hotel_disabled;
+  const vehicleDisabled = !!day.vehicle_disabled;
+  const guideDisabled = !!day.guide_disabled;
+  const securityDisabled = !!day.security_disabled;
   const weatherCities = [];
   if (day.departure_city) weatherCities.push({ label: '出发城市', value: day.departure_city });
   if (day.arrival_city) weatherCities.push({ label: '抵达城市', value: day.arrival_city });
   if (weatherCities.length === 0 && day.city) weatherCities.push({ label: '所在城市', value: day.city });
+  const hkoCurrent = weatherData?.current;
+  const hkoForecast = weatherData?.forecast;
+  const hkoStatus = hkoCurrent?.status;
+  const hkoData = hkoCurrent?.data;
+  const hkoTemp = hkoData?.temperature;
+  const hkoHumidity = hkoData?.humidity;
+  const hkoRainfall = hkoData?.rainfall;
+  const hkoUpdate = formatWeatherTime(hkoData?.updateTime);
+  const hkoWarning = toPlainText(hkoData?.warningMessage);
+  const forecastList = Array.isArray(hkoForecast?.list) ? hkoForecast.list : [];
+  const forecastForDay = forecastList.find((item) => item.date === day.date);
+  const hasForecast = !!forecastForDay;
+  const forecastUpdate = formatWeatherTime(hkoForecast?.updateTime);
+  const todayStr = dayjs().format('YYYY-MM-DD');
+  const isToday = day.date === todayStr;
+  const hasHkoData = !!(hkoData && (hkoTemp?.value !== undefined || hkoHumidity?.value !== undefined));
   const itineraryItems = scheduleItems.filter(isItineraryItem);
   const scheduleBuckets = splitScheduleItems(itineraryItems);
   const morningItems = buildSlotList(scheduleBuckets.morning);
   const afternoonItems = buildSlotList(scheduleBuckets.afternoon);
 
-  const hotelStatus = day.hotel ? '已填' : '未填';
-  const vehicleStatus = vehicle.plate || vehicle.driver || vehicle.phone ? '已填' : '未填';
-  const guideStatus = guide.name || guide.phone ? '已填' : '未填';
-  const securityStatus = security.name || security.phone ? '已填' : '未填';
+  const hotelStatus = hotelDisabled || day.hotel ? '已填' : '未填';
+  const vehicleStatus = vehicleDisabled || vehicle.plate || vehicleDriver || vehicle.phone ? '已填' : '未填';
+  const guideStatus = guideDisabled || guideName || guide.phone ? '已填' : '未填';
+  const securityStatus = securityDisabled || securityName || security.phone ? '已填' : '未填';
   const mealFilled = (value, disabled) => !!disabled || !!value;
   const mealFilledList = [
     mealFilled(meals.breakfast, meals.breakfast_disabled),
@@ -116,6 +176,9 @@ const DayLogisticsCard = ({
     if (nextDisabled) {
       updates[field] = '';
       updates[`${field}_place`] = '';
+      updates[`${field}_time`] = '';
+      updates[`${field}_end`] = '';
+      updates[`${field}_detached`] = false;
     }
     handleUpdate({ meals: { ...meals, ...updates } });
   };
@@ -132,17 +195,97 @@ const DayLogisticsCard = ({
     handleUpdate({ security: { ...security, [field]: value } });
   };
 
-  const handlePickupChange = (field, value) => {
-    handleUpdate({ pickup: { ...pickup, [field]: value } });
+  const handleHotelToggle = () => {
+    const nextDisabled = !hotelDisabled;
+    handleUpdate({
+      hotel_disabled: nextDisabled,
+      hotel: nextDisabled ? '' : day.hotel,
+      hotel_address: nextDisabled ? '' : day.hotel_address
+    });
   };
 
-  const handleDropoffChange = (field, value) => {
-    handleUpdate({ dropoff: { ...dropoff, [field]: value } });
+  const handleVehicleToggle = () => {
+    const nextDisabled = !vehicleDisabled;
+    handleUpdate({
+      vehicle_disabled: nextDisabled,
+      vehicle: nextDisabled ? { driver: '', plate: '', phone: '' } : vehicle
+    });
+  };
+
+  const handleGuideToggle = () => {
+    const nextDisabled = !guideDisabled;
+    handleUpdate({
+      guide_disabled: nextDisabled,
+      guide: nextDisabled ? { name: '', phone: '' } : guide
+    });
+  };
+
+  const handleSecurityToggle = () => {
+    const nextDisabled = !securityDisabled;
+    handleUpdate({
+      security_disabled: nextDisabled,
+      security: nextDisabled ? { name: '', phone: '' } : security
+    });
   };
 
   const breakfastDisabled = !!meals.breakfast_disabled;
   const lunchDisabled = !!meals.lunch_disabled;
   const dinnerDisabled = !!meals.dinner_disabled;
+
+  const handleDownloadWeather = () => {
+    const filename = `hko-weather-${day.date}.json`;
+
+    if (isToday && hkoData) {
+      const payload = {
+        date: day.date,
+        source: 'HKO rhrread',
+        temperature: hkoTemp,
+        humidity: hkoHumidity,
+        rainfall: hkoRainfall,
+        warning: hkoWarning || '',
+        wind: forecastForDay?.wind || '',
+        forecast: forecastForDay
+          ? {
+              weather: forecastForDay.weather,
+              minTemp: forecastForDay.minTemp,
+              maxTemp: forecastForDay.maxTemp,
+              minRh: forecastForDay.minRh,
+              maxRh: forecastForDay.maxRh
+            }
+          : null,
+        updateTime: hkoUpdate,
+        forecastUpdateTime: hkoForecast?.updateTime || ''
+      };
+      downloadJson(filename, payload);
+      return;
+    }
+
+    if (hasForecast) {
+      const payload = {
+        date: day.date,
+        source: 'HKO fnd',
+        temperature: {
+          min: forecastForDay.minTemp,
+          max: forecastForDay.maxTemp,
+          unit: 'C'
+        },
+        humidity: {
+          min: forecastForDay.minRh,
+          max: forecastForDay.maxRh,
+          unit: 'percent'
+        },
+        rainfall: null,
+        warning: '',
+        wind: forecastForDay.wind || '',
+        weather: forecastForDay.weather || '',
+        updateTime: hkoForecast?.updateTime || ''
+      };
+      downloadJson(filename, payload);
+      return;
+    }
+
+    window.alert('该日期暂无香港天文台数据可下载');
+  };
 
   return (
     <div className="day-card">
@@ -182,105 +325,119 @@ const DayLogisticsCard = ({
         </div>
 
         <div className="weather-box">
-          <div className="weather-label">城市天气</div>
-          {weatherCities.length === 0 && (
+          <div className="weather-header">
+            <div className="weather-label">香港天文台</div>
+            <button
+              className="btn-link weather-download"
+              type="button"
+              onClick={handleDownloadWeather}
+            >
+              下载天气
+            </button>
+          </div>
+          {isToday && !hasHkoData && hkoStatus !== 'error' && (
+            <div className="weather-item">加载中...</div>
+          )}
+          {isToday && hkoStatus === 'error' && (
+            <div className="weather-item">暂无法获取</div>
+          )}
+          {isToday && hasHkoData && (
+            <>
+              <div className="weather-item">
+                气温：{hkoTemp?.value ?? '--'}{hkoTemp?.unit || ''}
+              </div>
+              <div className="weather-item">
+                湿度：{hkoHumidity?.value ?? '--'}{hkoHumidity?.unit || ''}
+              </div>
+              {hkoRainfall && (
+                <div className="weather-item">
+                  降雨：{hkoRainfall.value ?? '--'}{hkoRainfall.unit || ''}
+                </div>
+              )}
+              {hkoUpdate && (
+                <div className="weather-item">更新：{hkoUpdate}</div>
+              )}
+              {hkoWarning && (
+                <div className="weather-item weather-warn">提示：{hkoWarning}</div>
+              )}
+            </>
+          )}
+          {!isToday && hasForecast && (
+            <>
+              {forecastForDay.weather && (
+                <div className="weather-item">预报：{forecastForDay.weather}</div>
+              )}
+              <div className="weather-item">
+                温度：{forecastForDay.minTemp ?? '--'}-{forecastForDay.maxTemp ?? '--'}C
+              </div>
+              <div className="weather-item">
+                湿度：{forecastForDay.minRh ?? '--'}-{forecastForDay.maxRh ?? '--'}%
+              </div>
+              {forecastForDay.wind && (
+                <div className="weather-item">风：{forecastForDay.wind}</div>
+              )}
+              {forecastUpdate && (
+                <div className="weather-item">更新：{forecastUpdate}</div>
+              )}
+            </>
+          )}
+          {!isToday && !hasForecast && (
+            <div className="weather-item">暂无预报</div>
+          )}
+          {weatherCities.length > 0 && (
+            <div className="weather-city">
+              {weatherCities.map((city) => (
+                <div className="weather-item" key={`${day.date}-${city.label}`}>
+                  {city.label}：{city.value}
+                </div>
+              ))}
+            </div>
+          )}
+          {weatherCities.length === 0 && !hasHkoData && !hasForecast && (
             <div className="weather-item">设置城市后显示</div>
           )}
-          {weatherCities.map((city) => (
-            <div className="weather-city" key={`${day.date}-${city.label}`}>
-              <div className="weather-item">{city.label}：{city.value}</div>
-              <div className="weather-item">温度：--</div>
-              <div className="weather-item">湿度：--</div>
-            </div>
-          ))}
+        </div>
+
+        <div className="context-footer">
+          <button
+            className="btn-link context-copy-btn"
+            type="button"
+            disabled={index === 0}
+            onClick={() => onCopyPrevDay?.(index)}
+          >
+            复制上一日
+          </button>
         </div>
       </div>
 
       <div className="day-form">
-        <div className="day-form-header">
-          <div className="day-form-title">资源配置</div>
-          <div className="day-form-status">
-            <span className="status-dot" />
-            自动保存
-          </div>
-        </div>
-        {isFirstDay && (
-          <div className="transfer-section">
-            <div className="transfer-title">接站信息</div>
-            <div className="transfer-grid">
-              <div className="input-group">
-                <label className="label">接站时间</label>
-                <input
-                  className="input-box"
-                  value={pickup.time || ''}
-                  placeholder="例如 09:30"
-                  onChange={(event) => handlePickupChange('time', event.target.value)}
-                />
-              </div>
-              <div className="input-group">
-                <label className="label">接站地点</label>
-                <input
-                  className="input-box"
-                  value={pickup.location || ''}
-                  placeholder="机场 / 车站 / 码头"
-                  onChange={(event) => handlePickupChange('location', event.target.value)}
-                />
-              </div>
-              <div className="input-group">
-                <label className="label">接站负责人</label>
-                <input
-                  className="input-box"
-                  value={pickup.contact || ''}
-                  placeholder="负责人 / 电话"
-                  onChange={(event) => handlePickupChange('contact', event.target.value)}
-                />
-              </div>
-              <div className="input-group">
-                <label className="label">航班号</label>
-                <input
-                  className="input-box"
-                  value={pickup.flight_no || ''}
-                  placeholder="例如 MU1234"
-                  onChange={(event) => handlePickupChange('flight_no', event.target.value)}
-                />
-              </div>
-              <div className="input-group">
-                <label className="label">航司</label>
-                <input
-                  className="input-box"
-                  value={pickup.airline || ''}
-                  placeholder="例如 中国东航"
-                  onChange={(event) => handlePickupChange('airline', event.target.value)}
-                />
-              </div>
-              <div className="input-group">
-                <label className="label">航站楼/登机口</label>
-                <input
-                  className="input-box"
-                  value={pickup.terminal || ''}
-                  placeholder="T2 / G18"
-                  onChange={(event) => handlePickupChange('terminal', event.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-        )}
         <div className="form-grid">
-          <div className="input-group">
-            <label className="label">住宿酒店</label>
+          <div className={`input-group ${hotelDisabled ? 'is-disabled' : ''}`}>
+            <div className="section-header">
+              <label className="label">住宿酒店</label>
+              <button
+                className={`section-toggle ${hotelDisabled ? 'is-off' : ''}`}
+                type="button"
+                onClick={handleHotelToggle}
+              >
+                {hotelDisabled ? '未安排' : '不安排'}
+              </button>
+            </div>
             <div className="multi-input">
               <input
                 className="input-box input-main"
                 value={day.hotel || ''}
-                placeholder="输入酒店名称"
+                placeholder={hotelDisabled ? '已标记不安排' : '输入酒店名称'}
                 onChange={(event) => handleUpdate({ hotel: event.target.value })}
                 list={`${id}-hotel`}
+                disabled={hotelDisabled}
               />
               <input
                 className="input-box input-sub"
                 value={day.hotel_address || ''}
-                placeholder="酒店地址"
+                placeholder={hotelDisabled ? '已标记不安排' : '酒店地址'}
                 onChange={(event) => handleUpdate({ hotel_address: event.target.value })}
+                disabled={hotelDisabled}
               />
             </div>
             {hotelOptions.length > 0 && (
@@ -291,35 +448,44 @@ const DayLogisticsCard = ({
               </datalist>
             )}
           </div>
-          <div className="input-group">
-            <label className="label">车辆调度</label>
+          <div className={`input-group ${vehicleDisabled ? 'is-disabled' : ''}`}>
+            <div className="section-header">
+              <label className="label">车辆调度</label>
+              <button
+                className={`section-toggle ${vehicleDisabled ? 'is-off' : ''}`}
+                type="button"
+                onClick={handleVehicleToggle}
+              >
+                {vehicleDisabled ? '未安排' : '不安排'}
+              </button>
+            </div>
             <div className="vehicle-stack">
               <div className="vehicle-row">
-                <span className="vehicle-label">车牌</span>
                 <input
                   className="input-box vehicle-input"
                   value={vehicle.plate || ''}
-                  placeholder="车牌号"
+                  placeholder={vehicleDisabled ? '已标记不安排' : '车牌号'}
                   onChange={(event) => handleVehicleChange('plate', event.target.value)}
+                  disabled={vehicleDisabled}
                 />
               </div>
               <div className="vehicle-row">
-                <span className="vehicle-label">司机</span>
                 <input
                   className="input-box vehicle-input"
-                  value={vehicle.driver || vehicle.name || ''}
-                  placeholder="司机姓名"
+                  value={vehicleDriver}
+                  placeholder={vehicleDisabled ? '已标记不安排' : '司机姓名'}
                   onChange={(event) => handleVehicleChange('driver', event.target.value)}
                   list={`${id}-vehicle`}
+                  disabled={vehicleDisabled}
                 />
               </div>
               <div className="vehicle-row">
-                <span className="vehicle-label">电话</span>
                 <input
                   className="input-box vehicle-input"
                   value={vehicle.phone || ''}
-                  placeholder="联系电话"
+                  placeholder={vehicleDisabled ? '已标记不安排' : '联系电话'}
                   onChange={(event) => handleVehicleChange('phone', event.target.value)}
+                  disabled={vehicleDisabled}
                 />
               </div>
             </div>
@@ -334,21 +500,32 @@ const DayLogisticsCard = ({
         </div>
 
         <div className="form-grid">
-          <div className="input-group">
-            <label className="label">随团导游</label>
+          <div className={`input-group ${guideDisabled ? 'is-disabled' : ''}`}>
+            <div className="section-header">
+              <label className="label">随团导游</label>
+              <button
+                className={`section-toggle ${guideDisabled ? 'is-off' : ''}`}
+                type="button"
+                onClick={handleGuideToggle}
+              >
+                {guideDisabled ? '未安排' : '不安排'}
+              </button>
+            </div>
             <div className="multi-input">
               <input
                 className="input-box input-main normal"
-                value={guide.name || ''}
-                placeholder="导游姓名"
-                onChange={(event) => handleGuideChange('name', event.target.value)}
-                list={`${id}-guide`}
+                  value={guideName}
+                  placeholder={guideDisabled ? '已标记不安排' : '导游姓名'}
+                  onChange={(event) => handleGuideChange('name', event.target.value)}
+                  list={`${id}-guide`}
+                  disabled={guideDisabled}
               />
               <input
                 className="input-box input-sub"
                 value={guide.phone || ''}
-                placeholder="联系电话"
+                placeholder={guideDisabled ? '已标记不安排' : '联系电话'}
                 onChange={(event) => handleGuideChange('phone', event.target.value)}
+                disabled={guideDisabled}
               />
             </div>
             {guideOptions.length > 0 && (
@@ -359,21 +536,32 @@ const DayLogisticsCard = ({
               </datalist>
             )}
           </div>
-          <div className="input-group">
-            <label className="label">安保人员</label>
+          <div className={`input-group ${securityDisabled ? 'is-disabled' : ''}`}>
+            <div className="section-header">
+              <label className="label">安保人员</label>
+              <button
+                className={`section-toggle ${securityDisabled ? 'is-off' : ''}`}
+                type="button"
+                onClick={handleSecurityToggle}
+              >
+                {securityDisabled ? '未安排' : '不安排'}
+              </button>
+            </div>
             <div className="multi-input">
               <input
                 className="input-box input-main normal"
-                value={security.name || ''}
-                placeholder="安保姓名"
-                onChange={(event) => handleSecurityChange('name', event.target.value)}
-                list={`${id}-security`}
+                  value={securityName}
+                  placeholder={securityDisabled ? '已标记不安排' : '安保姓名'}
+                  onChange={(event) => handleSecurityChange('name', event.target.value)}
+                  list={`${id}-security`}
+                  disabled={securityDisabled}
               />
               <input
                 className="input-box input-sub"
                 value={security.phone || ''}
-                placeholder="联系电话"
+                placeholder={securityDisabled ? '已标记不安排' : '联系电话'}
                 onChange={(event) => handleSecurityChange('phone', event.target.value)}
+                disabled={securityDisabled}
               />
             </div>
             {securityOptions.length > 0 && (
@@ -480,80 +668,9 @@ const DayLogisticsCard = ({
           />
         </div>
 
-        {isLastDay && (
-          <div className="transfer-section">
-            <div className="transfer-title">送站信息</div>
-            <div className="transfer-grid">
-              <div className="input-group">
-                <label className="label">送站时间</label>
-                <input
-                  className="input-box"
-                  value={dropoff.time || ''}
-                  placeholder="例如 18:00"
-                  onChange={(event) => handleDropoffChange('time', event.target.value)}
-                />
-              </div>
-              <div className="input-group">
-                <label className="label">送站地点</label>
-                <input
-                  className="input-box"
-                  value={dropoff.location || ''}
-                  placeholder="机场 / 车站 / 码头"
-                  onChange={(event) => handleDropoffChange('location', event.target.value)}
-                />
-              </div>
-              <div className="input-group">
-                <label className="label">送站负责人</label>
-                <input
-                  className="input-box"
-                  value={dropoff.contact || ''}
-                  placeholder="负责人 / 电话"
-                  onChange={(event) => handleDropoffChange('contact', event.target.value)}
-                />
-              </div>
-              <div className="input-group">
-                <label className="label">航班号</label>
-                <input
-                  className="input-box"
-                  value={dropoff.flight_no || ''}
-                  placeholder="例如 CZ5678"
-                  onChange={(event) => handleDropoffChange('flight_no', event.target.value)}
-                />
-              </div>
-              <div className="input-group">
-                <label className="label">航司</label>
-                <input
-                  className="input-box"
-                  value={dropoff.airline || ''}
-                  placeholder="例如 南方航空"
-                  onChange={(event) => handleDropoffChange('airline', event.target.value)}
-                />
-              </div>
-              <div className="input-group">
-                <label className="label">航站楼/登机口</label>
-                <input
-                  className="input-box"
-                  value={dropoff.terminal || ''}
-                  placeholder="T2 / G18"
-                  onChange={(event) => handleDropoffChange('terminal', event.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="day-summary">
-        <div className="summary-action">
-          <button
-            className="btn-link copy-btn"
-            type="button"
-            disabled={index === 0}
-            onClick={() => onCopyPrevDay?.(index)}
-          >
-            复制上一日
-          </button>
-        </div>
         <div className="summary-card">
           <div className="summary-title">当日行程摘要</div>
           <div className="summary-slot">
@@ -602,6 +719,11 @@ const DayLogisticsCard = ({
             <span>餐饮安排</span>
             <span className={`summary-status ${statusClassName(mealStatus)}`}>{mealStatus}</span>
           </div>
+        </div>
+
+        <div className="summary-save">
+          <span className="status-dot" />
+          自动保存
         </div>
       </div>
     </div>

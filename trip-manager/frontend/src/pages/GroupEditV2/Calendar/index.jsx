@@ -21,22 +21,23 @@ const SLOT_HEIGHT = 10;
 const MIN_SLOT_HEIGHT = 8;
 const SLOTS_PER_HOUR = Math.max(1, Math.round(60 / SLOT_MINUTES));
 
-const presetResourcesData = [
-  { id: 'meal', type: 'meal', title: '早餐', icon: '', duration: 1, description: '酒店自助早餐', isUnique: false },
-  { id: 'lunch', type: 'meal', title: '午餐', icon: '', duration: 1, description: '特色午餐', isUnique: false },
-  { id: 'dinner', type: 'meal', title: '晚餐', icon: '', duration: 1.5, description: '特色晚餐', isUnique: false },
-  { id: 'transport', type: 'transport', title: '大巴交通', icon: '', duration: 1, description: '团队集体交通', isUnique: false },
-  { id: 'rest', type: 'rest', title: '休息', icon: '', duration: 1, description: '酒店休息', isUnique: false },
-  { id: 'free', type: 'free', title: '自由活动', icon: '', duration: 2, description: '自由安排', isUnique: false },
-  { id: 'science', type: 'visit', title: '香港科学馆', icon: '', duration: 2.5, description: '常设展览参观', isUnique: true },
-  { id: 'ocean', type: 'visit', title: '海洋公园', icon: '', duration: 4, description: '海洋动物展示', isUnique: true },
-  { id: 'peak', type: 'visit', title: '太平山顶', icon: '', duration: 3, description: '观光与拍照', isUnique: true },
-  { id: 'university', type: 'visit', title: '香港大学', icon: '', duration: 2, description: '校园参观', isUnique: true },
-  { id: 'museum', type: 'visit', title: '历史博物馆', icon: '', duration: 2, description: '文化历史学习', isUnique: true },
-  { id: 'activity', type: 'activity', title: '团队活动', icon: '', duration: 2, description: '互动游戏', isUnique: true }
-];
-
 const DEFAULT_PLAN_DURATION = 2;
+
+const isDailyActivity = (activity) => {
+  const resourceId = activity?.resourceId ?? activity?.resource_id ?? '';
+  return typeof resourceId === 'string' && resourceId.startsWith('daily:');
+};
+
+const parseDailyDate = (resourceId) => {
+  if (typeof resourceId !== 'string') return '';
+  if (!resourceId.startsWith('daily:')) return '';
+  const parts = resourceId.split(':');
+  return parts[1] || '';
+};
+
+const buildClientId = () => (
+  `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+);
 
 const CalendarWorkshop = ({
   groupData,
@@ -47,10 +48,6 @@ const CalendarWorkshop = ({
   resourceWidth,
   loading = false
 }) => {
-  const repeatableResources = useMemo(
-    () => presetResourcesData.filter((resource) => !resource.isUnique),
-    []
-  );
   const [itineraryPlans, setItineraryPlans] = useState([]);
   const [locations, setLocations] = useState([]);
   const [planResources, setPlanResources] = useState([]);
@@ -80,14 +77,6 @@ const CalendarWorkshop = ({
 
   const resourcePanelStyle = resourceWidth ? { width: resourceWidth } : undefined;
 
-  if (loading) {
-    return (
-      <CalendarSkeleton
-        showResources={showResources}
-        resourceWidth={resourcePanelStyle?.width ?? 260}
-      />
-    );
-  }
   useEffect(() => {
     let isMounted = true;
 
@@ -168,8 +157,9 @@ const CalendarWorkshop = ({
     const usedLocationIds = new Set();
 
     sourceActivities.forEach((activity) => {
-      if (activity?.resourceId) {
-        usedResourceIds.add(activity.resourceId);
+      const resourceId = activity?.resourceId ?? activity?.resource_id;
+      if (resourceId) {
+        usedResourceIds.add(resourceId);
       }
       const locationId = Number(activity?.locationId);
       if (Number.isFinite(locationId)) {
@@ -273,6 +263,57 @@ const CalendarWorkshop = ({
     return activityTypes[type]?.color || '#1890ff';
   };
 
+  const isMealFilled = (meals, key) => {
+    if (!meals || meals[`${key}_disabled`]) return false;
+    return Boolean(meals[key] || meals[`${key}_place`]);
+  };
+
+  const hasPickupContent = (pickup) => {
+    if (!pickup || pickup.disabled) return false;
+    return Boolean(
+      pickup.time ||
+      pickup.end_time ||
+      pickup.location ||
+      pickup.contact ||
+      pickup.flight_no ||
+      pickup.airline ||
+      pickup.terminal
+    );
+  };
+
+  const buildFlightDescription = (pickup) => (
+    [
+      pickup?.flight_no && `航班 ${pickup.flight_no}`,
+      pickup?.airline && pickup.airline,
+      pickup?.terminal && pickup.terminal
+    ].filter(Boolean).join(' / ')
+  );
+
+  const dailyResourceId = (date, category, key) => {
+    if (!date) return '';
+    if (category === 'meal') {
+      return `daily:${date}:meal:${key}`;
+    }
+    return `daily:${date}:${category}`;
+  };
+
+  const toMinutes = (timeValue) => {
+    if (!timeValue) return null;
+    const [hourStr, minuteStr] = String(timeValue).split(':');
+    const hour = Number(hourStr);
+    const minute = Number(minuteStr);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    return hour * 60 + minute;
+  };
+
+  const calcDurationHours = (startTime, endTime, fallback = 60) => {
+    const start = toMinutes(startTime);
+    const end = toMinutes(endTime);
+    const diff = Number.isFinite(start) && Number.isFinite(end) ? (end - start) : null;
+    const minutes = diff && diff > 0 ? diff : fallback;
+    return Math.max(0.5, minutes / 60);
+  };
+
   const getActivityIdentity = (activity) => (
     activity
       ? (
@@ -325,6 +366,90 @@ const CalendarWorkshop = ({
 
   const days = calculateDays();
   const timeSlots = generateTimeSlots();
+
+  const dailyCardResources = useMemo(() => {
+    const logistics = Array.isArray(groupData?.logistics) ? groupData.logistics : [];
+    if (!logistics.length) return [];
+    const startDate = groupData?.start_date || '';
+    const endDate = groupData?.end_date || '';
+    const scheduledResources = new Set(
+      (activities || [])
+        .map((activity) => activity?.resourceId ?? activity?.resource_id)
+        .filter((id) => typeof id === 'string')
+    );
+    const mealDefaults = {
+      breakfast: { start: '07:30', end: '08:30', label: '早餐' },
+      lunch: { start: '12:00', end: '13:00', label: '午餐' },
+      dinner: { start: '18:00', end: '19:00', label: '晚餐' }
+    };
+    const resources = [];
+
+    logistics.forEach((row) => {
+      const date = row?.date;
+      if (!date) return;
+      const isStartDay = Boolean(startDate && date === startDate);
+      const isEndDay = Boolean(endDate && date === endDate);
+      const meals = row.meals || {};
+      ['breakfast', 'lunch', 'dinner'].forEach((key) => {
+        if (!isMealFilled(meals, key)) return;
+        const resourceId = dailyResourceId(date, 'meal', key);
+        if (scheduledResources.has(resourceId)) return;
+        const defaults = mealDefaults[key] || {};
+        const duration = calcDurationHours(
+          meals[`${key}_time`] || defaults.start,
+          meals[`${key}_end`] || defaults.end,
+          60
+        );
+        resources.push({
+          id: resourceId,
+          type: 'meal',
+          title: defaults.label || key,
+          duration,
+          description: meals[key] || '',
+          locationName: meals[`${key}_place`] || defaults.label || '',
+          fixedDate: date
+        });
+      });
+
+      const pickup = row.pickup || {};
+      if (isStartDay && !pickup.disabled) {
+        const resourceId = dailyResourceId(date, 'pickup');
+        if (!scheduledResources.has(resourceId)) {
+          resources.push({
+            id: resourceId,
+            type: 'transport',
+            title: '接站',
+            duration: calcDurationHours(pickup.time, pickup.end_time, 60),
+            description: buildFlightDescription(pickup),
+            locationName: pickup.location || '接站',
+            fixedDate: date
+          });
+        }
+      }
+
+      const dropoff = row.dropoff || {};
+      if (isEndDay && !dropoff.disabled) {
+        const resourceId = dailyResourceId(date, 'dropoff');
+        if (!scheduledResources.has(resourceId)) {
+          resources.push({
+            id: resourceId,
+            type: 'transport',
+            title: '送站',
+            duration: calcDurationHours(dropoff.time, dropoff.end_time, 60),
+            description: buildFlightDescription(dropoff),
+            locationName: dropoff.location || '送站',
+            fixedDate: date
+          });
+        }
+      }
+    });
+
+    return resources;
+  }, [groupData?.logistics, groupData?.start_date, groupData?.end_date, activities]);
+
+  const customResources = useMemo(() => (
+    Array.isArray(groupData?.customResources) ? groupData.customResources : []
+  ), [groupData?.customResources]);
 
   useLayoutEffect(() => {
     const wrapper = scrollWrapperRef.current;
@@ -496,6 +621,10 @@ const CalendarWorkshop = ({
   const updateDropIndicatorForDate = (event, dateStr) => {
     if (draggedResource) return;
     if (!draggedActivity || !dateStr) return;
+    if (isDailyActivity(draggedActivity) && draggedActivity.date && dateStr !== draggedActivity.date) {
+      setDropIndicator(null);
+      return;
+    }
 
     const calendarGrid = calendarRef.current?.querySelector('.calendar-grid');
     const scrollWrapper = calendarRef.current?.querySelector('.calendar-scroll-wrapper');
@@ -545,6 +674,11 @@ const CalendarWorkshop = ({
     const targetElement = event.target.closest('.time-slot');
     if (targetElement) {
       const dateStr = targetElement.dataset.date;
+      if (isDailyActivity(draggedActivity) && draggedActivity.date && dateStr && dateStr !== draggedActivity.date) {
+        event.dataTransfer.dropEffect = 'none';
+        setDropIndicator(null);
+        return;
+      }
       updateDropIndicatorForDate(event, dateStr);
     }
   };
@@ -566,6 +700,12 @@ const CalendarWorkshop = ({
     event.stopPropagation();
 
     if (draggedResource) {
+      const fixedDate = draggedResource.fixedDate || parseDailyDate(draggedResource.id);
+      if (fixedDate && targetDate && fixedDate !== targetDate) {
+        message.warning('每日卡片活动日期已固定，只能调整时间');
+        return;
+      }
+      const resolvedDate = fixedDate || targetDate;
       const durationSlots = Math.max(1, Math.ceil((draggedResource.duration * 60) / SLOT_MINUTES));
       const startIndex = Math.max(0, timeSlots.indexOf(targetTime));
       const maxStartIndex = Math.max(0, timeSlots.length - durationSlots - 1);
@@ -575,9 +715,10 @@ const CalendarWorkshop = ({
       const endRow = Math.min(startRow + durationSlots, timeSlots.length + 1);
       const endTime = gridRowToTime(endRow);
       const newActivity = {
-        id: Date.now(),
+        id: null,
+        clientId: buildClientId(),
         groupId: groupData.id,
-        date: targetDate,
+        date: resolvedDate,
         startTime: adjustedStartTime,
         endTime,
         type: draggedResource.type,
@@ -610,6 +751,11 @@ const CalendarWorkshop = ({
     }
 
     if (!draggedActivity) {
+      return;
+    }
+
+    if (isDailyActivity(draggedActivity) && draggedActivity.date && targetDate && targetDate !== draggedActivity.date) {
+      message.warning('每日卡片活动不能跨日期移动');
       return;
     }
 
@@ -797,7 +943,7 @@ const CalendarWorkshop = ({
     let resolvedLocation = payload.location || baseActivity?.location || '';
     let resolvedLocationId = baseActivity?.locationId ?? null;
     let resolvedLocationColor = baseActivity?.locationColor ?? null;
-    let resolvedResourceId = baseActivity?.resourceId ?? null;
+    let resolvedResourceId = baseActivity?.resourceId ?? baseActivity?.resource_id ?? null;
     let resolvedPlanItemId = baseActivity?.planItemId ?? null;
     let isFromResource = baseActivity?.isFromResource ?? false;
 
@@ -824,7 +970,8 @@ const CalendarWorkshop = ({
 
     const activityData = {
       ...baseActivity,
-      id: baseActivity?.id || Date.now(),
+      id: baseActivity?.id ?? null,
+      clientId: baseActivity?.clientId ?? buildClientId(),
       groupId: groupData.id,
       date: targetDate,
       startTime,
@@ -929,7 +1076,7 @@ const CalendarWorkshop = ({
   const handleResourceDrop = (event) => {
     event.preventDefault();
     if (draggedActivity) {
-      const resourceId = draggedActivity.resourceId || '';
+      const resourceId = draggedActivity.resourceId || draggedActivity.resource_id || '';
       let planResource = null;
 
       if (typeof resourceId === 'string' && resourceId.startsWith('plan-')) {
@@ -993,6 +1140,15 @@ const CalendarWorkshop = ({
 
   const sidebarWidth = resourcePanelStyle?.width ?? 260;
 
+  if (loading) {
+    return (
+      <CalendarSkeleton
+        showResources={showResources}
+        resourceWidth={sidebarWidth}
+      />
+    );
+  }
+
   const resourcePane = (
     <div className="resource-pane-scroll">
       <div className="resource-header">
@@ -1027,75 +1183,111 @@ const CalendarWorkshop = ({
       </div>
 
       <div className="resource-columns">
-        <div className="resource-column">
-          <div className="resource-section unique-section">
-            <div className="section-label">方案行程点</div>
-            <div className="resource-cards">
-              {availablePlanResources.length === 0 ? (
-                <div style={{ fontSize: '12px', color: '#999', padding: '8px 4px' }}>
-                  暂无可用方案行程点
+        <div className="resource-section unique-section">
+          <div className="section-label">方案行程点</div>
+          <div className="resource-cards">
+            {availablePlanResources.length === 0 ? (
+              <div style={{ fontSize: '12px', color: '#999', padding: '8px 4px' }}>
+                暂无可用方案行程点
+              </div>
+            ) : availablePlanResources.map(resource => (
+              <div
+                key={resource.id}
+                className={`resource-card ${resource.type} unique`}
+                draggable
+                onDragStart={(event) => {
+                  setDraggedResource(resource);
+                  setIsDragging(true);
+                  event.dataTransfer.effectAllowed = 'copy';
+                  event.dataTransfer.setData('resource', JSON.stringify(resource));
+                }}
+                onDragEnd={() => {
+                  setDraggedResource(null);
+                  setIsDragging(false);
+                }}
+                style={{
+                  background: activityTypes[resource.type]?.color || '#1890ff',
+                  cursor: 'grab'
+                }}
+                title={resource.description}
+              >
+                <div className="resource-info">
+                  <div className="resource-name">{resource.title}</div>
                 </div>
-              ) : availablePlanResources.map(resource => (
-                <div
-                  key={resource.id}
-                  className={`resource-card ${resource.type} unique`}
-                  draggable
-                  onDragStart={(event) => {
-                    setDraggedResource(resource);
-                    setIsDragging(true);
-                    event.dataTransfer.effectAllowed = 'copy';
-                    event.dataTransfer.setData('resource', JSON.stringify(resource));
-                  }}
-                  onDragEnd={() => {
-                    setDraggedResource(null);
-                    setIsDragging(false);
-                  }}
-                  style={{
-                    background: activityTypes[resource.type].color,
-                    cursor: 'grab'
-                  }}
-                  title={resource.description}
-                >
-                  <div className="resource-info">
-                    <div className="resource-name">{resource.title}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="resource-column">
-          <div className="resource-section repeatable-section">
-            <div className="section-label">可重复活动</div>
-            <div className="resource-cards">
-              {repeatableResources.map(resource => (
-                <div
-                  key={resource.id}
-                  className={`resource-card ${resource.type} repeatable`}
-                  draggable
-                  onDragStart={(event) => {
-                    setDraggedResource(resource);
-                    setIsDragging(true);
-                    event.dataTransfer.effectAllowed = 'copy';
-                    event.dataTransfer.setData('resource', JSON.stringify(resource));
-                  }}
-                  onDragEnd={() => {
-                    setDraggedResource(null);
-                    setIsDragging(false);
-                  }}
-                  style={{
-                    background: activityTypes[resource.type].color,
-                    cursor: 'grab'
-                  }}
-                  title={resource.description}
-                >
-                  <div className="resource-info">
-                    <div className="resource-name">{resource.title}</div>
-                  </div>
+        <div className="resource-section daily-section">
+          <div className="section-label">每日卡片</div>
+          <div className="resource-cards">
+            {dailyCardResources.length === 0 ? (
+              <div style={{ fontSize: '12px', color: '#999', padding: '8px 4px' }}>
+                暂无可用每日卡片
+              </div>
+            ) : dailyCardResources.map(resource => (
+              <div
+                key={resource.id}
+                className={`resource-card ${resource.type} repeatable`}
+                draggable
+                onDragStart={(event) => {
+                  setDraggedResource(resource);
+                  setIsDragging(true);
+                  event.dataTransfer.effectAllowed = 'copy';
+                  event.dataTransfer.setData('resource', JSON.stringify(resource));
+                }}
+                onDragEnd={() => {
+                  setDraggedResource(null);
+                  setIsDragging(false);
+                }}
+                style={{
+                  background: activityTypes[resource.type]?.color || '#1890ff',
+                  cursor: 'grab'
+                }}
+                title={resource.description}
+              >
+                <div className="resource-info">
+                  <div className="resource-name">{resource.title}</div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="resource-section custom-section">
+          <div className="section-label">其他</div>
+          <div className="resource-cards">
+            {customResources.length === 0 ? (
+              <div style={{ fontSize: '12px', color: '#999', padding: '8px 4px' }}>
+                暂无自定义模板
+              </div>
+            ) : customResources.map(resource => (
+              <div
+                key={resource.id}
+                className={`resource-card ${resource.type} repeatable`}
+                draggable
+                onDragStart={(event) => {
+                  setDraggedResource(resource);
+                  setIsDragging(true);
+                  event.dataTransfer.effectAllowed = 'copy';
+                  event.dataTransfer.setData('resource', JSON.stringify(resource));
+                }}
+                onDragEnd={() => {
+                  setDraggedResource(null);
+                  setIsDragging(false);
+                }}
+                style={{
+                  background: activityTypes[resource.type]?.color || '#1890ff',
+                  cursor: 'grab'
+                }}
+                title={resource.description}
+              >
+                <div className="resource-info">
+                  <div className="resource-name">{resource.title}</div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

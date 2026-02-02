@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const requireEditLock = require('../middleware/editLock');
+const { bumpScheduleRevision } = require('../utils/scheduleRevision');
 const CANCELLED_STATUS = '已取消';
 
 // 获取所有团组
@@ -281,6 +282,7 @@ router.put('/batch-status', requireEditLock, (req, res) => {
       if (shouldClearSchedules) {
         deleteSchedulesStmt.run(id);
         deleteActivitiesStmt.run(id);
+        bumpScheduleRevision(req.db, id);
       }
       updatedIds.push(id);
     });
@@ -382,6 +384,7 @@ router.put('/:id', requireEditLock, (req, res) => {
       if (shouldClearSchedules) {
         req.db.prepare('DELETE FROM schedules WHERE group_id = ?').run(id);
         req.db.prepare('DELETE FROM activities WHERE group_id = ?').run(id);
+        bumpScheduleRevision(req.db, id);
       }
 
       const updatedGroup = req.db.prepare('SELECT * FROM groups WHERE id = ?').get(id);

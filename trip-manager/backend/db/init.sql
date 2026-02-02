@@ -31,6 +31,7 @@ CREATE TABLE groups (
     accommodation TEXT,
     tags TEXT,
     notes TEXT,
+    schedule_revision INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -83,6 +84,127 @@ CREATE TABLE schedules (
     resource_id VARCHAR(100),
     is_from_resource BOOLEAN DEFAULT 0,
     location_id INTEGER REFERENCES locations(id),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4.8 每日卡片主表
+CREATE TABLE group_logistics_days (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    activity_date DATE NOT NULL,
+    city TEXT,
+    departure_city TEXT,
+    arrival_city TEXT,
+    hotel_name TEXT,
+    hotel_address TEXT,
+    hotel_disabled BOOLEAN DEFAULT 0,
+    vehicle_driver TEXT,
+    vehicle_plate TEXT,
+    vehicle_phone TEXT,
+    vehicle_disabled BOOLEAN DEFAULT 0,
+    guide_name TEXT,
+    guide_phone TEXT,
+    guide_disabled BOOLEAN DEFAULT 0,
+    security_name TEXT,
+    security_phone TEXT,
+    security_disabled BOOLEAN DEFAULT 0,
+    note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(group_id, activity_date)
+);
+
+-- 4.9 每日卡片-餐饮
+CREATE TABLE group_logistics_meals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    day_id INTEGER NOT NULL REFERENCES group_logistics_days(id) ON DELETE CASCADE,
+    meal_type TEXT CHECK(meal_type IN ('breakfast', 'lunch', 'dinner')) NOT NULL,
+    place TEXT,
+    arrangement TEXT,
+    disabled BOOLEAN DEFAULT 0,
+    start_time TEXT,
+    end_time TEXT,
+    detached BOOLEAN DEFAULT 0,
+    resource_id TEXT,
+    schedule_id INTEGER REFERENCES schedules(id) ON DELETE SET NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(day_id, meal_type)
+);
+
+-- 4.10 每日卡片-接送站
+CREATE TABLE group_logistics_transfers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    day_id INTEGER NOT NULL REFERENCES group_logistics_days(id) ON DELETE CASCADE,
+    transfer_type TEXT CHECK(transfer_type IN ('pickup', 'dropoff')) NOT NULL,
+    start_time TEXT,
+    end_time TEXT,
+    location TEXT,
+    contact TEXT,
+    flight_no TEXT,
+    airline TEXT,
+    terminal TEXT,
+    disabled BOOLEAN DEFAULT 0,
+    detached BOOLEAN DEFAULT 0,
+    resource_id TEXT,
+    schedule_id INTEGER REFERENCES schedules(id) ON DELETE SET NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(day_id, transfer_type)
+);
+
+-- 4.11 自定义资源模板（资源库-其他）
+CREATE TABLE group_schedule_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    template_hash TEXT NOT NULL,
+    type TEXT NOT NULL,
+    title TEXT,
+    duration_minutes INTEGER,
+    description TEXT,
+    location_name TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(group_id, template_hash)
+);
+
+-- 4.12 人员资源（司机/导游/安保）
+CREATE TABLE resource_people (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    role TEXT CHECK(role IN ('driver', 'guide', 'security')) NOT NULL,
+    name TEXT NOT NULL,
+    phone TEXT,
+    notes TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4.13 住宿资源（酒店）
+CREATE TABLE resource_hotels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    address TEXT,
+    city TEXT,
+    star INTEGER,
+    price TEXT,
+    contact_person TEXT,
+    contact_phone TEXT,
+    notes TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4.14 车辆资源
+CREATE TABLE resource_vehicles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plate TEXT NOT NULL,
+    brand TEXT,
+    model TEXT,
+    seats INTEGER,
+    notes TEXT,
+    is_active BOOLEAN DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -149,6 +271,17 @@ CREATE INDEX idx_groups_itinerary_plan ON groups(itinerary_plan_id);
 CREATE INDEX idx_itinerary_plan_items_plan ON itinerary_plan_items(plan_id);
 CREATE INDEX idx_itinerary_plan_items_location ON itinerary_plan_items(location_id);
 CREATE INDEX idx_group_members_group ON group_members(group_id);
+CREATE INDEX idx_logistics_days_group_date ON group_logistics_days(group_id, activity_date);
+CREATE INDEX idx_logistics_meals_day_type ON group_logistics_meals(day_id, meal_type);
+CREATE INDEX idx_logistics_meals_resource ON group_logistics_meals(resource_id);
+CREATE INDEX idx_logistics_transfers_day_type ON group_logistics_transfers(day_id, transfer_type);
+CREATE INDEX idx_logistics_transfers_resource ON group_logistics_transfers(resource_id);
+CREATE INDEX idx_schedule_templates_group_hash ON group_schedule_templates(group_id, template_hash);
+CREATE INDEX idx_resource_people_role ON resource_people(role);
+CREATE INDEX idx_resource_people_name ON resource_people(name);
+CREATE INDEX idx_resource_hotels_city ON resource_hotels(city);
+CREATE INDEX idx_resource_hotels_name ON resource_hotels(name);
+CREATE INDEX idx_resource_vehicles_plate ON resource_vehicles(plate);
 
 -- 创建视图简化查询
 CREATE VIEW calendar_view AS

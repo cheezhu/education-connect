@@ -1,11 +1,11 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
 
 const PROPERTY_TYPES = [
-  { type: 'text', label: 'Text', icon: 'Aa' },
-  { type: 'number', label: 'Number', icon: '#' },
-  { type: 'select', label: 'Select', icon: 'v' },
-  { type: 'date', label: 'Date', icon: 'CAL' },
-  { type: 'person', label: 'Person', icon: '@' }
+  { type: 'text', label: '文本', icon: 'Aa' },
+  { type: 'number', label: '数字', icon: '#' },
+  { type: 'select', label: '选择', icon: 'v' },
+  { type: 'date', label: '日期', icon: 'CAL' },
+  { type: 'person', label: '人员', icon: '@' }
 ];
 
 const PropertyRow = ({
@@ -36,7 +36,7 @@ const PropertyRow = ({
     const commonProps = {
       className: 'prop-input',
       value: property.value ?? '',
-      placeholder: property.placeholder || 'Empty',
+      placeholder: property.placeholder || '未填写',
       readOnly: property.readOnly,
       disabled: property.readOnly,
       onChange: (event) => onChangeValue?.(event.target.value)
@@ -107,7 +107,7 @@ const PropertyRow = ({
           ref={keyRef}
           className="prop-key-label"
           value={property.key || ''}
-          placeholder="Property"
+          placeholder="属性名"
           onChange={(event) => onChangeKey?.(event.target.value)}
         />
       </div>
@@ -119,7 +119,7 @@ const PropertyRow = ({
   );
 };
 
-const PropertyGrid = ({ properties = [], onChangeProperty, onAddProperty }) => {
+const PropertyGrid = ({ properties = [], onChangeProperty, onAddProperty, showAdd = true }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingFocusId, setPendingFocusId] = useState(null);
   const wrapperRef = useRef(null);
@@ -156,23 +156,25 @@ const PropertyGrid = ({ properties = [], onChangeProperty, onAddProperty }) => {
         />
       ))}
 
-      <div className="add-prop-wrapper" ref={wrapperRef}>
-        <div className="add-prop-btn" onClick={() => setMenuOpen((prev) => !prev)}>
-          + Add a property
+      {showAdd && (
+        <div className="add-prop-wrapper" ref={wrapperRef}>
+          <div className="add-prop-btn" onClick={() => setMenuOpen((prev) => !prev)}>
+            + 添加字段
+          </div>
+          <div className={`type-menu ${menuOpen ? 'visible' : ''}`}>
+            {PROPERTY_TYPES.map((typeMeta) => (
+              <div
+                className="type-item"
+                key={typeMeta.type}
+                onClick={() => handleAdd(typeMeta)}
+              >
+                <span>{typeMeta.icon}</span>
+                {typeMeta.label}
+              </div>
+            ))}
+          </div>
         </div>
-        <div className={`type-menu ${menuOpen ? 'visible' : ''}`}>
-          {PROPERTY_TYPES.map((typeMeta) => (
-            <div
-              className="type-item"
-              key={typeMeta.type}
-              onClick={() => handleAdd(typeMeta)}
-            >
-              <span>{typeMeta.icon}</span>
-              {typeMeta.label}
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   );
 };

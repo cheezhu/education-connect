@@ -1,6 +1,7 @@
 const express = require('express');
 const requireEditLock = require('../middleware/editLock');
 const { DEFAULT_TIME_SLOTS, getAiRules } = require('../utils/aiConfig');
+const { bumpScheduleRevision } = require('../utils/scheduleRevision');
 
 const router = express.Router();
 
@@ -634,6 +635,19 @@ router.post('/import', requireEditLock, (req, res) => {
   });
 
   transaction();
+
+  const touchedGroupIds = new Set();
+  if (replaceExisting) {
+    selectedGroupIds.forEach(id => touchedGroupIds.add(id));
+  }
+  accepted.forEach(item => {
+    if (Number.isFinite(item.groupId)) {
+      touchedGroupIds.add(item.groupId);
+    }
+  });
+  touchedGroupIds.forEach(id => {
+    bumpScheduleRevision(req.db, id);
+  });
 
   res.json({ summary, conflicts });
 });

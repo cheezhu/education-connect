@@ -9,7 +9,7 @@
 - username (unique)
 - password (bcrypt hash)
 - display_name
-- role: admin/viewer
+- role: admin/editor/viewer
 - created_at, last_login
 
 ### groups
@@ -20,7 +20,12 @@
 - start_date, end_date, duration
 - color
 - itinerary_plan_id (可空)
-- contact_person, contact_phone, notes
+- status
+- contact_person, contact_phone
+- emergency_contact, emergency_phone
+- accommodation
+- tags
+- notes
 - created_at, updated_at
 
 ### locations
@@ -58,6 +63,80 @@
 - resource_id
 - is_from_resource (0/1)
 - location_id
+- created_at, updated_at
+
+### group_logistics_days
+- id (PK)
+- group_id (FK groups)
+- activity_date
+- city, departure_city, arrival_city
+- hotel_name, hotel_address, hotel_disabled
+- vehicle_driver, vehicle_plate, vehicle_phone, vehicle_disabled
+- guide_name, guide_phone, guide_disabled
+- security_name, security_phone, security_disabled
+- note
+- created_at, updated_at
+
+### group_logistics_meals
+- id (PK)
+- day_id (FK group_logistics_days)
+- meal_type: breakfast/lunch/dinner
+- place, arrangement, disabled
+- start_time, end_time
+- detached (0/1)
+- resource_id
+- schedule_id (FK schedules, 可空)
+- created_at, updated_at
+
+### group_logistics_transfers
+- id (PK)
+- day_id (FK group_logistics_days)
+- transfer_type: pickup/dropoff
+- start_time, end_time
+- location, contact
+- flight_no, airline, terminal
+- disabled, detached
+- resource_id
+- schedule_id (FK schedules, 可空)
+- created_at, updated_at
+
+### group_schedule_templates
+- id (PK)
+- group_id (FK groups)
+- template_hash (unique per group)
+- type, title, duration_minutes
+- description, location_name
+- created_at
+
+### resource_people
+- id (PK)
+- role: driver/guide/security
+- name
+- phone
+- notes
+- is_active
+- created_at, updated_at
+
+### resource_hotels
+- id (PK)
+- name
+- address
+- city
+- star
+- price
+- contact_person, contact_phone
+- notes
+- is_active
+- created_at, updated_at
+
+### resource_vehicles
+- id (PK)
+- plate
+- brand
+- model
+- seats
+- notes
+- is_active
 - created_at, updated_at
 
 ### itinerary_plans

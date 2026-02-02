@@ -37,6 +37,134 @@ db.exec(`
 `);
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS group_logistics_days (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    activity_date DATE NOT NULL,
+    city TEXT,
+    departure_city TEXT,
+    arrival_city TEXT,
+    hotel_name TEXT,
+    hotel_address TEXT,
+    hotel_disabled BOOLEAN DEFAULT 0,
+    vehicle_driver TEXT,
+    vehicle_plate TEXT,
+    vehicle_phone TEXT,
+    vehicle_disabled BOOLEAN DEFAULT 0,
+    guide_name TEXT,
+    guide_phone TEXT,
+    guide_disabled BOOLEAN DEFAULT 0,
+    security_name TEXT,
+    security_phone TEXT,
+    security_disabled BOOLEAN DEFAULT 0,
+    note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(group_id, activity_date)
+  );
+
+  CREATE TABLE IF NOT EXISTS group_logistics_meals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    day_id INTEGER NOT NULL REFERENCES group_logistics_days(id) ON DELETE CASCADE,
+    meal_type TEXT CHECK(meal_type IN ('breakfast', 'lunch', 'dinner')) NOT NULL,
+    place TEXT,
+    arrangement TEXT,
+    disabled BOOLEAN DEFAULT 0,
+    start_time TEXT,
+    end_time TEXT,
+    detached BOOLEAN DEFAULT 0,
+    resource_id TEXT,
+    schedule_id INTEGER REFERENCES schedules(id) ON DELETE SET NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(day_id, meal_type)
+  );
+
+  CREATE TABLE IF NOT EXISTS group_logistics_transfers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    day_id INTEGER NOT NULL REFERENCES group_logistics_days(id) ON DELETE CASCADE,
+    transfer_type TEXT CHECK(transfer_type IN ('pickup', 'dropoff')) NOT NULL,
+    start_time TEXT,
+    end_time TEXT,
+    location TEXT,
+    contact TEXT,
+    flight_no TEXT,
+    airline TEXT,
+    terminal TEXT,
+    disabled BOOLEAN DEFAULT 0,
+    detached BOOLEAN DEFAULT 0,
+    resource_id TEXT,
+    schedule_id INTEGER REFERENCES schedules(id) ON DELETE SET NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(day_id, transfer_type)
+  );
+
+  CREATE TABLE IF NOT EXISTS group_schedule_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    template_hash TEXT NOT NULL,
+    type TEXT NOT NULL,
+    title TEXT,
+    duration_minutes INTEGER,
+    description TEXT,
+    location_name TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(group_id, template_hash)
+  );
+
+  CREATE TABLE IF NOT EXISTS resource_people (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    role TEXT CHECK(role IN ('driver', 'guide', 'security')) NOT NULL,
+    name TEXT NOT NULL,
+    phone TEXT,
+    notes TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS resource_hotels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    address TEXT,
+    city TEXT,
+    star INTEGER,
+    price TEXT,
+    contact_person TEXT,
+    contact_phone TEXT,
+    notes TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS resource_vehicles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plate TEXT NOT NULL,
+    brand TEXT,
+    model TEXT,
+    seats INTEGER,
+    notes TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_logistics_days_group_date ON group_logistics_days(group_id, activity_date);
+  CREATE INDEX IF NOT EXISTS idx_logistics_meals_day_type ON group_logistics_meals(day_id, meal_type);
+  CREATE INDEX IF NOT EXISTS idx_logistics_meals_resource ON group_logistics_meals(resource_id);
+  CREATE INDEX IF NOT EXISTS idx_logistics_transfers_day_type ON group_logistics_transfers(day_id, transfer_type);
+  CREATE INDEX IF NOT EXISTS idx_logistics_transfers_resource ON group_logistics_transfers(resource_id);
+  CREATE INDEX IF NOT EXISTS idx_schedule_templates_group_hash ON group_schedule_templates(group_id, template_hash);
+  CREATE INDEX IF NOT EXISTS idx_resource_people_role ON resource_people(role);
+  CREATE INDEX IF NOT EXISTS idx_resource_people_name ON resource_people(name);
+  CREATE INDEX IF NOT EXISTS idx_resource_hotels_city ON resource_hotels(city);
+  CREATE INDEX IF NOT EXISTS idx_resource_hotels_name ON resource_hotels(name);
+  CREATE INDEX IF NOT EXISTS idx_resource_vehicles_plate ON resource_vehicles(plate);
+`);
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS itinerary_plans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name VARCHAR(200) NOT NULL,
@@ -103,6 +231,10 @@ if (!groupColumns.includes('accommodation')) {
 if (!groupColumns.includes('tags')) {
   db.exec('ALTER TABLE groups ADD COLUMN tags TEXT');
   db.exec("UPDATE groups SET tags = '[]' WHERE tags IS NULL");
+}
+if (!groupColumns.includes('schedule_revision')) {
+  db.exec('ALTER TABLE groups ADD COLUMN schedule_revision INTEGER DEFAULT 0');
+  db.exec('UPDATE groups SET schedule_revision = 0 WHERE schedule_revision IS NULL');
 }
 
 const locationColumns = db.prepare("PRAGMA table_info(locations)").all().map(col => col.name);
@@ -198,6 +330,8 @@ app.use('/api/groups', requireAccess({ read: readAllRoles, write: writeEditorRol
 app.use('/api/locations', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/locations'));
 app.use('/api/itinerary-plans', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/itineraryPlans'));
 app.use('/api', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/schedules'));
+app.use('/api', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/logistics'));
+app.use('/api', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/resources'));
 app.use('/api', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/members'));
 
 // 错误处理

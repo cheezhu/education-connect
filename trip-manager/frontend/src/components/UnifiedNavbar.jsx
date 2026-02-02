@@ -37,7 +37,7 @@ const UnifiedNavbar = () => {
   const navItems = [
     { path: '/designer', icon: <CompassOutlined />, label: '行程设计器', permission: 'designer' },
     { path: '/groups', icon: <TeamOutlined />, label: '团组管理', permission: 'groups' },
-    { path: '/locations', icon: <EnvironmentOutlined />, label: '地点管理', permission: 'locations' },
+    { path: '/locations', icon: <EnvironmentOutlined />, label: '资源管理', permission: 'locations' },
     { path: '/statistics', icon: <BarChartOutlined />, label: '统计报表', permission: 'statistics' },
     { path: '/users', icon: <UserOutlined />, label: '用户管理', permission: 'users' }
   ];

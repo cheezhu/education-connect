@@ -144,6 +144,7 @@ function ItineraryDesigner() {
   const [groupCalendarDetailSchedules, setGroupCalendarDetailSchedules] = useState([]);
   const [groupCalendarDetailLoading, setGroupCalendarDetailLoading] = useState(false);
   const [groupCalendarDetailResourcesVisible, setGroupCalendarDetailResourcesVisible] = useState(true);
+  const [groupCalendarDetailRevision, setGroupCalendarDetailRevision] = useState(0);
   const groupCalendarDetailSaveTimeoutRef = useRef(null);
   const groupCalendarDetailSaveTokenRef = useRef(0);
   const [groupCalendarHeight, setGroupCalendarHeight] = useState(() => getStoredGroupCalendarHeight());
@@ -750,10 +751,14 @@ function ItineraryDesigner() {
     try {
       const response = await api.get(`/groups/${groupId}/schedules`);
       const loaded = Array.isArray(response.data) ? response.data : [];
+      const revisionHeader = response.headers?.['x-schedule-revision'];
+      const nextRevision = Number(revisionHeader);
+      setGroupCalendarDetailRevision(Number.isFinite(nextRevision) ? nextRevision : 0);
       setGroupCalendarDetailSchedules(loaded);
     } catch (error) {
       message.error('加载日程失败');
       setGroupCalendarDetailSchedules([]);
+      setGroupCalendarDetailRevision(0);
     } finally {
       setGroupCalendarDetailLoading(false);
     }
@@ -767,6 +772,7 @@ function ItineraryDesigner() {
       setGroupCalendarDetailSchedules([]);
       setGroupCalendarDetailGroupId(groupId);
       setGroupCalendarDetailResourcesVisible(true);
+      setGroupCalendarDetailRevision(0);
     }
     setGroupCalendarDetailVisible(true);
     if (alreadyOpen) {
@@ -789,13 +795,29 @@ function ItineraryDesigner() {
       const saveToken = groupCalendarDetailSaveTokenRef.current;
       try {
         const response = await api.post(`/groups/${groupCalendarDetailGroupId}/schedules/batch`, {
-          scheduleList: updatedSchedules
+          scheduleList: updatedSchedules,
+          revision: groupCalendarDetailRevision
         });
         if (saveToken !== groupCalendarDetailSaveTokenRef.current) return;
         const saved = Array.isArray(response.data) ? response.data : updatedSchedules;
+        const revisionHeader = response.headers?.['x-schedule-revision'];
+        const nextRevision = Number(revisionHeader);
+        if (Number.isFinite(nextRevision)) {
+          setGroupCalendarDetailRevision(nextRevision);
+        }
         setGroupCalendarDetailSchedules(saved);
         await refreshActivitiesOnly(saveToken);
       } catch (error) {
+        if (error?.response?.status === 409) {
+          const revisionHeader = error.response?.headers?.['x-schedule-revision'];
+          const nextRevision = Number(revisionHeader);
+          if (Number.isFinite(nextRevision)) {
+            setGroupCalendarDetailRevision(nextRevision);
+          }
+          message.warning('日程已被其他人修改，请刷新后再试');
+          loadGroupCalendarDetailSchedules(groupCalendarDetailGroupId);
+          return;
+        }
         message.error('保存日程失败');
       }
     }, 500);
