@@ -74,19 +74,12 @@ const GroupEditV2 = () => {
       display: content.style.display,
       flexDirection: content.style.flexDirection
     };
-    const prevBody = {
-      overflow: document.body.style.overflow,
-      overflowHtml: document.documentElement.style.overflow
-    };
-
-    content.style.overflow = 'hidden';
+    content.style.overflow = 'auto';
     content.style.height = 'calc(100vh - 42px)';
     content.style.boxSizing = 'border-box';
     content.style.padding = '0';
     content.style.display = 'flex';
     content.style.flexDirection = 'column';
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
 
     return () => {
       content.style.overflow = prev.overflow;
@@ -95,8 +88,6 @@ const GroupEditV2 = () => {
       content.style.padding = prev.padding;
       content.style.display = prev.display;
       content.style.flexDirection = prev.flexDirection;
-      document.body.style.overflow = prevBody.overflow;
-      document.documentElement.style.overflow = prevBody.overflowHtml;
     };
   }, []);
 
