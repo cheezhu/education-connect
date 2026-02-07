@@ -255,7 +255,8 @@ function LocationManagement({ editMode }) {
         targetGroups: location.target_groups || 'all',
         contactPerson: location.contact_person || '',
         contactPhone: location.contact_phone || '',
-        blockedWeekdays: location.blocked_weekdays ? location.blocked_weekdays.split(',') : []
+        blockedWeekdays: location.blocked_weekdays ? location.blocked_weekdays.split(',') : [],
+        clusterPreferSameDay: Boolean(location.cluster_prefer_same_day)
       });
     } else {
       form.resetFields();
@@ -263,7 +264,8 @@ function LocationManagement({ editMode }) {
         capacity: 100,
         color: '#1890ff',
         targetGroups: 'all',
-        blockedWeekdays: []
+        blockedWeekdays: [],
+        clusterPreferSameDay: false
       });
     }
   };
@@ -279,7 +281,9 @@ function LocationManagement({ editMode }) {
         target_groups: values.targetGroups,
         contact_person: values.contactPerson,
         contact_phone: values.contactPhone,
-        color: values.color || '#1890ff'
+        color: values.color || '#1890ff',
+        clusterPreferSameDay: values.clusterPreferSameDay ? 1 : 0,
+        cluster_prefer_same_day: values.clusterPreferSameDay ? 1 : 0
       };
 
       if (editingLocation) {
@@ -605,6 +609,13 @@ function LocationManagement({ editMode }) {
         if (target === 'secondary') return '中学';
         return target;
       }
+    },
+    {
+      title: '归集',
+      dataIndex: 'cluster_prefer_same_day',
+      key: 'cluster_prefer_same_day',
+      width: 96,
+      render: (value) => (Number(value) === 1 ? <Tag color="blue">同日优先</Tag> : '-')
     },
     {
       title: '受限日期',
@@ -1093,6 +1104,15 @@ function LocationManagement({ editMode }) {
             label="不可用日期"
           >
             <Checkbox.Group options={weekdayOptions} />
+          </Form.Item>
+
+          <Form.Item
+            name="clusterPreferSameDay"
+            valuePropName="checked"
+            label="归集排班"
+            tooltip="开启后，求解器会尽量把该地点安排在更少的日期内"
+          >
+            <Checkbox>同日优先（尽量集中在同一天）</Checkbox>
           </Form.Item>
 
           <div style={{ display: 'flex', gap: '16px' }}>

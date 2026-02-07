@@ -224,7 +224,7 @@ router.post('/export', (req, res) => {
   const filteredPlaceholders = filteredGroupIds.map(() => '?').join(', ');
 
   const allLocations = req.db.prepare(`
-    SELECT id, name, address, capacity, blocked_weekdays, open_hours, closed_dates, target_groups, is_active
+    SELECT id, name, address, capacity, cluster_prefer_same_day, blocked_weekdays, open_hours, closed_dates, target_groups, is_active
     FROM locations
   `).all();
   const activeLocations = allLocations.filter(location => Boolean(location.is_active));
@@ -240,7 +240,6 @@ router.post('/export', (req, res) => {
     ORDER BY p.sort_order, p.id
   `);
 
-  const planItemsByGroup = {};
   const mustVisitByGroup = {};
   const exportValidationErrors = [];
 
@@ -302,10 +301,6 @@ router.post('/export', (req, res) => {
       });
     });
 
-    planItemsByGroup[groupKey] = normalizedMustVisit.map(item => ({
-      location_id: item.location_id,
-      sort_order: item.sort_order
-    }));
     mustVisitByGroup[groupKey] = normalizedMustVisit;
   });
 
@@ -336,44 +331,82 @@ router.post('/export', (req, res) => {
 
   const snapshotId = buildSnapshotId();
   const exportedAt = new Date().toISOString();
+  const rules = getAiRules(req.db);
+
+  const groupExportRows = filteredGroups.map((group) => ({
+    id: group.id,
+    name: group.name,
+    type: group.type,
+    studentCount: group.student_count,
+    teacherCount: group.teacher_count,
+    participantCount: (group.student_count || 0) + (group.teacher_count || 0),
+    startDate: group.start_date,
+    endDate: group.end_date,
+    itineraryPlanId: group.itinerary_plan_id || null
+  }));
+
+  const locationExportRows = activeLocations.map((location) => ({
+    id: location.id,
+    name: location.name,
+    address: location.address,
+    capacity: location.capacity,
+    clusterPreferSameDay: Boolean(location.cluster_prefer_same_day),
+    blockedWeekdays: location.blocked_weekdays ?? '',
+    closedDates: parseArraySafe(location.closed_dates),
+    openHours: parseObjectSafe(location.open_hours),
+    targetGroups: location.target_groups,
+    isActive: Boolean(location.is_active)
+  }));
+
+  const requiredLocationsByGroup = includePlanItemsByGroup
+    ? filteredGroups.reduce((result, group) => {
+      const groupId = Number(group.id);
+      const groupKey = String(groupId);
+      const rows = Array.isArray(mustVisitByGroup[groupKey]) ? mustVisitByGroup[groupKey] : [];
+      result[groupKey] = {
+        locationIds: rows
+          .map(item => Number(item.location_id))
+          .filter(id => Number.isFinite(id) && id > 0)
+      };
+      return result;
+    }, {})
+    : {};
+
+  const existingAssignments = activities.map((row) => ({
+    groupId: row.group_id,
+    locationId: row.location_id,
+    date: row.activity_date,
+    timeSlot: row.time_slot,
+    participantCount: row.participant_count
+  }));
+
+  const existingSchedules = schedules.map((row) => ({
+    groupId: row.group_id,
+    date: row.activity_date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    isFromResource: Boolean(row.is_from_resource),
+    locationId: row.location_id ?? null
+  }));
 
   const payload = {
-    schema: 'ec-planning-input@1',
-    snapshot_id: snapshotId,
-    exported_at: exportedAt,
-    range: { startDate, endDate },
-    rules: getAiRules(req.db),
-    groups: filteredGroups.map(group => ({
-      id: group.id,
-      name: group.name,
-      type: group.type,
-      student_count: group.student_count,
-      teacher_count: group.teacher_count,
-      start_date: group.start_date,
-      end_date: group.end_date,
-      itinerary_plan_id: group.itinerary_plan_id,
-      must_visit_mode: normalizeMustVisitMode(
-        group.must_visit_mode,
-        normalizeLocationIdList(group.manual_must_visit_location_ids).length > 0 ? 'manual' : 'plan'
-      ),
-      manual_must_visit_location_ids: normalizeLocationIdList(group.manual_must_visit_location_ids)
-    })),
-    locations: activeLocations.map(location => ({
-      id: location.id,
-      name: location.name,
-      address: location.address,
-      capacity: location.capacity,
-      blocked_weekdays: location.blocked_weekdays ?? '',
-      closed_dates: parseArraySafe(location.closed_dates),
-      open_hours: parseObjectSafe(location.open_hours),
-      target_groups: location.target_groups,
-      is_active: location.is_active ? 1 : 0
-    })),
-    plan_items_by_group: includePlanItemsByGroup ? planItemsByGroup : {},
-    must_visit_by_group: includePlanItemsByGroup ? mustVisitByGroup : {},
-    existing: {
-      activities,
-      schedules
+    schema: 'ec-planning-input@2',
+    meta: {
+      snapshotId,
+      exportedAt
+    },
+    scope: {
+      startDate,
+      endDate,
+      groupIds: filteredGroupIds
+    },
+    rules,
+    data: {
+      groups: groupExportRows,
+      locations: locationExportRows,
+      requiredLocationsByGroup,
+      existingAssignments,
+      existingSchedules
     }
   };
 

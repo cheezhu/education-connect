@@ -1,0 +1,21 @@
+{
+  "summary": {
+    "groups": 2,
+    "locations": 3,
+    "assignmentsInput": 3,
+    "assignmentsOutput": 5,
+    "elapsedMs": 21
+  },
+  "audit": {
+    "hardViolations": [],
+    "mustVisitMissing": []
+  },
+  "diagnostics": {
+    "keptExisting": 3,
+    "addedRequired": 2,
+    "replacedForRequired": 0,
+    "droppedExisting": 0,
+    "reinsertedDropped": 0,
+    "requiredUnplaced": []
+  }
+}

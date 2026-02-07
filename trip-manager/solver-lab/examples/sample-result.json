@@ -1,0 +1,77 @@
+{
+  "schema": "ec-planning-result@1",
+  "snapshot_id": "solver-1770439502926",
+  "mode": "replaceExisting",
+  "range": {
+    "startDate": "2026-07-01",
+    "endDate": "2026-07-03"
+  },
+  "rules": {
+    "timeSlots": [
+      "MORNING",
+      "AFTERNOON"
+    ],
+    "slotWindows": {
+      "MORNING": {
+        "start": 6,
+        "end": 12
+      },
+      "AFTERNOON": {
+        "start": 12,
+        "end": 18
+      },
+      "EVENING": {
+        "start": 18,
+        "end": 20.75
+      }
+    }
+  },
+  "assignments": [
+    {
+      "groupId": 101,
+      "locationId": 11,
+      "date": "2026-07-01",
+      "timeSlot": "MORNING",
+      "participantCount": 40,
+      "notes": "keep-existing"
+    },
+    {
+      "groupId": 101,
+      "locationId": 13,
+      "date": "2026-07-01",
+      "timeSlot": "AFTERNOON",
+      "participantCount": 40,
+      "notes": "keep-existing"
+    },
+    {
+      "groupId": 101,
+      "locationId": 12,
+      "date": "2026-07-02",
+      "timeSlot": "MORNING",
+      "participantCount": 40,
+      "notes": "add-required"
+    },
+    {
+      "groupId": 102,
+      "locationId": 13,
+      "date": "2026-07-01",
+      "timeSlot": "MORNING",
+      "participantCount": 43,
+      "notes": "keep-existing"
+    },
+    {
+      "groupId": 102,
+      "locationId": 11,
+      "date": "2026-07-01",
+      "timeSlot": "AFTERNOON",
+      "participantCount": 43,
+      "notes": "add-required"
+    }
+  ],
+  "unassigned": [],
+  "meta": {
+    "solver": "solver-lab-greedy@1",
+    "seed": 42,
+    "elapsedMs": 20
+  }
+}

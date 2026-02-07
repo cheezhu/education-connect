@@ -1,0 +1,135 @@
+{
+  "schema": "ec-planning-result@1",
+  "snapshot_id": "solver-py-1770441151847",
+  "mode": "replaceExisting",
+  "range": {
+    "startDate": "2026-07-01",
+    "endDate": "2026-07-03"
+  },
+  "rules": {
+    "timeSlots": [
+      "MORNING",
+      "AFTERNOON"
+    ],
+    "slotWindows": {
+      "MORNING": {
+        "start": 6.0,
+        "end": 12.0
+      },
+      "AFTERNOON": {
+        "start": 12.0,
+        "end": 18.0
+      },
+      "EVENING": {
+        "start": 18.0,
+        "end": 20.75
+      }
+    }
+  },
+  "assignments": [
+    {
+      "groupId": 101,
+      "locationId": 11,
+      "date": "2026-07-01",
+      "timeSlot": "MORNING",
+      "participantCount": 40,
+      "notes": "solver"
+    },
+    {
+      "groupId": 101,
+      "locationId": 13,
+      "date": "2026-07-01",
+      "timeSlot": "AFTERNOON",
+      "participantCount": 40,
+      "notes": "solver"
+    },
+    {
+      "groupId": 101,
+      "locationId": 11,
+      "date": "2026-07-02",
+      "timeSlot": "MORNING",
+      "participantCount": 40,
+      "notes": "solver"
+    },
+    {
+      "groupId": 101,
+      "locationId": 11,
+      "date": "2026-07-02",
+      "timeSlot": "AFTERNOON",
+      "participantCount": 40,
+      "notes": "solver"
+    },
+    {
+      "groupId": 101,
+      "locationId": 11,
+      "date": "2026-07-03",
+      "timeSlot": "MORNING",
+      "participantCount": 40,
+      "notes": "solver"
+    },
+    {
+      "groupId": 101,
+      "locationId": 12,
+      "date": "2026-07-03",
+      "timeSlot": "AFTERNOON",
+      "participantCount": 40,
+      "notes": "solver"
+    },
+    {
+      "groupId": 102,
+      "locationId": 13,
+      "date": "2026-07-01",
+      "timeSlot": "MORNING",
+      "participantCount": 43,
+      "notes": "solver"
+    },
+    {
+      "groupId": 102,
+      "locationId": 11,
+      "date": "2026-07-01",
+      "timeSlot": "AFTERNOON",
+      "participantCount": 43,
+      "notes": "solver"
+    },
+    {
+      "groupId": 102,
+      "locationId": 11,
+      "date": "2026-07-02",
+      "timeSlot": "MORNING",
+      "participantCount": 43,
+      "notes": "solver"
+    },
+    {
+      "groupId": 102,
+      "locationId": 11,
+      "date": "2026-07-02",
+      "timeSlot": "AFTERNOON",
+      "participantCount": 43,
+      "notes": "solver"
+    },
+    {
+      "groupId": 102,
+      "locationId": 11,
+      "date": "2026-07-03",
+      "timeSlot": "MORNING",
+      "participantCount": 43,
+      "notes": "solver"
+    },
+    {
+      "groupId": 102,
+      "locationId": 11,
+      "date": "2026-07-03",
+      "timeSlot": "AFTERNOON",
+      "participantCount": 43,
+      "notes": "solver"
+    }
+  ],
+  "unassigned": [],
+  "meta": {
+    "solver": "solver-lab-py@1",
+    "seed": 42,
+    "timeLimitSec": 20,
+    "elapsedMs": 19023,
+    "engine": "cp_sat_feasible"
+  }
+}

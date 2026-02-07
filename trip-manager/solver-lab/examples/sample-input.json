@@ -1,0 +1,153 @@
+{
+  "schema": "ec-planning-input@2",
+  "meta": {
+    "snapshotId": "sample-001",
+    "exportedAt": "2026-02-07T10:00:00.000Z"
+  },
+  "scope": {
+    "startDate": "2026-07-01",
+    "endDate": "2026-07-03",
+    "groupIds": [
+      101,
+      102
+    ]
+  },
+  "rules": {
+    "timeSlots": [
+      "MORNING",
+      "AFTERNOON"
+    ],
+    "slotWindows": {
+      "MORNING": {
+        "start": 6,
+        "end": 12
+      },
+      "AFTERNOON": {
+        "start": 12,
+        "end": 18
+      },
+      "EVENING": {
+        "start": 18,
+        "end": 20.75
+      }
+    }
+  },
+  "data": {
+    "groups": [
+      {
+        "id": 101,
+        "name": "Shanghai School",
+        "type": "secondary",
+        "studentCount": 36,
+        "teacherCount": 4,
+        "participantCount": 40,
+        "startDate": "2026-07-01",
+        "endDate": "2026-07-03"
+      },
+      {
+        "id": 102,
+        "name": "Hangzhou School",
+        "type": "primary",
+        "studentCount": 38,
+        "teacherCount": 5,
+        "participantCount": 43,
+        "startDate": "2026-07-01",
+        "endDate": "2026-07-03"
+      }
+    ],
+    "locations": [
+      {
+        "id": 11,
+        "name": "Science Museum",
+        "targetGroups": "all",
+        "isActive": true,
+        "capacity": 120,
+        "blockedWeekdays": "",
+        "closedDates": [],
+        "openHours": null
+      },
+      {
+        "id": 12,
+        "name": "University",
+        "targetGroups": "secondary",
+        "isActive": true,
+        "capacity": 80,
+        "blockedWeekdays": "",
+        "closedDates": [],
+        "openHours": null
+      },
+      {
+        "id": 13,
+        "name": "Ocean Park",
+        "targetGroups": "all",
+        "isActive": true,
+        "capacity": 120,
+        "blockedWeekdays": "",
+        "closedDates": [],
+        "openHours": null
+      }
+    ],
+    "requiredLocationsByGroup": {
+      "101": {
+        "mode": "plan",
+        "locationIds": [
+          11,
+          12
+        ],
+        "locations": [
+          {
+            "locationId": 11,
+            "locationName": "Science Museum",
+            "sortOrder": 0,
+            "source": "plan"
+          },
+          {
+            "locationId": 12,
+            "locationName": "University",
+            "sortOrder": 1,
+            "source": "plan"
+          }
+        ]
+      },
+      "102": {
+        "mode": "manual",
+        "locationIds": [
+          11
+        ],
+        "locations": [
+          {
+            "locationId": 11,
+            "locationName": "Science Museum",
+            "sortOrder": 0,
+            "source": "manual"
+          }
+        ]
+      }
+    },
+    "existingAssignments": [
+      {
+        "groupId": 101,
+        "locationId": 11,
+        "date": "2026-07-01",
+        "timeSlot": "MORNING",
+        "participantCount": 40
+      },
+      {
+        "groupId": 101,
+        "locationId": 13,
+        "date": "2026-07-01",
+        "timeSlot": "AFTERNOON",
+        "participantCount": 40
+      },
+      {
+        "groupId": 102,
+        "locationId": 13,
+        "date": "2026-07-01",
+        "timeSlot": "MORNING",
+        "participantCount": 43
+      }
+    ],
+    "existingSchedules": []
+  }
+}
+

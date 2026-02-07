@@ -5,7 +5,7 @@
 本次重点检查了与“行程设计器升级”和“日历详情 AI 助手”直接相关的模块：
 
 - 文档：`docs/itinerary-designer.md`、`docs/calendar-system.md`、`docs/api/api-reference.md`、`docs/db-schema.md`、`docs/code-review-issues.md`
-- 前端：`trip-manager/frontend/src/pages/ItineraryDesigner.jsx`、`trip-manager/frontend/src/pages/GroupEditV2/Calendar/index.jsx`、`trip-manager/frontend/src/pages/GroupEditV2/Calendar/components/AICoPilot.jsx`
+- 前端：`trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`、`trip-manager/frontend/src/pages/GroupEditV2/Calendar/index.jsx`、`trip-manager/frontend/src/pages/GroupEditV2/Calendar/components/AICoPilot.jsx`
 - 后端：`trip-manager/backend/server.js`、`trip-manager/backend/src/routes/planning.js`、`trip-manager/backend/src/routes/schedules.js`、`trip-manager/backend/src/routes/systemConfig.js`、`trip-manager/backend/src/utils/aiConfig.js`
 
 ---
@@ -14,10 +14,10 @@
 
 ### 2.1 前端关键模块
 
-- `trip-manager/frontend/src/pages/ItineraryDesigner.jsx`（约 2552 行）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`（约 2800 行，已拆分一部分 UI/工具）
   - 同时承担：周时间轴、团组详情弹层、导入导出、拖拽、保存、配置读取
   - 是当前改造主战场
-- `trip-manager/frontend/src/pages/ItineraryDesigner.css`（约 1353 行）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/ItineraryDesigner.css`（约 1560 行）
   - 承担布局、弹层、主题覆盖、控制台样式
 - `trip-manager/frontend/src/pages/GroupEditV2/Calendar/index.jsx`（约 1199 行）
   - 日历详情内的活动渲染、拖拽、资源侧栏、AI 面板挂载
@@ -108,13 +108,13 @@
 
 证据：
 
-- `trip-manager/frontend/src/pages/ItineraryDesigner.jsx:163`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx:189`
   - `getDesignerContainer` 有 `document.body` 回退
-- `trip-manager/frontend/src/pages/ItineraryDesigner.jsx:2271`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx:2497`
   - 详情弹窗 `width="100%"`
-- `trip-manager/frontend/src/pages/ItineraryDesigner.css:729`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/ItineraryDesigner.css:747`
   - `.itinerary-modal-wrap { position:absolute; inset:0; }`
-- `trip-manager/frontend/src/pages/ItineraryDesigner.css:717`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/ItineraryDesigner.css:735`
   - `.group-calendar-drawer { position:absolute !important; inset:0; }`
 
 影响：
@@ -132,21 +132,23 @@
 
 证据：
 
-- `trip-manager/frontend/src/pages/ItineraryDesigner.jsx` 约 2552 行
-- `trip-manager/frontend/src/pages/ItineraryDesigner.css` 约 1353 行
+- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx` 约 2800 行
+- `trip-manager/frontend/src/pages/ItineraryDesigner/ItineraryDesigner.css` 约 1560 行
 
 影响：
 
 - 功能迭代时回归风险高，定位问题成本大
 
-建议拆分：
+建议拆分（当前已落地一部分）：
 
-- `pages/ItineraryDesigner/index.jsx`（页面编排）
-- `pages/ItineraryDesigner/components/TimelineGrid.jsx`
-- `pages/ItineraryDesigner/components/GroupConsoleDrawer.jsx`
-- `pages/ItineraryDesigner/components/GroupCalendarModal.jsx`
-- `pages/ItineraryDesigner/hooks/useGroupCalendarSync.js`
-- `pages/ItineraryDesigner/services/designerApi.js`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`（页面编排）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/timeline/TimelineGrid.jsx`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/console/GroupConsoleDrawer.jsx`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/planning/PlanningImportModal.jsx`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/planning/PlanningExportModal.jsx`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/planning/planningIO.js`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/conflicts/SlotConflictModal.jsx`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/shared/`（dates/timeSlots/parse/groupRules/messages）
 
 ### 3.6 缺少自动化测试
 
@@ -227,4 +229,3 @@
 - 先实现“阶段 A 的聊天接口 + 预览应用（仅新增，不覆盖）”
 
 这样能最快把“AI 对话有实际价值”落地，再逐步做续聊和安全治理。
-

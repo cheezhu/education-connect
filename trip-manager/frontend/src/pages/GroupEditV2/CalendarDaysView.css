@@ -261,6 +261,7 @@
 .calendar-activity {
   margin: 2px;
   padding: 2px 4px;
+  position: relative;
   border-radius: 4px;
   cursor: grab;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
@@ -381,6 +382,7 @@
   flex-direction: column;
   gap: 2px;
   line-height: 1.2;
+  padding-right: 26px;
 }
 
 .activity-time {
@@ -402,10 +404,51 @@
   text-overflow: clip;
 }
 
+.activity-location {
+  font-size: clamp(8px, calc(var(--activity-height, 40px) * 0.22), 11px);
+  line-height: 1.1;
+  white-space: normal;
+  word-break: break-word;
+  opacity: 0.9;
+}
+
 .activity-meta {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.activity-corner-tag {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  height: 16px;
+  min-width: 22px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  color: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  pointer-events: none;
+}
+
+.activity-corner-tag.source-plan {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.activity-corner-tag.source-daily {
+  background: rgba(255, 251, 230, 0.95);
+  border-color: rgba(255, 229, 143, 0.95);
+}
+
+.activity-corner-tag.source-custom {
+  background: rgba(240, 245, 255, 0.95);
+  border-color: rgba(173, 198, 255, 0.9);
 }
 
 .activity-source-badge {
@@ -957,6 +1000,7 @@
   min-width: 50px;
   width: 50px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
 }
 
 .resource-card:hover {
@@ -967,6 +1011,33 @@
 .resource-card:active {
   cursor: grabbing;
   transform: translateY(0);
+}
+
+.resource-delete-btn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.resource-card:hover .resource-delete-btn {
+  display: inline-flex;
+}
+
+.resource-delete-btn:hover {
+  background: rgba(0, 0, 0, 0.55);
 }
 
 

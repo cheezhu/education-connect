@@ -1,0 +1,38 @@
+{
+  "summary": {
+    "groups": 2,
+    "locations": 3,
+    "assignmentsInput": 3,
+    "assignmentsOutput": 12,
+    "elapsedMs": 19023
+  },
+  "precheck": {
+    "blockingErrors": [],
+    "warnings": []
+  },
+  "phase1": {
+    "engine": "cp_sat_feasible",
+    "status": "OPTIMAL",
+    "objective": 0,
+    "diagnostics": {
+      "phase1_time_sec": 5,
+      "best_bound": 0.0
+    }
+  },
+  "optimize": {
+    "engine": "cp_sat_feasible+lns",
+    "diagnostics": {
+      "phase1_engine": "cp_sat_feasible",
+      "phase1_status": "OPTIMAL",
+      "phase1_score": 747,
+      "lns_iterations": 1312,
+      "improvements": 1,
+      "cp_sat_used": true,
+      "final_score": 992
+    }
+  },
+  "audit": {
+    "hardViolations": [],
+    "mustVisitMissing": []
+  }
+}

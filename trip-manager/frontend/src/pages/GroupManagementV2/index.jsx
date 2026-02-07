@@ -152,7 +152,7 @@ const isDailyResourceId = (resourceId) => (
 );
 
 const isPlanResourceId = (resourceId) => (
-  typeof resourceId === 'string' && resourceId.startsWith('plan-')
+  typeof resourceId === 'string' && (resourceId.startsWith('plan-') || resourceId.startsWith('plan-sync-'))
 );
 
 const isMealFilled = (meals, key) => {
@@ -189,9 +189,15 @@ const buildCustomResource = (schedule) => {
   const title = schedule?.title || schedule?.location || '自定义活动';
   const type = schedule?.type || 'activity';
   const hash = hashString(`${type}|${title}|${durationMinutes}`);
+  const resourceId = getResourceId(schedule);
+  const id = (
+    typeof resourceId === 'string' && resourceId.startsWith('custom:')
+      ? resourceId
+      : `custom:${hash}`
+  );
 
   return {
-    id: `custom:${hash}`,
+    id,
     type,
     title,
     duration: durationHours,
@@ -981,7 +987,25 @@ const GroupManagementV2 = () => {
             group={activeGroup}
             schedules={groupSchedules}
             onSchedulesUpdate={handleScheduleUpdate}
+            onCustomResourcesChange={(nextCustomResources) => {
+              if (!activeGroupId) return;
+              setGroups(prev => prev.map(group => (
+                group.id === activeGroupId ? { ...group, customResources: nextCustomResources } : group
+              )));
+            }}
             resourceWidth={rightPanelWidth}
+            scheduleRevision={activeGroupId ? (scheduleRevisionRef.current[activeGroupId] ?? 0) : 0}
+            onRevisionChange={(nextRevision) => {
+              if (!activeGroupId) return;
+              if (Number.isFinite(nextRevision)) {
+                scheduleRevisionRef.current[activeGroupId] = nextRevision;
+              }
+            }}
+            onRevisionConflict={() => {
+              if (activeGroupId) {
+                fetchSchedules(activeGroupId);
+              }
+            }}
           />
         );
       case 'members':

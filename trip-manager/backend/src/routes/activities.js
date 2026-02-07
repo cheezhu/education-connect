@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const requireEditLock = require('../middleware/editLock');
-const { bumpScheduleRevision } = require('../utils/scheduleRevision');
 
 const mapActivityRow = (row) => ({
   id: row.id,
@@ -309,11 +308,8 @@ router.post('/', requireEditLock, (req, res) => {
     `).run(groupId, locationId ?? null, date, timeSlot, participantCount, notes ?? null);
 
     const activity = req.db.prepare('SELECT * FROM activities WHERE id = ?').get(result.lastInsertRowid);
-    syncActivityToSchedule(req.db, activity, { reposition: true });
-    bumpScheduleRevision(req.db, activity.group_id);
-
-    const updated = req.db.prepare('SELECT * FROM activities WHERE id = ?').get(result.lastInsertRowid);
-    res.json(mapActivityRow(updated));
+    // Activities are the designer's source-of-truth now; schedules are synced explicitly via push/pull.
+    res.json(mapActivityRow(activity));
   } catch (error) {
     console.error('创建活动失败:', error);
     res.status(500).json({ error: '创建活动失败' });
@@ -332,6 +328,18 @@ router.put('/:id', requireEditLock, (req, res) => {
   }
   
   // 检查新的安排是否有冲突
+  const hardConflicts = checkHardConstraints(req.db, {
+    groupId: activity.group_id,
+    locationId: locationId ?? activity.location_id,
+    date: date ?? activity.activity_date
+  });
+  if (hardConflicts.length > 0) {
+    return res.status(400).json({
+      error: 'Hard constraints violated',
+      conflicts: hardConflicts
+    });
+  }
+
   if (ignoreConflicts !== true) {
     const conflicts = checkConflicts(req.db, {
       groupId: activity.group_id,
@@ -352,6 +360,16 @@ router.put('/:id', requireEditLock, (req, res) => {
   
   const updates = [];
   const values = [];
+
+  // If the activity is moved/retargeted, its previous schedule link (if any) is no longer meaningful.
+  const nextLocationId = locationId !== undefined ? (locationId ?? null) : activity.location_id;
+  const nextDate = date !== undefined ? date : activity.activity_date;
+  const nextTimeSlot = timeSlot !== undefined ? timeSlot : activity.time_slot;
+  const invalidateScheduleLink = (
+    nextLocationId !== activity.location_id
+    || nextDate !== activity.activity_date
+    || nextTimeSlot !== activity.time_slot
+  );
   
   if (locationId !== undefined) {
     updates.push('location_id = ?');
@@ -378,6 +396,9 @@ router.put('/:id', requireEditLock, (req, res) => {
     return res.status(400).json({ error: '没有要更新的字段' });
   }
   
+  if (invalidateScheduleLink) {
+    updates.push('schedule_id = NULL');
+  }
   updates.push('updated_at = CURRENT_TIMESTAMP');
   values.push(id);
   
@@ -389,12 +410,7 @@ router.put('/:id', requireEditLock, (req, res) => {
     `).run(...values);
 
     const updatedActivity = req.db.prepare('SELECT * FROM activities WHERE id = ?').get(id);
-    const shouldReposition = date !== undefined || timeSlot !== undefined;
-    syncActivityToSchedule(req.db, updatedActivity, { reposition: shouldReposition || !updatedActivity.schedule_id });
-    bumpScheduleRevision(req.db, updatedActivity.group_id);
-
-    const syncedActivity = req.db.prepare('SELECT * FROM activities WHERE id = ?').get(id);
-    res.json(mapActivityRow(syncedActivity));
+    res.json(mapActivityRow(updatedActivity));
   } catch (error) {
     console.error('更新活动失败:', error);
     res.status(500).json({ error: '更新活动失败' });
@@ -404,13 +420,7 @@ router.put('/:id', requireEditLock, (req, res) => {
 // 删除活动（需要编辑锁）
 router.delete('/:id', requireEditLock, (req, res) => {
   try {
-    const activity = req.db.prepare('SELECT schedule_id, group_id FROM activities WHERE id = ?').get(req.params.id);
     const result = req.db.prepare('DELETE FROM activities WHERE id = ?').run(req.params.id);
-
-    if (activity?.schedule_id) {
-      req.db.prepare('DELETE FROM schedules WHERE id = ?').run(activity.schedule_id);
-      bumpScheduleRevision(req.db, activity.group_id);
-    }
 
     res.json({ 
       success: result.changes > 0,
@@ -433,6 +443,75 @@ function getTimeFromSlot(slot) {
 }
 
 // 辅助函数：检查冲突
+function parseDelimitedValues(value) {
+  return String(value || "")
+    .split(/[ ,|;]+/)
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function toDateOnly(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function toDateString(date) {
+  if (!date) return "";
+  return String(date.getFullYear()) + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+}
+
+function checkHardConstraints(db, params) {
+  const conflicts = [];
+  const { groupId, locationId, date } = params;
+  const targetDate = toDateOnly(date);
+
+  if (groupId && targetDate) {
+    const group = db.prepare("SELECT name, start_date, end_date FROM groups WHERE id = ?").get(groupId);
+    if (group?.start_date && group?.end_date) {
+      const startDate = toDateOnly(group.start_date);
+      const endDate = toDateOnly(group.end_date);
+      if (startDate && endDate && (targetDate < startDate || targetDate > endDate)) {
+        conflicts.push({
+          type: "group_date_range",
+          message: (group.name || "Group") + " is outside travel date range"
+        });
+      }
+    }
+  }
+
+  if (locationId && targetDate) {
+    const location = db.prepare("SELECT name, is_active, blocked_weekdays, closed_dates FROM locations WHERE id = ?").get(locationId);
+    if (location) {
+      if (Number(location.is_active) === 0) {
+        conflicts.push({
+          type: "location_inactive",
+          message: (location.name || "Location") + " is inactive"
+        });
+      }
+      const dayOfWeek = targetDate.getDay();
+      const blockedWeekdays = parseDelimitedValues(location.blocked_weekdays);
+      if (blockedWeekdays.includes(String(dayOfWeek))) {
+        conflicts.push({
+          type: "location_weekday_blocked",
+          message: (location.name || "Location") + " is not available on this weekday"
+        });
+      }
+      const dateText = toDateString(targetDate);
+      const closedDateSet = new Set(parseDelimitedValues(location.closed_dates));
+      if (closedDateSet.has(dateText)) {
+        conflicts.push({
+          type: "location_closed_date",
+          message: (location.name || "Location") + " is closed on " + dateText
+        });
+      }
+    }
+  }
+
+  return conflicts;
+}
 function checkConflicts(db, params) {
   const conflicts = [];
   const { groupId, locationId, date, timeSlot, participantCount, excludeId } = params;

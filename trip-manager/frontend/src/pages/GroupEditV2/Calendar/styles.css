@@ -44,13 +44,51 @@
 .calendar-workshop .calendar-grid {
   display: grid;
   width: 100%;
-  grid-template-columns: 60px repeat(7, 1fr);
-  grid-template-rows: 30px repeat(60, 20px);
 }
 
 .calendar-workshop .calendar-grid .time-slot {
   border-right: 1px solid #f0f0f0;
   border-bottom: 1px dashed #f0f0f0;
+}
+
+.calendar-range-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  gap: 8px;
+  background: #fff;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.calendar-range-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.calendar-range-center {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.calendar-range-title {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #262626;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-range-subtitle {
+  font-size: 11px;
+  line-height: 1.2;
+  color: #8c8c8c;
+  margin-top: 2px;
 }
 
 .calendar-workshop .calendar-layout.calendar-only .calendar-container {

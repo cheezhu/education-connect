@@ -1,17 +1,25 @@
 ﻿
 import React, { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect } from 'react';
-import { Modal, Select, Button, message } from 'antd';
+import { Button, DatePicker, Modal, message } from 'antd';
 import dayjs from 'dayjs';
 import api from '../../../services/api';
+import { useAuth } from '../../../hooks/useAuth';
 import CalendarGrid from './components/CalendarGrid';
 import ResourceSidebar from './components/ResourceSidebar';
+import ResourcePane from './components/ResourcePane';
 import ActivityPopover from './components/ActivityPopover';
 import EventChip from './components/EventChip';
 import CalendarSkeleton from './CalendarSkeleton';
+import useDailyCardResources from './hooks/useDailyCardResources';
+import useDesignerSync from './hooks/useDesignerSync';
+import useMustVisitPool from './hooks/useMustVisitPool';
 import '../CalendarDaysView.css';
 import './styles.css';
 
-const { Option } = Select;
+import { buildClientId } from './utils/clientId';
+import { hashString } from './utils/hash';
+import { isDailyActivity, parseDailyDate } from './utils/resourceId';
+import { calcDurationHours, calcDurationMinutes } from './utils/time';
 
 const START_HOUR = 6;
 const END_HOUR = 20;
@@ -22,38 +30,25 @@ const MIN_SLOT_HEIGHT = 8;
 const SLOTS_PER_HOUR = Math.max(1, Math.round(60 / SLOT_MINUTES));
 
 const DEFAULT_PLAN_DURATION = 2;
-
-const isDailyActivity = (activity) => {
-  const resourceId = activity?.resourceId ?? activity?.resource_id ?? '';
-  return typeof resourceId === 'string' && resourceId.startsWith('daily:');
-};
-
-const parseDailyDate = (resourceId) => {
-  if (typeof resourceId !== 'string') return '';
-  if (!resourceId.startsWith('daily:')) return '';
-  const parts = resourceId.split(':');
-  return parts[1] || '';
-};
-
-const buildClientId = () => (
-  `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-);
+const MAX_FULL_DAYS = 9;
+const DEFAULT_WINDOW_DAYS = 7;
 
 const CalendarWorkshop = ({
   groupData,
   schedules = [],
   onUpdate,
   onPlanChange,
+  onPushedToDesigner,
+  onCustomResourcesChange,
   showResources = true,
   resourceWidth,
   loading = false
 }) => {
   const [itineraryPlans, setItineraryPlans] = useState([]);
   const [locations, setLocations] = useState([]);
-  const [planResources, setPlanResources] = useState([]);
-  const [availablePlanResources, setAvailablePlanResources] = useState([]);
   const [selectedPlanId, setSelectedPlanId] = useState(groupData?.itinerary_plan_id ?? null);
   const [activities, setActivities] = useState(schedules);
+  const [viewStartIndex, setViewStartIndex] = useState(0);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [draggedActivity, setDraggedActivity] = useState(null);
   const [draggedResource, setDraggedResource] = useState(null);
@@ -76,6 +71,10 @@ const CalendarWorkshop = ({
   });
 
   const resourcePanelStyle = resourceWidth ? { width: resourceWidth } : undefined;
+  const groupId = groupData?.id ?? null;
+
+  const { canAccess } = useAuth();
+  const canSyncDesigner = canAccess?.('designer', 'write');
 
   useEffect(() => {
     let isMounted = true;
@@ -117,67 +116,10 @@ const CalendarWorkshop = ({
     setSelectedPlanId(groupData?.itinerary_plan_id ?? null);
   }, [groupData?.itinerary_plan_id]);
 
-  useEffect(() => {
-    const selectedPlan = itineraryPlans.find(
-      (plan) => plan.id === selectedPlanId
-    );
-    if (!selectedPlan || !Array.isArray(selectedPlan.items)) {
-      setPlanResources([]);
-      setAvailablePlanResources([]);
-      return;
-    }
-
-    const resources = [...selectedPlan.items]
-      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-      .map((item) => ({
-        id: `plan-${selectedPlan.id}-loc-${item.location_id}`,
-        type: 'visit',
-        title: item.location_name,
-        icon: '',
-        duration: DEFAULT_PLAN_DURATION,
-        description: item.address
-          ? `${item.address} · 容量${item.capacity || 0}人`
-          : `容量${item.capacity || 0}人`,
-        isUnique: true,
-        locationId: item.location_id,
-        locationName: item.location_name,
-        location: item.location_name,
-        locationColor: item.location_color || null,
-        planId: selectedPlan.id
-      }));
-
-    setPlanResources(resources);
-  }, [selectedPlanId, itineraryPlans]);
-
-  useEffect(() => {
-    const sourceActivities = (activities && activities.length > 0)
-      ? activities
-      : (schedules || []);
-    const usedResourceIds = new Set();
-    const usedLocationIds = new Set();
-
-    sourceActivities.forEach((activity) => {
-      const resourceId = activity?.resourceId ?? activity?.resource_id;
-      if (resourceId) {
-        usedResourceIds.add(resourceId);
-      }
-      const locationId = Number(activity?.locationId);
-      if (Number.isFinite(locationId)) {
-        usedLocationIds.add(locationId);
-      }
-    });
-
-    setAvailablePlanResources(
-      planResources.filter((resource) => {
-        if (usedResourceIds.has(resource.id)) return false;
-        const resourceLocationId = Number(resource.locationId);
-        if (Number.isFinite(resourceLocationId) && usedLocationIds.has(resourceLocationId)) {
-          return false;
-        }
-        return true;
-      })
-    );
-  }, [planResources, schedules, activities]);
+  const isLocationSchedule = useCallback((schedule) => {
+    const locationId = Number(schedule?.locationId ?? schedule?.location_id);
+    return Number.isFinite(locationId) && locationId > 0;
+  }, []);
 
   const handleResetSchedules = () => {
     Modal.confirm({
@@ -193,6 +135,34 @@ const CalendarWorkshop = ({
       }
     });
   };
+
+  const {
+    designerSourceState,
+    pullingFromDesigner,
+    pushingToDesigner,
+    pullFromDesigner: handlePullFromDesigner,
+    pushToDesigner: handlePushToDesigner
+  } = useDesignerSync({
+    groupId,
+    canSyncDesigner,
+    activities,
+    setActivities,
+    isLocationSchedule,
+    onUpdate,
+    onPushedToDesigner
+  });
+
+  const {
+    planResources,
+    availablePlanResources,
+    setAvailablePlanResources
+  } = useMustVisitPool({
+    selectedPlanId,
+    itineraryPlans,
+    designerSourceList: designerSourceState.list,
+    activities,
+    schedules
+  });
 
   useEffect(() => {
     const handleGlobalDragEnd = () => {
@@ -263,57 +233,6 @@ const CalendarWorkshop = ({
     return activityTypes[type]?.color || '#1890ff';
   };
 
-  const isMealFilled = (meals, key) => {
-    if (!meals || meals[`${key}_disabled`]) return false;
-    return Boolean(meals[key] || meals[`${key}_place`]);
-  };
-
-  const hasPickupContent = (pickup) => {
-    if (!pickup || pickup.disabled) return false;
-    return Boolean(
-      pickup.time ||
-      pickup.end_time ||
-      pickup.location ||
-      pickup.contact ||
-      pickup.flight_no ||
-      pickup.airline ||
-      pickup.terminal
-    );
-  };
-
-  const buildFlightDescription = (pickup) => (
-    [
-      pickup?.flight_no && `航班 ${pickup.flight_no}`,
-      pickup?.airline && pickup.airline,
-      pickup?.terminal && pickup.terminal
-    ].filter(Boolean).join(' / ')
-  );
-
-  const dailyResourceId = (date, category, key) => {
-    if (!date) return '';
-    if (category === 'meal') {
-      return `daily:${date}:meal:${key}`;
-    }
-    return `daily:${date}:${category}`;
-  };
-
-  const toMinutes = (timeValue) => {
-    if (!timeValue) return null;
-    const [hourStr, minuteStr] = String(timeValue).split(':');
-    const hour = Number(hourStr);
-    const minute = Number(minuteStr);
-    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
-    return hour * 60 + minute;
-  };
-
-  const calcDurationHours = (startTime, endTime, fallback = 60) => {
-    const start = toMinutes(startTime);
-    const end = toMinutes(endTime);
-    const diff = Number.isFinite(start) && Number.isFinite(end) ? (end - start) : null;
-    const minutes = diff && diff > 0 ? diff : fallback;
-    return Math.max(0.5, minutes / 60);
-  };
-
   const getActivityIdentity = (activity) => (
     activity
       ? (
@@ -367,89 +286,105 @@ const CalendarWorkshop = ({
   const days = calculateDays();
   const timeSlots = generateTimeSlots();
 
-  const dailyCardResources = useMemo(() => {
-    const logistics = Array.isArray(groupData?.logistics) ? groupData.logistics : [];
-    if (!logistics.length) return [];
-    const startDate = groupData?.start_date || '';
-    const endDate = groupData?.end_date || '';
-    const scheduledResources = new Set(
-      (activities || [])
-        .map((activity) => activity?.resourceId ?? activity?.resource_id)
-        .filter((id) => typeof id === 'string')
-    );
-    const mealDefaults = {
-      breakfast: { start: '07:30', end: '08:30', label: '早餐' },
-      lunch: { start: '12:00', end: '13:00', label: '午餐' },
-      dinner: { start: '18:00', end: '19:00', label: '晚餐' }
-    };
-    const resources = [];
+  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+  const viewSpan = DEFAULT_WINDOW_DAYS;
+  const hasPaging = days.length > MAX_FULL_DAYS;
+  const maxViewStartIndex = hasPaging ? Math.max(0, days.length - viewSpan) : 0;
+  const windowStartIndex = hasPaging ? clamp(viewStartIndex, 0, maxViewStartIndex) : 0;
+  const visibleDays = hasPaging
+    ? days.slice(windowStartIndex, windowStartIndex + viewSpan)
+    : days;
 
-    logistics.forEach((row) => {
-      const date = row?.date;
-      if (!date) return;
-      const isStartDay = Boolean(startDate && date === startDate);
-      const isEndDay = Boolean(endDate && date === endDate);
-      const meals = row.meals || {};
-      ['breakfast', 'lunch', 'dinner'].forEach((key) => {
-        if (!isMealFilled(meals, key)) return;
-        const resourceId = dailyResourceId(date, 'meal', key);
-        if (scheduledResources.has(resourceId)) return;
-        const defaults = mealDefaults[key] || {};
-        const duration = calcDurationHours(
-          meals[`${key}_time`] || defaults.start,
-          meals[`${key}_end`] || defaults.end,
-          60
-        );
-        resources.push({
-          id: resourceId,
-          type: 'meal',
-          title: defaults.label || key,
-          duration,
-          description: meals[key] || '',
-          locationName: meals[`${key}_place`] || defaults.label || '',
-          fixedDate: date
-        });
-      });
-
-      const pickup = row.pickup || {};
-      if (isStartDay && !pickup.disabled) {
-        const resourceId = dailyResourceId(date, 'pickup');
-        if (!scheduledResources.has(resourceId)) {
-          resources.push({
-            id: resourceId,
-            type: 'transport',
-            title: '接站',
-            duration: calcDurationHours(pickup.time, pickup.end_time, 60),
-            description: buildFlightDescription(pickup),
-            locationName: pickup.location || '接站',
-            fixedDate: date
-          });
-        }
-      }
-
-      const dropoff = row.dropoff || {};
-      if (isEndDay && !dropoff.disabled) {
-        const resourceId = dailyResourceId(date, 'dropoff');
-        if (!scheduledResources.has(resourceId)) {
-          resources.push({
-            id: resourceId,
-            type: 'transport',
-            title: '送站',
-            duration: calcDurationHours(dropoff.time, dropoff.end_time, 60),
-            description: buildFlightDescription(dropoff),
-            locationName: dropoff.location || '送站',
-            fixedDate: date
-          });
-        }
-      }
-    });
-
-    return resources;
-  }, [groupData?.logistics, groupData?.start_date, groupData?.end_date, activities]);
+  const dailyCardResources = useDailyCardResources({ groupData, activities });
 
   const customResources = useMemo(() => (
     Array.isArray(groupData?.customResources) ? groupData.customResources : []
   ), [groupData?.customResources]);
+
+  const availableCustomResources = useMemo(() => {
+    const usedResourceIds = new Set();
+    (activities || []).forEach((activity) => {
+      const resourceId = activity?.resourceId ?? activity?.resource_id;
+      if (typeof resourceId === 'string' && resourceId.length > 0) {
+        usedResourceIds.add(resourceId);
+        return;
+      }
+
+      // Backward-compat: legacy custom schedules might not have `resourceId` yet.
+      // Hide the matching custom resource card by deriving its id deterministically.
+      const planItemId = activity?.planItemId;
+      if (planItemId) return;
+      const locationPlanId = typeof activity?.resourceId === 'string' && activity.resourceId.startsWith('plan-')
+        ? activity.resourceId
+        : '';
+      if (locationPlanId) return;
+
+      const typeKey = activity?.type || 'activity';
+      const titleKey = activity?.title || activity?.location || '自定义活动';
+      const durationMinutes = calcDurationMinutes(activity?.startTime, activity?.endTime, 60);
+      const hash = hashString(`${typeKey}|${titleKey}|${durationMinutes}`);
+      usedResourceIds.add(`custom:${hash}`);
+    });
+
+    return customResources.filter((resource) => !usedResourceIds.has(resource.id));
+  }, [customResources, activities]);
+
+  const handleDeleteCustomResource = useCallback((resourceId) => {
+    if (!resourceId) return;
+    if (!onCustomResourcesChange) {
+      message.warning('当前页面未接入自定义资源删除能力');
+      return;
+    }
+    const next = customResources.filter((item) => item?.id !== resourceId);
+    onCustomResourcesChange(next);
+    message.success('已删除自定义卡片', 1);
+  }, [customResources, onCustomResourcesChange]);
+
+  useEffect(() => {
+    // Reset to the first window when switching groups.
+    setViewStartIndex(0);
+  }, [groupData?.id]);
+
+  useEffect(() => {
+    if (!hasPaging) {
+      if (viewStartIndex !== 0) {
+        setViewStartIndex(0);
+      }
+      return;
+    }
+    if (viewStartIndex !== windowStartIndex) {
+      setViewStartIndex(windowStartIndex);
+    }
+  }, [hasPaging, viewStartIndex, windowStartIndex]);
+
+  const setWindowToIncludeDate = useCallback((dateStr) => {
+    if (!hasPaging) return;
+    if (!dateStr) return;
+    const targetIndex = days.findIndex((day) => day.dateStr === dateStr);
+    if (targetIndex < 0) return;
+    const centeredStart = targetIndex - Math.floor(viewSpan / 2);
+    setViewStartIndex(clamp(centeredStart, 0, maxViewStartIndex));
+  }, [hasPaging, days, viewSpan, maxViewStartIndex]);
+
+  const handleJumpPrevDay = useCallback(() => {
+    if (!hasPaging) return;
+    setViewStartIndex((prev) => clamp(prev - 1, 0, maxViewStartIndex));
+  }, [hasPaging, maxViewStartIndex]);
+
+  const handleJumpNextDay = useCallback(() => {
+    if (!hasPaging) return;
+    setViewStartIndex((prev) => clamp(prev + 1, 0, maxViewStartIndex));
+  }, [hasPaging, maxViewStartIndex]);
+
+  const handleJumpPrevChunk = useCallback(() => {
+    if (!hasPaging) return;
+    setViewStartIndex((prev) => clamp(prev - viewSpan, 0, maxViewStartIndex));
+  }, [hasPaging, viewSpan, maxViewStartIndex]);
+
+  const handleJumpNextChunk = useCallback(() => {
+    if (!hasPaging) return;
+    setViewStartIndex((prev) => clamp(prev + viewSpan, 0, maxViewStartIndex));
+  }, [hasPaging, viewSpan, maxViewStartIndex]);
 
   useLayoutEffect(() => {
     const wrapper = scrollWrapperRef.current;
@@ -650,7 +585,7 @@ const CalendarWorkshop = ({
     const maxStartIndex = Math.max(0, timeSlots.length - duration - 1);
     const constrainedIndex = Math.max(0, Math.min(maxStartIndex, targetSlotIndex));
 
-    const dayIndex = days.findIndex(d => d.dateStr === dateStr);
+    const dayIndex = visibleDays.findIndex(d => d.dateStr === dateStr);
     if (dayIndex === -1) return;
 
     setDropIndicator({
@@ -968,6 +903,25 @@ const CalendarWorkshop = ({
       isFromResource = false;
     }
 
+    // Treat custom activities as a unique sidebar resource (the "其他" pool).
+    // This enforces a 1-of-1 behavior: either scheduled on the calendar, or returned to the pool.
+    const resourceIdStr = typeof resolvedResourceId === 'string' ? resolvedResourceId : '';
+    const isDailyResource = resourceIdStr.startsWith('daily:');
+    const isPlanResource = resourceIdStr.startsWith('plan-') || resourceIdStr.startsWith('plan-sync-');
+    const isCustomResource = resourceIdStr.startsWith('custom:');
+    if (!isDailyResource && !isPlanResource) {
+      if (!resourceIdStr) {
+        const typeKey = payload.type || baseActivity?.type || 'activity';
+        const durationMinutes = calcDurationMinutes(startTime, endTime, 60);
+        const titleKey = resolvedTitle || resolvedLocation || '自定义活动';
+        const hash = hashString(`${typeKey}|${titleKey}|${durationMinutes}`);
+        resolvedResourceId = `custom:${hash}`;
+        isFromResource = true;
+      } else if (isCustomResource) {
+        isFromResource = true;
+      }
+    }
+
     const activityData = {
       ...baseActivity,
       id: baseActivity?.id ?? null,
@@ -1077,10 +1031,11 @@ const CalendarWorkshop = ({
     event.preventDefault();
     if (draggedActivity) {
       const resourceId = draggedActivity.resourceId || draggedActivity.resource_id || '';
+      const isDaily = typeof resourceId === 'string' && resourceId.startsWith('daily:');
       let planResource = null;
 
-      if (typeof resourceId === 'string' && resourceId.startsWith('plan-')) {
-        planResource = planResources.find(r => r.id === resourceId) || null;
+      if (resourceId) {
+        planResource = planResources.find(r => String(r.id) === String(resourceId)) || null;
       }
 
       if (!planResource) {
@@ -1107,7 +1062,19 @@ const CalendarWorkshop = ({
         );
         setActivities(updatedActivities);
         onUpdate?.(updatedActivities);
-        message.success(`${draggedActivity.title} 已归还`, 1);
+        message.success(`${draggedActivity.title} 已归还到必去行程点`, 1);
+      } else {
+        // Daily card and custom activities are "returned" by removing them from the calendar.
+        // Daily resources will reappear automatically via `dailyCardResources` once unscheduled.
+        const updatedActivities = activities.filter(
+          (activity) => getActivityIdentity(activity) !== getActivityIdentity(draggedActivity)
+        );
+        setActivities(updatedActivities);
+        onUpdate?.(updatedActivities);
+        message.success(
+          isDaily ? `${draggedActivity.title} 已归还到每日卡片` : `${draggedActivity.title} 已移出日历`,
+          1
+        );
       }
     }
 
@@ -1149,154 +1116,50 @@ const CalendarWorkshop = ({
     );
   }
 
+  const locationScheduleCount = (activities || []).filter(isLocationSchedule).length;
+
   const resourcePane = (
-    <div className="resource-pane-scroll">
-      <div className="resource-header">
-        <div className="resource-hint">
-          <div className="resource-hint-header">
-            <span className="resource-hint-label">行程方案</span>
-          </div>
-          <Select
-            size="small"
-            allowClear
-            placeholder="请选择行程方案"
-            value={selectedPlanId ?? undefined}
-            style={{ width: '100%' }}
-            onChange={(value) => {
-              const nextPlanId = value ?? null;
-              setSelectedPlanId(nextPlanId);
-              onPlanChange?.(nextPlanId);
-            }}
-          >
-            {(itineraryPlans || []).map(plan => (
-              <Option key={plan.id} value={plan.id}>
-                {plan.name}
-              </Option>
-            ))}
-          </Select>
-        </div>
-        <div className="resource-actions">
-          <Button size="small" danger onClick={handleResetSchedules}>
-            重置行程
-          </Button>
-        </div>
-      </div>
-
-      <div className="resource-columns">
-        <div className="resource-section unique-section">
-          <div className="section-label">方案行程点</div>
-          <div className="resource-cards">
-            {availablePlanResources.length === 0 ? (
-              <div style={{ fontSize: '12px', color: '#999', padding: '8px 4px' }}>
-                暂无可用方案行程点
-              </div>
-            ) : availablePlanResources.map(resource => (
-              <div
-                key={resource.id}
-                className={`resource-card ${resource.type} unique`}
-                draggable
-                onDragStart={(event) => {
-                  setDraggedResource(resource);
-                  setIsDragging(true);
-                  event.dataTransfer.effectAllowed = 'copy';
-                  event.dataTransfer.setData('resource', JSON.stringify(resource));
-                }}
-                onDragEnd={() => {
-                  setDraggedResource(null);
-                  setIsDragging(false);
-                }}
-                style={{
-                  background: activityTypes[resource.type]?.color || '#1890ff',
-                  cursor: 'grab'
-                }}
-                title={resource.description}
-              >
-                <div className="resource-info">
-                  <div className="resource-name">{resource.title}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="resource-section daily-section">
-          <div className="section-label">每日卡片</div>
-          <div className="resource-cards">
-            {dailyCardResources.length === 0 ? (
-              <div style={{ fontSize: '12px', color: '#999', padding: '8px 4px' }}>
-                暂无可用每日卡片
-              </div>
-            ) : dailyCardResources.map(resource => (
-              <div
-                key={resource.id}
-                className={`resource-card ${resource.type} repeatable`}
-                draggable
-                onDragStart={(event) => {
-                  setDraggedResource(resource);
-                  setIsDragging(true);
-                  event.dataTransfer.effectAllowed = 'copy';
-                  event.dataTransfer.setData('resource', JSON.stringify(resource));
-                }}
-                onDragEnd={() => {
-                  setDraggedResource(null);
-                  setIsDragging(false);
-                }}
-                style={{
-                  background: activityTypes[resource.type]?.color || '#1890ff',
-                  cursor: 'grab'
-                }}
-                title={resource.description}
-              >
-                <div className="resource-info">
-                  <div className="resource-name">{resource.title}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="resource-section custom-section">
-          <div className="section-label">其他</div>
-          <div className="resource-cards">
-            {customResources.length === 0 ? (
-              <div style={{ fontSize: '12px', color: '#999', padding: '8px 4px' }}>
-                暂无自定义模板
-              </div>
-            ) : customResources.map(resource => (
-              <div
-                key={resource.id}
-                className={`resource-card ${resource.type} repeatable`}
-                draggable
-                onDragStart={(event) => {
-                  setDraggedResource(resource);
-                  setIsDragging(true);
-                  event.dataTransfer.effectAllowed = 'copy';
-                  event.dataTransfer.setData('resource', JSON.stringify(resource));
-                }}
-                onDragEnd={() => {
-                  setDraggedResource(null);
-                  setIsDragging(false);
-                }}
-                style={{
-                  background: activityTypes[resource.type]?.color || '#1890ff',
-                  cursor: 'grab'
-                }}
-                title={resource.description}
-              >
-                <div className="resource-info">
-                  <div className="resource-name">{resource.title}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
+    <ResourcePane
+      loading={loading}
+      canSyncDesigner={canSyncDesigner}
+      designerSourceState={designerSourceState}
+      pullingFromDesigner={pullingFromDesigner}
+      pushingToDesigner={pushingToDesigner}
+      locationScheduleCount={locationScheduleCount}
+      onPullFromDesigner={handlePullFromDesigner}
+      onPushToDesigner={handlePushToDesigner}
+      onResetSchedules={handleResetSchedules}
+      availablePlanResources={availablePlanResources}
+      dailyCardResources={dailyCardResources}
+      availableCustomResources={availableCustomResources}
+      activityTypes={activityTypes}
+      onResourceDragStart={(resource) => {
+        setDraggedResource(resource);
+        setIsDragging(true);
+      }}
+      onResourceDragEnd={() => {
+        setDraggedResource(null);
+        setIsDragging(false);
+      }}
+      onDeleteCustomResource={handleDeleteCustomResource}
+    />
   );
 
   if (!groupData) {
     return <div className="calendar-empty">请选择团组查看日程</div>;
   }
+
+  const atWindowStart = hasPaging && windowStartIndex <= 0;
+  const atWindowEnd = hasPaging && windowStartIndex >= maxViewStartIndex;
+  const windowStartLabel = visibleDays[0]?.dateStr || '';
+  const windowEndLabel = visibleDays[visibleDays.length - 1]?.dateStr || '';
+
+  const startDay = groupData?.start_date ? dayjs(groupData.start_date) : null;
+  const endDay = groupData?.end_date ? dayjs(groupData.end_date) : null;
+  const disableJumpDate = (current) => {
+    if (!current || !startDay || !endDay) return false;
+    return current.isBefore(startDay.startOf('day')) || current.isAfter(endDay.endOf('day'));
+  };
 
   return (
     <div
@@ -1306,9 +1169,50 @@ const CalendarWorkshop = ({
     >
       <div className={`calendar-layout${showResources ? '' : ' calendar-only'}`}>
         <div className="calendar-container">
+          {hasPaging ? (
+            <div className="calendar-range-toolbar">
+              <div className="calendar-range-actions">
+                <Button size="small" onClick={handleJumpPrevChunk} disabled={atWindowStart}>
+                  上一段
+                </Button>
+                <Button size="small" onClick={handleJumpPrevDay} disabled={atWindowStart}>
+                  上一天
+                </Button>
+              </div>
+
+              <div className="calendar-range-center" title={`${windowStartLabel} ~ ${windowEndLabel}`}>
+                <div className="calendar-range-title">
+                  {windowStartLabel} ~ {windowEndLabel}
+                </div>
+                <div className="calendar-range-subtitle">
+                  第 {windowStartIndex + 1}-{windowStartIndex + visibleDays.length} 天 / 共 {days.length} 天
+                </div>
+              </div>
+
+              <div className="calendar-range-actions">
+                <Button size="small" onClick={handleJumpNextDay} disabled={atWindowEnd}>
+                  下一天
+                </Button>
+                <Button size="small" onClick={handleJumpNextChunk} disabled={atWindowEnd}>
+                  下一段
+                </Button>
+                <DatePicker
+                  size="small"
+                  allowClear
+                  placeholder="跳转日期"
+                  disabledDate={disableJumpDate}
+                  onChange={(value) => {
+                    if (!value) return;
+                    setWindowToIncludeDate(value.format('YYYY-MM-DD'));
+                  }}
+                  style={{ width: 120 }}
+                />
+              </div>
+            </div>
+          ) : null}
           <div className="calendar-scroll-wrapper" ref={scrollWrapperRef}>
             <CalendarGrid
-              days={days}
+              days={visibleDays}
               timeSlots={timeSlots}
               slotHeight={slotHeight}
               slotsPerHour={SLOTS_PER_HOUR}

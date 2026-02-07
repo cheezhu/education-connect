@@ -1,0 +1,298 @@
+{
+  "summary": {
+    "groups": 12,
+    "locations": 8,
+    "assignmentsInput": 62,
+    "assignmentsOutput": 84,
+    "elapsedMs": 44017
+  },
+  "precheck": {
+    "blockingErrors": [],
+    "warnings": []
+  },
+  "phase1": {
+    "engine": "cp_sat_feasible",
+    "status": "OPTIMAL",
+    "objective": 0,
+    "diagnostics": {
+      "phase1_time_sec": 11,
+      "best_bound": 0.0
+    }
+  },
+  "optimize": {
+    "engine": "cp_sat_feasible+lns",
+    "diagnostics": {
+      "phase1_engine": "cp_sat_feasible",
+      "phase1_status": "OPTIMAL",
+      "phase1_score": 12464,
+      "lns_iterations": 1056,
+      "improvements": 1,
+      "cp_sat_used": true,
+      "release_strategy": "hotspot_lns_v2",
+      "curve": [
+        {
+          "iter": 0,
+          "iterScore": 12464,
+          "bestScore": 12464,
+          "accepted": true,
+          "releasedCount": 0,
+          "releaseMode": "phase1",
+          "note_zh": "初始可行解得分 12464。"
+        },
+        {
+          "iter": "base",
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": true,
+          "releasedCount": 0,
+          "releaseMode": "base_optimize",
+          "note_zh": "基础优化后得分提升到 15484。"
+        },
+        {
+          "iter": 50,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 50 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 100,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 100 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 150,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 150 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 200,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 21,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.25,
+          "note_zh": "第 200 轮：释放 21 个任务（混合策略，释放比例 25%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 250,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 250 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 300,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 300 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 350,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 350 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 400,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 21,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.25,
+          "note_zh": "第 400 轮：释放 21 个任务（混合策略，释放比例 25%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 450,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 450 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 500,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 500 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 550,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 550 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 600,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 21,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.25,
+          "note_zh": "第 600 轮：释放 21 个任务（混合策略，释放比例 25%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 650,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 650 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 700,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 700 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 750,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 750 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 800,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 21,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.25,
+          "note_zh": "第 800 轮：释放 21 个任务（混合策略，释放比例 25%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 850,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 850 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 900,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 900 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 950,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 950 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 1000,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 21,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.25,
+          "note_zh": "第 1000 轮：释放 21 个任务（混合策略，释放比例 25%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": 1050,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15,
+          "note_zh": "第 1050 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。"
+        },
+        {
+          "iter": "final",
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": true,
+          "releasedCount": 0,
+          "releaseMode": "final",
+          "note_zh": "优化结束，最终得分 15484。"
+        }
+      ],
+      "hotspot_totals": {
+        "missing_required": 0,
+        "overloaded_capacity": 0,
+        "displaced_existing": 6336,
+        "random": 7600
+      },
+      "curve_tail_zh": [
+        "第 550 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。",
+        "第 600 轮：释放 21 个任务（混合策略，释放比例 25%），得分 15484，最优保持 15484。",
+        "第 650 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。",
+        "第 700 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。",
+        "第 750 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。",
+        "第 800 轮：释放 21 个任务（混合策略，释放比例 25%），得分 15484，最优保持 15484。",
+        "第 850 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。",
+        "第 900 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。",
+        "第 950 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。",
+        "第 1000 轮：释放 21 个任务（混合策略，释放比例 25%），得分 15484，最优保持 15484。",
+        "第 1050 轮：释放 13 个任务（混合策略，释放比例 15%），得分 15484，最优保持 15484。",
+        "优化结束，最终得分 15484。"
+      ],
+      "final_score": 15484
+    }
+  },
+  "audit": {
+    "hardViolations": [],
+    "mustVisitMissing": []
+  }
+}

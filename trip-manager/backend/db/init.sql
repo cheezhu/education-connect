@@ -44,6 +44,7 @@ CREATE TABLE locations (
     name VARCHAR(200) NOT NULL,
     address VARCHAR(500),
     capacity INTEGER DEFAULT 100,
+    cluster_prefer_same_day INTEGER DEFAULT 0,
     color VARCHAR(20) DEFAULT '#1890ff',
     contact_person VARCHAR(100),
     contact_phone VARCHAR(20),

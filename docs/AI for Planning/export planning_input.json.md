@@ -20,7 +20,7 @@ A. 后端新增一个聚合导出接口：
   返回 JSON，同时支持浏览器“下载文件”的方式（Content-Disposition attachment）。
   文件名示例：planning_input_2026-01-24T10-00-00Z_abc123.json
 
-B. 前端在 ItineraryDesigner 页面右上角新增按钮：
+B. 前端在 ItineraryDesigner 页面（`trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`）右上角新增按钮：
 - 按钮名：“导出排程输入包(JSON)”
 - 点击后：弹窗选择团组 + 日期范围（如果页面已有团组选择和日期范围，就复用现有 UI）
 - 调用 /api/planning/export 下载 JSON 文件到本地（axios responseType=blob）
@@ -117,7 +117,7 @@ rules 的来源：
 ========================
 4) 前端实现细节（尽量复用现有）
 ========================
-- 修改 ItineraryDesigner 页面：在现有 “AI 多团组生成/导出” 附近加一个按钮。
+- 修改 ItineraryDesigner 页面（`trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`）：在现有 “AI 多团组生成/导出” 附近加一个按钮。
 - 点击后弹窗：选择 groupIds + startDate/endDate
 - 调用 POST /api/planning/export，responseType='blob'，然后触发浏览器下载。
 - 下载文件名从响应 header 的 Content-Disposition 读取；读不到就用默认命名。

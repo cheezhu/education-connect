@@ -17,12 +17,32 @@ import {
   UploadOutlined,
   InboxOutlined
 } from '@ant-design/icons';
-import api from '../services/api';
-import { useAuth } from '../hooks/useAuth';
+import api from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
 import dayjs from 'dayjs';
-import useDataSync from '../hooks/useDataSync';
-import CalendarDaysView from './GroupEditV2/CalendarDaysView';
+import useDataSync from '../../hooks/useDataSync';
+import CalendarDaysView from '../GroupEditV2/CalendarDaysView';
 import ItineraryDesignerSkeleton from './ItineraryDesignerSkeleton';
+import PlanningImportModal from './planning/PlanningImportModal';
+import PlanningExportModal from './planning/PlanningExportModal';
+import {
+  buildPlanningImportValidationKey,
+  buildPlanningResultPayloadFromCsv,
+  buildPlanningTemplateCsv,
+  extractPlanningAssignments,
+  extractPlanningGroupIds,
+  extractPlanningRange,
+  triggerDownload
+} from './planning/planningIO';
+import { generateDateRange, formatDateString, maxDate, minDate, iterateDateStrings } from './shared/dates';
+import { timeSlotKeys, timeSlotWindows, toMinutes, getTimeSlotFromStart, resolveTimeSlotByOverlap, normalizeImportedTimeSlot } from './shared/timeSlots';
+import { parseDelimitedValues, parseDelimitedList, parseDelimitedIdList } from './shared/parse';
+import { normalizeManualMustVisitLocationIds, normalizeMustVisitMode, extractPlanLocationIds, isDateWithinGroupRange, isGroupMissingMustVisitConfig } from './shared/groupRules';
+import { getRequestErrorMessage } from './shared/messages';
+import { getPlanningConflictReasonLabel, getPlanningConflictHandlingTip, isPlanningConflictManualRequired } from './conflicts/conflictLabels';
+import SlotConflictModal from './conflicts/SlotConflictModal';
+import TimelineGrid from './timeline/TimelineGrid';
+import GroupConsoleDrawer from './console/GroupConsoleDrawer';
 import './ItineraryDesigner.css';
 
 const { Option } = Select;
@@ -32,12 +52,6 @@ function ItineraryDesigner() {
   const GROUP_CALENDAR_HEIGHT_DEFAULT = 30;
   const GROUP_CALENDAR_HEIGHT_MIN = 20;
   const GROUP_CALENDAR_HEIGHT_MAX = 70;
-  const timeSlotKeys = ['MORNING', 'AFTERNOON', 'EVENING'];
-  const timeSlotWindows = {
-    MORNING: { start: '06:00', end: '12:00' },
-    AFTERNOON: { start: '12:00', end: '18:00' },
-    EVENING: { start: '18:00', end: '20:45' }
-  };
   const getStoredWeekStartDate = () => {
     try {
       const stored = localStorage.getItem('itinerary_week_start');
@@ -114,6 +128,7 @@ function ItineraryDesigner() {
   const [groups, setGroups] = useState([]);
   const [activities, setActivities] = useState([]);
   const [locations, setLocations] = useState([]);
+  const [itineraryPlans, setItineraryPlans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [weekStartDate, setWeekStartDate] = useState(() => getStoredWeekStartDate());
@@ -158,6 +173,8 @@ function ItineraryDesigner() {
   const groupCalendarDetailSaveTokenRef = useRef(0);
   const [groupCalendarHeight, setGroupCalendarHeight] = useState(() => getStoredGroupCalendarHeight());
   const [groupCalendarResizing, setGroupCalendarResizing] = useState(false);
+  const [groupConsoleDragPayload, setGroupConsoleDragPayload] = useState(null);
+  const [groupConsoleDropTarget, setGroupConsoleDropTarget] = useState(null);
   const groupCalendarHeightRef = useRef(getStoredGroupCalendarHeight());
   const groupCalendarResizeRef = useRef(null);
   const groupCalendarSaveTimeoutRef = useRef(null);
@@ -187,19 +204,41 @@ function ItineraryDesigner() {
   const planningAvailableGroups = (planningDateRange && planningDateRange.length === 2)
     ? filterGroupsByRange(planningDateRange)
     : [];
+  const itineraryPlanById = useMemo(() => (
+    new Map(
+      (itineraryPlans || [])
+        .map(plan => [Number(plan.id), plan])
+        .filter(([planId]) => Number.isFinite(planId))
+    )
+  ), [itineraryPlans]);
+
+  const planningMissingMustVisitGroupIds = useMemo(() => (
+    new Set(
+      planningAvailableGroups
+        .filter(group => isGroupMissingMustVisitConfig(group, itineraryPlanById))
+        .map(group => Number(group.id))
+        .filter(Number.isFinite)
+    )
+  ), [planningAvailableGroups, itineraryPlanById]);
+
+  const planningMissingMustVisitGroups = useMemo(() => (
+    planningAvailableGroups.filter(group => planningMissingMustVisitGroupIds.has(Number(group.id)))
+  ), [planningAvailableGroups, planningMissingMustVisitGroupIds]);
 
   // 加载数据
   const loadData = async (preserveSelection = false) => {
     setLoading(true);
     try {
-      const [groupsRes, activitiesRes, locationsRes] = await Promise.all([
+      const [groupsRes, activitiesRes, locationsRes, plansRes] = await Promise.all([
         api.get('/groups'),
         api.get('/activities/raw'),
-        api.get('/locations')
+        api.get('/locations'),
+        api.get('/itinerary-plans').catch(() => ({ data: [] }))
       ]);
       setGroups(groupsRes.data);
       setActivities(activitiesRes.data);
       setLocations(locationsRes.data);
+      setItineraryPlans(Array.isArray(plansRes.data) ? plansRes.data : []);
 
       // 只在首次加载时选中所有团组，后续刷新保持用户选择
       if (!preserveSelection && selectedGroups.length === 0) {
@@ -443,22 +482,7 @@ function ItineraryDesigner() {
   }, [planningImportResult, planningImportVisible]);
 
   // 生成日期范围（7天一页）
-  const generateDateRange = (startDate) => {
-    const baseDate = startDate ? dayjs(startDate) : dayjs();
-    return Array.from({ length: 7 }, (_, index) => (
-      baseDate.add(index, 'day').toDate()
-    ));
-  };
-
   const dateRange = generateDateRange(weekStartDate);
-
-  // 格式化日期
-  const formatDateString = (date) => {
-    if (!date) return '';
-    const normalized = dayjs(date);
-    if (!normalized.isValid()) return '';
-    return normalized.format('YYYY-MM-DD');
-  };
 
   const getGroupDateRange = (group) => {
     if (!group?.start_date || !group?.end_date) return [];
@@ -478,24 +502,6 @@ function ItineraryDesigner() {
   };
 
   const getGroupDisplayName = (group) => group?.name || '未命名团组';
-
-  const normalizeGroupTags = (value) => {
-    if (Array.isArray(value)) return value.filter(Boolean).map(String);
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      if (!trimmed) return [];
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          return parsed.filter(Boolean).map(String);
-        }
-      } catch (error) {
-        // ignore
-      }
-      return trimmed.split(',').map(item => item.trim()).filter(Boolean);
-    }
-    return [];
-  };
 
   const isGroupActiveOnDate = (group, date) => {
     if (!group?.start_date || !group?.end_date) return false;
@@ -523,52 +529,6 @@ function ItineraryDesigner() {
   const isGroupDepartureDay = (group, dateString) => (
     Boolean(group?.end_date && dateString && group.end_date === dateString)
   );
-
-  const toMinutes = (timeValue) => {
-    if (!timeValue || typeof timeValue !== 'string') return null;
-    const [hourStr, minuteStr] = timeValue.split(':');
-    const hour = Number(hourStr);
-    const minute = Number(minuteStr);
-    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
-    return hour * 60 + minute;
-  };
-
-  const getTimeSlotFromStart = (startTime) => {
-    const minutes = toMinutes(startTime);
-    if (minutes === null) return 'MORNING';
-    if (minutes < 12 * 60) return 'MORNING';
-    if (minutes < 18 * 60) return 'AFTERNOON';
-    return 'EVENING';
-  };
-
-  const resolveTimeSlotByOverlap = (startTime, endTime) => {
-    const startMinutes = toMinutes(startTime);
-    const endMinutes = toMinutes(endTime);
-    if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) {
-      return getTimeSlotFromStart(startTime);
-    }
-
-    let bestSlot = null;
-    let bestOverlap = -1;
-    Object.entries(timeSlotWindows).forEach(([slotKey, window]) => {
-      const windowStart = toMinutes(window.start);
-      const windowEnd = toMinutes(window.end);
-      if (!Number.isFinite(windowStart) || !Number.isFinite(windowEnd)) return;
-      const overlap = Math.max(
-        0,
-        Math.min(endMinutes, windowEnd) - Math.max(startMinutes, windowStart)
-      );
-      if (overlap > bestOverlap) {
-        bestOverlap = overlap;
-        bestSlot = slotKey;
-      }
-    });
-
-    if (bestSlot && bestOverlap > 0) {
-      return bestSlot;
-    }
-    return getTimeSlotFromStart(startTime);
-  };
 
   const buildScheduleMatchKey = (schedule) => {
     const title = schedule?.title || schedule?.location || schedule?.description || '';
@@ -798,12 +758,6 @@ function ItineraryDesigner() {
 
   const handleGroupCalendarDetailUpdate = (updatedSchedules) => {
     setGroupCalendarDetailSchedules(updatedSchedules);
-    if (groupCalendarDetailGroupId) {
-      applyOptimisticScheduleUpdate({
-        groupId: groupCalendarDetailGroupId,
-        schedules: updatedSchedules
-      });
-    }
     clearTimeout(groupCalendarDetailSaveTimeoutRef.current);
     groupCalendarDetailSaveTimeoutRef.current = setTimeout(async () => {
       if (!groupCalendarDetailGroupId) return;
@@ -822,7 +776,6 @@ function ItineraryDesigner() {
           setGroupCalendarDetailRevision(nextRevision);
         }
         setGroupCalendarDetailSchedules(saved);
-        await refreshActivitiesOnly(saveToken);
       } catch (error) {
         if (error?.response?.status === 409) {
           const revisionHeader = error.response?.headers?.['x-schedule-revision'];
@@ -864,478 +817,6 @@ function ItineraryDesigner() {
     };
   };
 
-  const triggerDownload = (blob, filename) => {
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const planningConflictReasonLabels = {
-    INVALID_TIME_SLOT: '时段不合法',
-    OUT_OF_RANGE: '超出可导入日期范围',
-    GROUP_TIME_CONFLICT: '同团组同日同时段冲突',
-    INACTIVE_LOCATION: '地点已停用',
-    GROUP_TYPE: '地点不适用于该团组类型',
-    INVALID_DATE: '日期无效',
-    BLOCKED_WEEKDAY: '地点在该星期不可用',
-    CLOSED_DATE: '地点在该日期闭馆',
-    OPEN_HOURS: '地点开放时段不覆盖该时段',
-    CAPACITY: '地点容量不足'
-  };
-
-  const planningManualRequiredReasons = new Set([
-    'GROUP_TIME_CONFLICT',
-    'CAPACITY',
-    'INACTIVE_LOCATION',
-    'GROUP_TYPE',
-    'BLOCKED_WEEKDAY',
-    'CLOSED_DATE',
-    'OPEN_HOURS',
-    'INVALID_TIME_SLOT',
-    'INVALID_DATE'
-  ]);
-
-  const getPlanningConflictReasonLabel = (reason) => (
-    planningConflictReasonLabels[reason] || reason || '未知冲突'
-  );
-
-  const planningConflictHandlingTips = {
-    INVALID_TIME_SLOT: '改成标准时段（上午/下午/晚上）后重试',
-    OUT_OF_RANGE: '调整导入范围或把活动日期改到范围内',
-    GROUP_TIME_CONFLICT: '同团组同一时段有重复，保留一条其余换时段',
-    INACTIVE_LOCATION: '地点停用，替换为可用地点',
-    GROUP_TYPE: '当前地点不匹配团组类型，改匹配地点',
-    INVALID_DATE: '修正为 YYYY-MM-DD 有效日期',
-    BLOCKED_WEEKDAY: '避开地点禁用星期或改地点',
-    CLOSED_DATE: '避开闭馆日或改地点',
-    OPEN_HOURS: '改为地点开放时段',
-    CAPACITY: '换到更大容量地点或错峰安排'
-  };
-
-  const getPlanningConflictHandlingTip = (reason) => (
-    planningConflictHandlingTips[reason] || '需人工核对后处理'
-  );
-
-  const isPlanningConflictManualRequired = (reason) => (
-    planningManualRequiredReasons.has(String(reason || '').trim())
-  );
-
-  const escapeCsvValue = (value) => {
-    const text = value === null || value === undefined ? '' : String(value);
-    if (/[",\r\n]/.test(text)) {
-      return `"${text.replace(/"/g, '""')}"`;
-    }
-    return text;
-  };
-
-  const parseCsvRows = (text) => {
-    const rows = [];
-    let row = [];
-    let cell = '';
-    let inQuotes = false;
-
-    for (let index = 0; index < text.length; index += 1) {
-      const char = text[index];
-      const nextChar = text[index + 1];
-
-      if (char === '"') {
-        if (inQuotes && nextChar === '"') {
-          cell += '"';
-          index += 1;
-        } else {
-          inQuotes = !inQuotes;
-        }
-        continue;
-      }
-
-      if (char === ',' && !inQuotes) {
-        row.push(cell);
-        cell = '';
-        continue;
-      }
-
-      if (char === '\n' && !inQuotes) {
-        row.push(cell);
-        if (row.some(item => String(item || '').trim() !== '')) {
-          rows.push(row);
-        }
-        row = [];
-        cell = '';
-        continue;
-      }
-
-      if (char !== '\r') {
-        cell += char;
-      }
-    }
-
-    row.push(cell);
-    if (row.some(item => String(item || '').trim() !== '')) {
-      rows.push(row);
-    }
-    return rows;
-  };
-
-  const normalizeCsvHeader = (value) => (
-    String(value || '')
-      .replace(/^\uFEFF/, '')
-      .trim()
-      .replace(/\s+/g, '')
-      .replace(/[_-]/g, '')
-      .toLowerCase()
-  );
-
-  const normalizeImportedTimeSlot = (value) => {
-    const normalized = String(value || '').trim().toUpperCase();
-    if (!normalized) return '';
-    if (normalized === '上午') return 'MORNING';
-    if (normalized === '下午') return 'AFTERNOON';
-    if (normalized === '晚上') return 'EVENING';
-    if (normalized === 'MORNING' || normalized === 'AFTERNOON' || normalized === 'EVENING') {
-      return normalized;
-    }
-    return '';
-  };
-
-  const maxDate = (left, right) => {
-    if (!left) return right;
-    if (!right) return left;
-    return left > right ? left : right;
-  };
-
-  const minDate = (left, right) => {
-    if (!left) return right;
-    if (!right) return left;
-    return left < right ? left : right;
-  };
-
-  const iterateDateStrings = (start, end) => {
-    if (!start || !end || !dayjs(start).isValid() || !dayjs(end).isValid()) return [];
-    const result = [];
-    let cursor = dayjs(start).startOf('day');
-    const limit = dayjs(end).startOf('day');
-    while (cursor.isBefore(limit, 'day') || cursor.isSame(limit, 'day')) {
-      result.push(cursor.format('YYYY-MM-DD'));
-      cursor = cursor.add(1, 'day');
-    }
-    return result;
-  };
-
-  const parseDelimitedList = (value) => (
-    String(value || '')
-      .split(/[,\uFF0C\u3001;|\uFF5C]/)
-      .map(item => item.trim())
-      .filter(Boolean)
-  );
-
-  const parseDelimitedIdList = (value) => (
-    parseDelimitedList(value)
-      .map(item => Number(item))
-      .filter(id => Number.isFinite(id) && id > 0)
-  );
-
-  const buildPlanningTemplateCsv = (payload, selectedGroupIds = []) => {
-    const locationsById = new Map((payload?.locations || []).map(location => [Number(location.id), location]));
-    const selectedSet = new Set(
-      (selectedGroupIds || [])
-        .map(id => Number(id))
-        .filter(Number.isFinite)
-    );
-    const mustVisitByGroup = payload?.must_visit_by_group && typeof payload.must_visit_by_group === 'object'
-      ? payload.must_visit_by_group
-      : {};
-    const planItemsByGroup = payload?.plan_items_by_group && typeof payload.plan_items_by_group === 'object'
-      ? payload.plan_items_by_group
-      : {};
-    const targetGroups = (payload?.groups || [])
-      .filter(group => selectedSet.size === 0 || selectedSet.has(Number(group.id)));
-
-    const slotKeys = Array.isArray(payload?.rules?.timeSlots) && payload.rules.timeSlots.length
-      ? payload.rules.timeSlots
-      : ['MORNING', 'AFTERNOON', 'EVENING'];
-    const slotLabels = {
-      MORNING: '上午',
-      AFTERNOON: '下午',
-      EVENING: '晚上'
-    };
-
-    const existingByKey = new Map();
-    (payload?.existing?.activities || []).forEach((activity) => {
-      const groupId = Number(activity.group_id ?? activity.groupId);
-      if (!Number.isFinite(groupId)) return;
-      const key = `${groupId}|${activity.activity_date}|${activity.time_slot}`;
-      if (!existingByKey.has(key)) {
-        existingByKey.set(key, activity);
-      }
-    });
-
-    const header = [
-      '团组ID',
-      '团组名称',
-      '日期',
-      '时段',
-      '地点ID',
-      '地点名称',
-      '预计人数',
-      '必去行程点ID列表',
-      '必去行程点名称列表',
-      '本行是否必去',
-      '备注'
-    ];
-    const lines = [header.map(escapeCsvValue).join(',')];
-
-    targetGroups.forEach((group) => {
-      const groupId = Number(group.id);
-      const groupStart = maxDate(payload?.range?.startDate, group.start_date);
-      const groupEnd = minDate(payload?.range?.endDate, group.end_date);
-      const groupDates = iterateDateStrings(groupStart, groupEnd);
-      const fallbackParticipants = (group.student_count || 0) + (group.teacher_count || 0);
-      const rawMustVisitItems = Array.isArray(mustVisitByGroup[String(groupId)])
-        ? mustVisitByGroup[String(groupId)]
-        : [];
-      const rawPlanItems = rawMustVisitItems.length > 0
-        ? rawMustVisitItems
-        : (Array.isArray(planItemsByGroup[String(groupId)])
-          ? planItemsByGroup[String(groupId)]
-          : []);
-      const requiredLocationIds = Array.from(new Set(
-        rawPlanItems
-          .map(item => Number(item?.location_id ?? item?.locationId))
-          .filter(id => Number.isFinite(id) && id > 0)
-      ));
-      const requiredLocationNameById = new Map();
-      rawPlanItems.forEach((item) => {
-        const id = Number(item?.location_id ?? item?.locationId);
-        if (!Number.isFinite(id) || id <= 0) return;
-        const name = String(item?.location_name ?? item?.locationName ?? '').trim();
-        if (name) requiredLocationNameById.set(id, name);
-      });
-      const requiredLocationNames = requiredLocationIds
-        .map(locationId => (
-          requiredLocationNameById.get(locationId)
-          || locationsById.get(locationId)?.name
-          || `#${locationId}`
-        ));
-      const requiredLocationSet = new Set(requiredLocationIds);
-      const requiredIdsText = requiredLocationIds.join('|');
-      const requiredNamesText = requiredLocationNames.join(' | ');
-
-      groupDates.forEach((date) => {
-        slotKeys.forEach((slotKey) => {
-          const existing = existingByKey.get(`${groupId}|${date}|${slotKey}`);
-          const locationId = Number(existing?.location_id);
-          const location = Number.isFinite(locationId) ? locationsById.get(locationId) : null;
-          const participants = Number(existing?.participant_count);
-          const isRequired = Number.isFinite(locationId) && requiredLocationSet.has(locationId) ? '是' : '';
-          const row = [
-            groupId,
-            group.name || '',
-            date,
-            slotLabels[slotKey] || slotKey,
-            Number.isFinite(locationId) ? locationId : '',
-            location?.name || '',
-            Number.isFinite(participants) && participants > 0 ? participants : fallbackParticipants,
-            requiredIdsText,
-            requiredNamesText,
-            isRequired,
-            ''
-          ];
-          lines.push(row.map(escapeCsvValue).join(','));
-        });
-      });
-    });
-
-    return `\uFEFF${lines.join('\r\n')}`;
-  };
-
-  const buildPlanningResultPayloadFromCsv = (text, fileName) => {
-    const rows = parseCsvRows(text || '');
-    if (rows.length < 2) {
-      throw new Error('CSV 内容为空');
-    }
-
-    const headers = rows[0].map(item => String(item || '').trim());
-    const normalizedHeaders = headers.map(normalizeCsvHeader);
-    const findColumn = (aliases) => normalizedHeaders.findIndex((column) => aliases.includes(column));
-    const readCell = (row, aliases) => {
-      const index = findColumn(aliases);
-      if (index < 0) return '';
-      return String(row[index] ?? '').trim();
-    };
-
-    const groupNameToId = new Map(
-      groups
-        .map(group => [String(group.name || '').trim(), Number(group.id)])
-        .filter(([name, id]) => name && Number.isFinite(id))
-    );
-    const groupIdToName = new Map(
-      groups.map(group => [Number(group.id), String(group.name || '').trim() || `#${group.id}`])
-    );
-    const locationNameToId = new Map(
-      locations
-        .map(location => [String(location.name || '').trim(), Number(location.id)])
-        .filter(([name, id]) => name && Number.isFinite(id))
-    );
-    const locationIdToName = new Map(
-      locations
-        .map(location => [Number(location.id), String(location.name || '').trim() || `#${location.id}`])
-        .filter(([id]) => Number.isFinite(id))
-    );
-    const groupSizeById = new Map(
-      groups.map(group => [Number(group.id), (group.student_count || 0) + (group.teacher_count || 0)])
-    );
-
-    const assignments = [];
-    const errors = [];
-    const requiredByGroup = new Map();
-    const requiredNameByGroup = new Map();
-
-    rows.slice(1).forEach((row, index) => {
-      const rowNo = index + 2;
-      const groupIdText = readCell(row, ['groupid', 'group_id', '团组id', '团组编号']);
-      const groupNameText = readCell(row, ['groupname', 'group_name', '团组名称']);
-      const dateText = readCell(row, ['date', 'activitydate', '日期']);
-      const slotText = readCell(row, ['timeslot', 'time_slot', '时段']);
-      const locationIdText = readCell(row, ['locationid', 'location_id', '地点id']);
-      const locationNameText = readCell(row, ['locationname', 'location_name', '地点名称', '行程点名称']);
-      const participantText = readCell(row, ['participantcount', 'participant_count', '预计人数', '人数']);
-      const requiredLocationIdsText = readCell(row, [
-        'requiredlocationids',
-        'required_location_ids',
-        'mustlocationids',
-        'must_location_ids',
-        '必去行程点id列表',
-        '必去地点id列表',
-        '必去行程点id',
-        '必去地点id'
-      ]);
-      const requiredLocationNamesText = readCell(row, [
-        'requiredlocationnames',
-        'required_location_names',
-        'mustlocationnames',
-        'must_location_names',
-        '必去行程点名称列表',
-        '必去地点名称列表',
-        '必去行程点名称',
-        '必去地点名称'
-      ]);
-      const notes = readCell(row, ['notes', 'note', '备注']);
-
-      if (!groupIdText && !groupNameText && !dateText && !slotText && !locationIdText && !locationNameText) {
-        return;
-      }
-
-      let groupId = Number(groupIdText);
-      if (!Number.isFinite(groupId) || groupId <= 0) {
-        groupId = groupNameToId.get(groupNameText) || NaN;
-      }
-      let locationId = Number(locationIdText);
-      if (!Number.isFinite(locationId) || locationId <= 0) {
-        locationId = locationNameToId.get(locationNameText) || NaN;
-      }
-      const timeSlot = normalizeImportedTimeSlot(slotText);
-      const participantCount = Number(participantText);
-
-      if (!Number.isFinite(groupId) || groupId <= 0) {
-        errors.push(`第${rowNo}行：团组无法识别`);
-        return;
-      }
-      const groupKey = Math.floor(groupId);
-      const requiredIds = parseDelimitedIdList(requiredLocationIdsText);
-      const requiredNames = parseDelimitedList(requiredLocationNamesText);
-      if (requiredIds.length > 0) {
-        let requiredSet = requiredByGroup.get(groupKey);
-        if (!requiredSet) {
-          requiredSet = new Set();
-          requiredByGroup.set(groupKey, requiredSet);
-        }
-        let requiredNameMap = requiredNameByGroup.get(groupKey);
-        if (!requiredNameMap) {
-          requiredNameMap = new Map();
-          requiredNameByGroup.set(groupKey, requiredNameMap);
-        }
-        requiredIds.forEach((id, idx) => {
-          requiredSet.add(id);
-          const name = requiredNames[idx] || locationIdToName.get(id) || `#${id}`;
-          requiredNameMap.set(id, name);
-        });
-      }
-      if (!dayjs(dateText).isValid()) {
-        errors.push(`第${rowNo}行：日期无效`);
-        return;
-      }
-      if (!timeSlot) {
-        errors.push(`第${rowNo}行：时段无效（需为上午/下午/晚上或 MORNING/AFTERNOON/EVENING）`);
-        return;
-      }
-      if (!Number.isFinite(locationId) || locationId <= 0) {
-        errors.push(`第${rowNo}行：地点无法识别`);
-        return;
-      }
-
-      assignments.push({
-        groupId: Math.floor(groupId),
-        date: dayjs(dateText).format('YYYY-MM-DD'),
-        timeSlot,
-        locationId: Math.floor(locationId),
-        participantCount: Number.isFinite(participantCount) && participantCount > 0
-          ? Math.floor(participantCount)
-          : (groupSizeById.get(Math.floor(groupId)) || null),
-        notes: notes || `csv:${fileName || 'import'}`
-      });
-    });
-
-    if (errors.length > 0) {
-      throw new Error(errors.slice(0, 5).join('；'));
-    }
-    if (!assignments.length) {
-      throw new Error('CSV 中没有可导入的有效记录');
-    }
-
-    const assignedLocationsByGroup = new Map();
-    assignments.forEach((item) => {
-      const groupKey = Number(item.groupId);
-      const locationId = Number(item.locationId);
-      if (!Number.isFinite(groupKey) || !Number.isFinite(locationId) || locationId <= 0) return;
-      let set = assignedLocationsByGroup.get(groupKey);
-      if (!set) {
-        set = new Set();
-        assignedLocationsByGroup.set(groupKey, set);
-      }
-      set.add(locationId);
-    });
-
-    const missingRequiredErrors = [];
-    requiredByGroup.forEach((requiredSet, groupId) => {
-      if (!requiredSet || requiredSet.size === 0) return;
-      const assignedSet = assignedLocationsByGroup.get(groupId) || new Set();
-      const nameMap = requiredNameByGroup.get(groupId) || new Map();
-      const missing = Array.from(requiredSet).filter(locationId => !assignedSet.has(locationId));
-      if (missing.length === 0) return;
-      const missingText = missing
-        .map(locationId => nameMap.get(locationId) || locationIdToName.get(locationId) || `#${locationId}`)
-        .join('、');
-      const groupName = groupIdToName.get(groupId) || `#${groupId}`;
-      missingRequiredErrors.push(`${groupName} 缺少必去行程点：${missingText}`);
-    });
-    if (missingRequiredErrors.length > 0) {
-      throw new Error(missingRequiredErrors.slice(0, 5).join('；'));
-    }
-
-    return {
-      schema: 'ec-planning-result@1',
-      snapshot_id: `csv-${Date.now()}`,
-      mode: 'replaceExisting',
-      assignments,
-      unassigned: []
-    };
-  };
-
   const handlePlanningExport = async () => {
     try {
       const values = await planningForm.validateFields();
@@ -1344,7 +825,9 @@ function ItineraryDesigner() {
       const payload = typeof response.data === 'string'
         ? JSON.parse(response.data)
         : response.data;
-      const snapshotId = String(payload?.snapshot_id || dayjs().toISOString()).replace(/[:.]/g, '-');
+      const snapshotId = String(
+        payload?.meta?.snapshotId || payload?.snapshot_id || dayjs().toISOString()
+      ).replace(/[:.]/g, '-');
       const filename = `planning_input_${snapshotId}.json`;
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       triggerDownload(blob, filename);
@@ -1393,33 +876,6 @@ function ItineraryDesigner() {
     }
   };
 
-  const extractPlanningAssignments = (payload) => (
-    payload && Array.isArray(payload.assignments) ? payload.assignments : []
-  );
-
-  const extractPlanningGroupIds = (payload) => {
-    const ids = extractPlanningAssignments(payload)
-      .map(item => Number(item?.groupId ?? item?.group_id))
-      .filter(Number.isFinite);
-    return Array.from(new Set(ids));
-  };
-
-  const extractPlanningRange = (payload) => {
-    if (!payload) return null;
-    const range = payload.range || {};
-    const start = range.startDate || range.start_date;
-    const end = range.endDate || range.end_date;
-    if (start && end) {
-      return { start, end };
-    }
-    const dates = extractPlanningAssignments(payload)
-      .map(item => item?.date)
-      .filter(Boolean)
-      .sort();
-    if (!dates.length) return null;
-    return { start: dates[0], end: dates[dates.length - 1] };
-  };
-
   const resetPlanningImportState = () => {
     setPlanningImportPayload(null);
     setPlanningImportFileList([]);
@@ -1449,7 +905,7 @@ function ItineraryDesigner() {
         const lowerName = String(file?.name || '').toLowerCase();
         const isCsv = lowerName.endsWith('.csv') || file?.type === 'text/csv';
         const parsed = isCsv
-          ? buildPlanningResultPayloadFromCsv(rawText, file?.name || '')
+          ? buildPlanningResultPayloadFromCsv(rawText, file?.name || '', { groups, locations })
           : JSON.parse(rawText);
         const payload = parsed?.payload && parsed.payload.schema ? parsed.payload : parsed;
         if (!payload || payload.schema !== 'ec-planning-result@1') {
@@ -1533,16 +989,6 @@ function ItineraryDesigner() {
       dryRun
     };
   };
-
-  const buildPlanningImportValidationKey = (payload, options) => JSON.stringify({
-    snapshot: payload?.snapshot_id || '',
-    assignments: extractPlanningAssignments(payload).length,
-    groupIds: (options.groupIds || []).map(id => Number(id)).filter(Number.isFinite).sort((a, b) => a - b),
-    replaceExisting: Boolean(options.replaceExisting),
-    skipConflicts: Boolean(options.skipConflicts),
-    startDate: options.startDate || '',
-    endDate: options.endDate || ''
-  });
 
   const runPlanningImport = async (dryRun) => {
     if (!planningImportPayload) {
@@ -1990,256 +1436,38 @@ function ItineraryDesigner() {
 
   // 时间轴网格
   const renderTimelineGrid = () => (
-    <div className="timeline-grid">
-      {/* 表头 */}
-      <div className="timeline-header">
-        <div className="time-label-cell">时间段</div>
-        {dateRange.map((date, index) => (
-          <div key={index} className="date-header-cell">
-            <div style={{ textAlign: 'center', display: 'flex', justifyContent: 'center', gap: '6px' }}>
-              <span style={{ fontWeight: 'bold' }}>
-                {dayjs(date).format('MM-DD')}
-              </span>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                {dayjs(date).format('ddd')}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* 表格主体 */}
-      {visibleTimeSlots.map(timeSlot => (
-        <div key={timeSlot.key} className="timeline-row">
-          <div
-            className="time-label-cell"
-            style={{
-              backgroundColor: timeSlot.color,
-              borderLeft: `3px solid ${timeSlot.borderColor}`
-            }}
-          >
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontWeight: 'bold' }}>{timeSlot.label}</div>
-              <div style={{ fontSize: '10px' }}>{timeSlot.time}</div>
-            </div>
-          </div>
-
-          {(() => {
-            const groupNamesForSlot = new Set();
-            if (alignGroupRows) {
-              dateRange.forEach((date) => {
-                const slotActivities = getActivitiesForSlot(date, timeSlot.key);
-                slotActivities.forEach((activity) => {
-                  const group = groups.find(g => g.id === activity.groupId);
-                  const groupName = getGroupDisplayName(group);
-                  groupNamesForSlot.add(groupName);
-                });
-                if (showUnscheduledGroups) {
-                  getActiveGroupsForDate(date).forEach((group) => {
-                    groupNamesForSlot.add(getGroupDisplayName(group));
-                  });
-                }
-              });
-            }
-            const orderedGroupNames = alignGroupRows
-              ? Array.from(groupNamesForSlot).sort((a, b) => a.localeCompare(b, 'zh'))
-              : [];
-            return dateRange.map((date, dateIndex) => {
-              const dateString = formatDateString(date);
-              const slotActivities = getActivitiesForSlot(date, timeSlot.key);
-              const groupedByName = slotActivities.reduce((acc, activity) => {
-                const group = groups.find(g => g.id === activity.groupId);
-                const groupName = getGroupDisplayName(group);
-                if (!acc.has(groupName)) {
-                  acc.set(groupName, []);
-                }
-                acc.get(groupName).push({ activity, group });
-                return acc;
-              }, new Map());
-              const activeGroupNames = showUnscheduledGroups
-                ? getActiveGroupNamesForDate(date)
-                : null;
-              if (showUnscheduledGroups) {
-                activeGroupNames.forEach((groupName) => {
-                  if (!groupedByName.has(groupName)) {
-                    groupedByName.set(groupName, []);
-                  }
-                });
-              }
-              const rowGroupNames = alignGroupRows
-                ? orderedGroupNames
-                : Array.from(groupedByName.keys()).sort((a, b) => a.localeCompare(b, 'zh'));
-              const slotConflictInfo = timelineSlotConflictMap.get(`${dateString}|${timeSlot.key}`) || null;
-              const hasSlotConflict = Boolean(slotConflictInfo?.conflicts?.length);
-
-              return (
-                <div
-                  key={`${timeSlot.key}-${dateIndex}`}
-                  className={`timeline-cell ${alignGroupRows ? 'aligned-rows' : ''} ${hasSlotConflict ? 'conflict conflict-hot' : ''}`}
-                  style={{ backgroundColor: hasSlotConflict ? 'rgba(120, 6, 26, 0.26)' : timeSlot.color }}
-                  onClick={() => handleCellClick(date, timeSlot.key, slotActivities, slotConflictInfo)}
-                  onDragOver={handleDragOver}
-                  onDragEnter={handleDragEnter}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, date, timeSlot.key)}
-                >
-                  {hasSlotConflict ? (
-                    <div className="cell-conflict-badge">
-                      冲突 {slotConflictInfo.conflicts.length}
-                    </div>
-                  ) : null}
-                  {rowGroupNames.length === 0 ? (
-                    <div className="empty-cell">
-                      <PlusOutlined style={{ color: 'var(--text-muted)' }} />
-                      <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>点击添加</div>
-                    </div>
-                  ) : (
-                    <div className={`activity-summary grouped ${alignGroupRows ? "aligned" : "compact"}`}>
-                      {rowGroupNames.map((groupName) => {
-                        const items = groupedByName.get(groupName) || [];
-                        const fallbackGroup = showUnscheduledGroups
-                          ? getActiveGroupsForDate(date).find(group => getGroupDisplayName(group) === groupName)
-                          : null;
-                        const groupForRow = items[0]?.group || fallbackGroup || null;
-                        const isActiveGroup = showUnscheduledGroups
-                          ? activeGroupNames?.has(groupName)
-                          : items.length > 0;
-                        const showPlaceholder = showUnscheduledGroups && isActiveGroup && items.length === 0;
-                        const showArrivalMarker = showPlaceholder && isGroupArrivalDay(groupForRow, dateString);
-                        const showDepartureMarker = showPlaceholder && isGroupDepartureDay(groupForRow, dateString);
-                        const rowClassName = [
-                          'activity-group-row',
-                          items.length === 0 ? 'empty' : '',
-                          showPlaceholder ? 'unscheduled' : '',
-                          showUnscheduledGroups && !isActiveGroup ? 'inactive' : ''
-                        ]
-                          .filter(Boolean)
-                          .join(' ');
-                        return (
-                          <div
-                            key={groupName}
-                            className={rowClassName}
-                          >
-                            {items.map(({ activity, group }) => {
-                              const isCompact = items.length > 1;
-                              const location = locations.find(l => l.id === activity.locationId);
-                              const isSelected = selectedActivities.includes(activity.id);
-
-                              return (
-                                <div
-                                  key={activity.id}
-                                  draggable
-                                  onDragStart={(e) => handleDragStart(e, activity)}
-                                  onDragEnd={handleDragEnd}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (batchMode) {
-                                      if (isSelected) {
-                                        setSelectedActivities(prev => prev.filter(id => id !== activity.id));
-                                      } else {
-                                        setSelectedActivities(prev => [...prev, activity.id]);
-                                      }
-                                    } else {
-                                      openGroupCalendar(activity.groupId);
-                                    }
-                                  }}
-                                  style={{
-                                    opacity: batchMode && !isSelected ? 0.6 : 1,
-                                    outline: isSelected ? '2px solid #1890ff' : 'none',
-                                    borderRadius: '4px'
-                                  }}
-                                  title={`${group?.name}${location ? ` - ${location.name}` : ''} (${activity.participantCount}人)`}
-                                >
-                                  {renderActivityCard(activity, group, location, isCompact)}
-                                </div>
-                              );
-                            })}
-                            {showPlaceholder && (
-                              <div
-                                className="unscheduled-card"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  if (groupForRow?.id) {
-                                    openGroupCalendar(groupForRow.id);
-                                  }
-                                }}
-                              >
-                                {(showArrivalMarker || showDepartureMarker) && (
-                                  <div className="unscheduled-day-marker">
-                                    {showArrivalMarker && (
-                                      <span className="activity-day-marker-dot arrival" />
-                                    )}
-                                    {showDepartureMarker && (
-                                      <span className="activity-day-marker-dot departure" />
-                                    )}
-                                  </div>
-                                )}
-                                {groupName}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            });
-          })()}
-        </div>
-      ))}
-
-      {showDailyFocus && (
-        <div
-          className="daily-focus-row"
-          style={{ gridTemplateColumns: `100px repeat(${dateRange.length}, minmax(0, 1fr))` }}
-        >
-          <div className="daily-focus-label-cell">
-            <div className="daily-focus-title">每日关注</div>
-          </div>
-          {dateRange.map((date) => {
-            const dateString = formatDateString(date);
-            const arrivals = getArrivalsForDate(dateString);
-            const departures = getDeparturesForDate(dateString);
-
-            return (
-              <div key={dateString} className="daily-focus-cell">
-                <div className="daily-focus-section">
-                  <div className="daily-focus-item">
-                    {arrivals.length
-                      ? arrivals.map(group => `${group.name}团组抵达`).join('，')
-                      : '暂无团组抵达'}
-                  </div>
-                  <div className="daily-focus-item">
-                    {departures.length
-                      ? departures.map(group => `${group.name}团组结束`).join('，')
-                      : '暂无团组结束'}
-                  </div>
-                </div>
-
-                {visibleTimeSlots.map((slot) => {
-                  const totals = getLocationTotalsForDate(dateString, slot.key);
-                  return (
-                    <div key={`${dateString}-${slot.key}`} className="daily-focus-section">
-                      <div className="daily-focus-section-title">{slot.label}</div>
-                      {totals.length ? (
-                        totals.map(item => (
-                          <div key={`${item.locationId}-${slot.key}`} className="daily-focus-item">
-                            {item.name} {item.total}人
-                          </div>
-                        ))
-                      ) : (
-                        <div className="daily-focus-item">暂无安排</div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    <TimelineGrid
+      dateRange={dateRange}
+      visibleTimeSlots={visibleTimeSlots}
+      alignGroupRows={alignGroupRows}
+      showUnscheduledGroups={showUnscheduledGroups}
+      showDailyFocus={showDailyFocus}
+      groups={groups}
+      locations={locations}
+      timelineSlotConflictMap={timelineSlotConflictMap}
+      selectedActivities={selectedActivities}
+      batchMode={batchMode}
+      formatDateString={formatDateString}
+      getActivitiesForSlot={getActivitiesForSlot}
+      getGroupDisplayName={getGroupDisplayName}
+      getActiveGroupsForDate={getActiveGroupsForDate}
+      getActiveGroupNamesForDate={getActiveGroupNamesForDate}
+      isGroupArrivalDay={isGroupArrivalDay}
+      isGroupDepartureDay={isGroupDepartureDay}
+      getArrivalsForDate={getArrivalsForDate}
+      getDeparturesForDate={getDeparturesForDate}
+      getLocationTotalsForDate={getLocationTotalsForDate}
+      handleCellClick={handleCellClick}
+      handleDragOver={handleDragOver}
+      handleDragEnter={handleDragEnter}
+      handleDragLeave={handleDragLeave}
+      handleDrop={handleDrop}
+      handleDragStart={handleDragStart}
+      handleDragEnd={handleDragEnd}
+      openGroupCalendar={openGroupCalendar}
+      setSelectedActivities={setSelectedActivities}
+      renderActivityCard={renderActivityCard}
+    />
   );
 
   // 渲染活动卡片 - 根据不同样式
@@ -2723,6 +1951,23 @@ function ItineraryDesigner() {
     return conflicts;
   };
 
+  const getLocationUnavailableReason = (location, dateString) => {
+    if (!location) return null;
+    if (Number(location.is_active) === 0) {
+      return `${location.name || '该地点'}已停用，不能拖入`;
+    }
+    const weekday = dayjs(dateString).day();
+    const blockedWeekdays = parseDelimitedValues(location.blocked_weekdays);
+    if (blockedWeekdays.includes(String(weekday))) {
+      return `${location.name || '该地点'}在该日期不可用，不能拖入`;
+    }
+    const closedDates = new Set(parseDelimitedValues(location.closed_dates));
+    if (closedDates.has(dateString)) {
+      return `${location.name || '该地点'}在${dateString}闭馆，不能拖入`;
+    }
+    return null;
+  };
+
   // 放置
   const handleDrop = async (e, targetDate, targetTimeSlot) => {
     e.preventDefault();
@@ -2733,6 +1978,17 @@ function ItineraryDesigner() {
     if (!draggedActivity) return;
 
     const targetDateString = formatDateString(targetDate);
+    const targetGroup = groups.find(group => group.id === draggedActivity.groupId);
+    if (!isDateWithinGroupRange(targetGroup, targetDateString)) {
+      message.warning('不能拖入团组行程区间外的日期');
+      return;
+    }
+    const targetLocation = locations.find(location => location.id === draggedActivity.locationId);
+    const locationUnavailableReason = getLocationUnavailableReason(targetLocation, targetDateString);
+    if (locationUnavailableReason) {
+      message.warning(locationUnavailableReason);
+      return;
+    }
 
     // 检查是否移动到相同位置
     if (draggedActivity.date === targetDateString && draggedActivity.timeSlot === targetTimeSlot) {
@@ -2748,7 +2004,186 @@ function ItineraryDesigner() {
 
       message.success('活动时间调整成功');
     } catch (error) {
-      message.error('调整活动时间失败');
+      const errorMessage = error?.response?.data?.conflicts?.[0]?.message
+        || error?.response?.data?.error
+        || '调整活动时间失败';
+      message.error(errorMessage);
+    }
+  };
+
+  const GROUP_CONSOLE_DRAG_TYPE = 'application/x-ec-group-console';
+
+  const readGroupConsoleDragPayload = (event) => {
+    if (event?.dataTransfer) {
+      const encoded = event.dataTransfer.getData(GROUP_CONSOLE_DRAG_TYPE);
+      if (encoded) {
+        try {
+          const parsed = JSON.parse(encoded);
+          if (parsed && typeof parsed === 'object') {
+            return parsed;
+          }
+        } catch (error) {
+          // ignore parse error and fallback to in-memory payload
+        }
+      }
+    }
+    return groupConsoleDragPayload;
+  };
+
+  const handleGroupConsoleCardDragStart = (event, payload) => {
+    if (!payload || typeof payload !== 'object') return;
+    setGroupConsoleDragPayload(payload);
+    if (event?.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', String(payload.locationName || payload.locationId || ''));
+      event.dataTransfer.setData(GROUP_CONSOLE_DRAG_TYPE, JSON.stringify(payload));
+    }
+  };
+
+  const handleGroupConsoleCardDragEnd = () => {
+    setGroupConsoleDragPayload(null);
+    setGroupConsoleDropTarget(null);
+  };
+
+  const handleGroupConsoleCellDragOver = (event, inactive) => {
+    if (inactive) return;
+    event.preventDefault();
+    if (event?.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+  };
+
+  const handleGroupConsoleCellDragEnter = (event, dateString, slotKey, inactive) => {
+    if (inactive) return;
+    event.preventDefault();
+    setGroupConsoleDropTarget({ date: dateString, slotKey });
+  };
+
+  const handleGroupConsoleCellDragLeave = (event, dateString, slotKey) => {
+    const relatedTarget = event.relatedTarget;
+    if (relatedTarget && event.currentTarget.contains(relatedTarget)) {
+      return;
+    }
+    setGroupConsoleDropTarget((prev) => (
+      prev && prev.date === dateString && prev.slotKey === slotKey ? null : prev
+    ));
+  };
+
+  const handleGroupConsoleRemoveActivity = async (activityId) => {
+    if (!activityId) return;
+    try {
+      await api.delete(`/activities/${activityId}`);
+      setActivities(prev => prev.filter(item => item.id !== activityId));
+      message.success('安排已移除');
+      refreshData();
+    } catch (error) {
+      message.error(getRequestErrorMessage(error, '移除安排失败'));
+    }
+  };
+
+  const handleGroupConsoleClearSlot = (slotKey) => {
+    if (!groupCalendarGroup) return;
+    const slotActivities = groupCalendarActivities.filter((activity) => activity.timeSlot === slotKey);
+    if (!slotActivities.length) {
+      message.info(`${getTimeSlotLabel(slotKey)}暂无可清空安排`);
+      return;
+    }
+    Modal.confirm({
+      title: `清空${getTimeSlotLabel(slotKey)}安排？`,
+      content: `将删除 ${slotActivities.length} 条活动，其他时段保持不变。`,
+      okText: '确认清空',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await Promise.all(slotActivities.map((activity) => api.delete(`/activities/${activity.id}`)));
+          const deleteIds = new Set(slotActivities.map(activity => activity.id));
+          setActivities(prev => prev.filter(activity => !deleteIds.has(activity.id)));
+          message.success(`${getTimeSlotLabel(slotKey)}已清空`);
+          refreshData();
+        } catch (error) {
+          message.error(getRequestErrorMessage(error, '清空失败'));
+        }
+      }
+    });
+  };
+
+  const handleGroupConsoleDrop = async (event, targetDate, slotKey, inactive) => {
+    event.preventDefault();
+    setGroupConsoleDropTarget(null);
+    if (inactive || !groupCalendarGroup) return;
+    const payload = readGroupConsoleDragPayload(event);
+    setGroupConsoleDragPayload(null);
+    if (!payload) return;
+
+    const targetDateString = formatDateString(targetDate);
+    if (!targetDateString) return;
+    if (!isDateWithinGroupRange(groupCalendarGroup, targetDateString)) {
+      message.warning('不能拖入团组行程区间外的日期');
+      return;
+    }
+
+    const locationId = Number(payload.locationId);
+    if (!Number.isFinite(locationId) || locationId <= 0) {
+      message.warning('该卡片缺少地点，无法安排');
+      return;
+    }
+
+    const targetLocation = locations.find(location => Number(location.id) === locationId);
+    const locationUnavailableReason = getLocationUnavailableReason(targetLocation, targetDateString);
+    if (locationUnavailableReason) {
+      message.warning(locationUnavailableReason);
+      return;
+    }
+
+    const fallbackAssignments = groupConsoleMustVisitActivityMap.get(locationId) || [];
+    let movingActivity = null;
+    const payloadActivityId = Number(payload.activityId);
+    if (Number.isFinite(payloadActivityId)) {
+      movingActivity = groupCalendarActivities.find(activity => Number(activity.id) === payloadActivityId) || null;
+    }
+    if (!movingActivity && fallbackAssignments.length > 0) {
+      movingActivity = fallbackAssignments[0];
+    }
+
+    try {
+      if (movingActivity) {
+        const samePosition = (
+          movingActivity.date === targetDateString
+          && movingActivity.timeSlot === slotKey
+          && Number(movingActivity.locationId) === locationId
+        );
+        if (samePosition) {
+          return;
+        }
+        await handleUpdateActivity(movingActivity.id, {
+          date: targetDateString,
+          timeSlot: slotKey,
+          locationId,
+          ignoreConflicts: true
+        });
+        if (fallbackAssignments.length > 1) {
+          message.warning(`${targetLocation?.name || `#${locationId}`} 存在重复安排，请手动清理其余 ${fallbackAssignments.length - 1} 条`);
+        }
+        return;
+      }
+
+      const participantCount = (
+        Number(groupCalendarGroup.student_count || 0)
+        + Number(groupCalendarGroup.teacher_count || 0)
+      ) || 1;
+      const response = await api.post('/activities', {
+        groupId: groupCalendarGroup.id,
+        locationId,
+        date: targetDateString,
+        timeSlot: slotKey,
+        participantCount
+      });
+      setActivities(prev => [...prev, response.data]);
+      message.success('必去行程点已安排');
+      refreshData();
+    } catch (error) {
+      message.error(getRequestErrorMessage(error, '安排失败'));
     }
   };
 
@@ -2892,12 +2327,61 @@ function ItineraryDesigner() {
       groupCalendarIndex.get(key).push(activity);
     });
   }
-  const groupCalendarLocationMap = new Map(locations.map(location => [location.id, location]));
-  const groupConsoleTags = normalizeGroupTags(groupCalendarGroup?.tags);
-  const groupConsoleAccommodation = groupCalendarGroup?.accommodation || '';
-  const groupConsoleMemberCount = groupCalendarGroup
-    ? (groupCalendarGroup.student_count || 0) + (groupCalendarGroup.teacher_count || 0)
-    : 0;
+  const groupCalendarLocationMap = new Map(locations.map(location => [Number(location.id), location]));
+  const groupCalendarSlotOrder = {
+    MORNING: 0,
+    AFTERNOON: 1
+  };
+  const groupConsoleManualMustVisitIds = normalizeManualMustVisitLocationIds(
+    groupCalendarGroup?.manual_must_visit_location_ids
+  );
+  const groupConsoleFallbackMode = groupConsoleManualMustVisitIds.length > 0 ? 'manual' : 'plan';
+  const groupConsoleMustVisitMode = normalizeMustVisitMode(
+    groupCalendarGroup?.must_visit_mode,
+    groupConsoleFallbackMode
+  );
+  const groupConsoleActivePlan = Number.isFinite(Number(groupCalendarGroup?.itinerary_plan_id))
+    ? itineraryPlanById.get(Number(groupCalendarGroup.itinerary_plan_id)) || null
+    : null;
+  const groupConsolePlanMustVisitIds = extractPlanLocationIds(groupConsoleActivePlan?.items || []);
+  const groupConsoleMustVisitIds = Array.from(new Set(
+    (groupConsoleMustVisitMode === 'manual'
+      ? groupConsoleManualMustVisitIds
+      : groupConsolePlanMustVisitIds)
+      .map(id => Number(id))
+      .filter(id => Number.isFinite(id) && id > 0)
+  ));
+  const groupConsoleMustVisitIdSet = new Set(groupConsoleMustVisitIds);
+  const groupConsoleMustVisitActivityMap = new Map();
+  groupCalendarActivities.forEach((activity) => {
+    if (!groupCalendarSlotKeys.includes(activity.timeSlot)) return;
+    const locationId = Number(activity.locationId);
+    if (!Number.isFinite(locationId) || !groupConsoleMustVisitIdSet.has(locationId)) return;
+    if (!groupConsoleMustVisitActivityMap.has(locationId)) {
+      groupConsoleMustVisitActivityMap.set(locationId, []);
+    }
+    groupConsoleMustVisitActivityMap.get(locationId).push(activity);
+  });
+  groupConsoleMustVisitActivityMap.forEach((items) => {
+    items.sort((left, right) => {
+      if (left.date !== right.date) return String(left.date).localeCompare(String(right.date), 'zh-CN');
+      return (groupCalendarSlotOrder[left.timeSlot] ?? 99) - (groupCalendarSlotOrder[right.timeSlot] ?? 99);
+    });
+  });
+  const groupConsoleMustVisitCards = groupConsoleMustVisitIds.map((locationId) => {
+    const location = groupCalendarLocationMap.get(locationId);
+    const assignedActivities = groupConsoleMustVisitActivityMap.get(locationId) || [];
+    return {
+      locationId,
+      locationName: location?.name || `#${locationId}`,
+      assignedActivity: assignedActivities[0] || null,
+      duplicateCount: Math.max(0, assignedActivities.length - 1)
+    };
+  });
+  const groupConsoleUnassignedMustVisitCards = groupConsoleMustVisitCards.filter(
+    (card) => !card.assignedActivity
+  );
+  const groupConsoleAssignedMustVisitCount = groupConsoleMustVisitCards.length - groupConsoleUnassignedMustVisitCards.length;
   const groupConsoleTypeLabel = groupCalendarGroup?.type === 'primary'
     ? '小学'
     : groupCalendarGroup?.type === 'secondary'
@@ -2908,27 +2392,32 @@ function ItineraryDesigner() {
     label: getTimeSlotLabel(slotKey),
     cells: groupConsoleDates.map((date) => {
       const dateString = formatDateString(date);
-      if (!groupCalendarGroup || !isGroupActiveOnDate(groupCalendarGroup, date)) {
-        return { label: '—', status: 'inactive', extra: 0 };
-      }
-      const items = groupCalendarIndex.get(`${dateString}|${slotKey}`) || [];
-      if (!items.length) {
-        return { label: '空档', status: 'empty', extra: 0 };
-      }
-      const locationNames = items.map((activity) => (
-        groupCalendarLocationMap.get(activity.locationId)?.name
-          || (activity?.notes ? String(activity.notes) : '')
-          || '未设置场地'
-      ));
+      const inactive = !groupCalendarGroup || !isGroupActiveOnDate(groupCalendarGroup, date);
+      const items = (groupCalendarIndex.get(`${dateString}|${slotKey}`) || [])
+        .slice()
+        .sort((left, right) => Number(left.id) - Number(right.id))
+        .map((activity) => {
+          const locationId = Number(activity.locationId);
+          const location = groupCalendarLocationMap.get(locationId);
+          const locationName = location?.name
+            || (activity?.notes ? String(activity.notes) : '')
+            || '未设置场地';
+          return {
+            ...activity,
+            locationId,
+            locationName,
+            isMustVisit: Number.isFinite(locationId) && groupConsoleMustVisitIdSet.has(locationId)
+          };
+        });
       return {
-        label: locationNames[0],
-        status: 'filled',
-        extra: Math.max(0, locationNames.length - 1)
+        key: `${dateString}|${slotKey}`,
+        date,
+        dateString,
+        inactive,
+        activities: items
       };
     })
   }));
-  const morningSlot = groupConsoleSchedule.find(slot => slot.key === 'MORNING');
-  const afternoonSlot = groupConsoleSchedule.find(slot => slot.key === 'AFTERNOON');
   if (loading && groups.length === 0 && activities.length === 0) {
     return <ItineraryDesignerSkeleton />;
   }
@@ -2970,141 +2459,34 @@ function ItineraryDesigner() {
         {renderGroupPanel(false)}
       </Drawer>
 
-      <Drawer
-        title={null}
-        placement="bottom"
+      <GroupConsoleDrawer
         open={groupCalendarVisible}
         onClose={() => setGroupCalendarVisible(false)}
-        height={`${groupCalendarHeight}vh`}
-        mask={false}
-        closable={false}
-        bodyStyle={{ padding: 0, height: '100%' }}
-        rootClassName={`group-calendar-drawer${groupCalendarResizing ? ' resizing' : ''}`}
+        heightVh={groupCalendarHeight}
+        resizing={groupCalendarResizing}
+        onResizeStart={handleGroupCalendarResizeStart}
         getContainer={getDesignerContainer}
-      >
-        <div
-          className="group-calendar-resize-handle"
-          onMouseDown={handleGroupCalendarResizeStart}
-          onTouchStart={handleGroupCalendarResizeStart}
-        />
-        {groupCalendarGroup ? (
-          <div className="group-console">
-            <div className="group-console-header">
-              <div className="group-console-title">
-                <span className="group-console-label">团组详情</span>
-                <span className="group-color-dot" style={{ backgroundColor: groupCalendarGroup.color }} />
-                <span className="group-console-name-link">
-                  {groupCalendarGroup.name}
-                </span>
-                <span className="group-console-type">{groupConsoleTypeLabel}</span>
-                <span className="group-console-date">
-                  {dayjs(groupCalendarGroup.start_date).format('YYYY-MM-DD')} ~ {dayjs(groupCalendarGroup.end_date).format('YYYY-MM-DD')}
-                </span>
-              </div>
-              <div className="group-console-actions">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<CloseOutlined />}
-                  onClick={() => setGroupCalendarVisible(false)}
-                />
-              </div>
-            </div>
-            
-            <div className="group-console-body">
-              <div className="group-console-info">
-                <div className="console-info-card">
-                  <div className="console-section-title">团组信息</div>
-                  <div className="console-info-list">
-                    <div className="console-info-row">
-                      <span className="console-info-label">团期</span>
-                      <span className="console-info-value">
-                        {dayjs(groupCalendarGroup.start_date).format('YYYY-MM-DD')} ~ {dayjs(groupCalendarGroup.end_date).format('YYYY-MM-DD')}
-                      </span>
-                    </div>
-                    <div className="console-info-row">
-                      <span className="console-info-label">人数</span>
-                      <span className="console-info-value">
-                        {(groupCalendarGroup.student_count || 0)} 学生 / {(groupCalendarGroup.teacher_count || 0)} 教师 / {groupConsoleMemberCount} 人
-                      </span>
-                    </div>
-                    <div className="console-info-row">
-                      <span className="console-info-label">类型</span>
-                      <span className="console-info-value">{groupConsoleTypeLabel}</span>
-                    </div>
-                    <div className="console-info-row">
-                      <span className="console-info-label">住宿安排</span>
-                      <span className="console-info-value">
-                        {groupConsoleAccommodation || '—'}
-                      </span>
-                    </div>
-                    <div className="console-info-row console-info-tags-row">
-                      <span className="console-info-label">备注标签</span>
-                      <span className="console-info-value">
-                        {groupConsoleTags.length ? (
-                          <span className="console-info-tags">
-                            {groupConsoleTags.slice(0, 4).map((tag) => (
-                              <span key={tag} className="console-tag">{tag}</span>
-                            ))}
-                            {groupConsoleTags.length > 4 && (
-                              <span className="console-tag console-tag-muted">+{groupConsoleTags.length - 4}</span>
-                            )}
-                          </span>
-                        ) : (
-                          '—'
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="console-schedule-card">
-                  <div className="console-section-title">行程摘要（上午 / 下午）</div>
-                  <div className="console-schedule-strip">
-                    {groupConsoleDates.map((date, index) => {
-                      const morningCell = morningSlot?.cells[index] || { label: '—', status: 'inactive', extra: 0 };
-                      const afternoonCell = afternoonSlot?.cells[index] || { label: '—', status: 'inactive', extra: 0 };
-                      return (
-                        <div key={formatDateString(date)} className="schedule-day-card">
-                          <div className="schedule-day-header">
-                            <span className="schedule-day-date">{dayjs(date).format('MM/DD')}</span>
-                            <span className="schedule-day-week">{dayjs(date).format('ddd')}</span>
-                          </div>
-                          <div className={`schedule-day-slot ${morningCell.status}`}>
-                            <span className="slot-label">上午</span>
-                            <span className="slot-value">{morningCell.label}</span>
-                            {morningCell.extra > 0 && (
-                              <span className="slot-extra">+{morningCell.extra}</span>
-                            )}
-                          </div>
-                          <div className={`schedule-day-slot ${afternoonCell.status}`}>
-                            <span className="slot-label">下午</span>
-                            <span className="slot-value">{afternoonCell.label}</span>
-                            {afternoonCell.extra > 0 && (
-                              <span className="slot-extra">+{afternoonCell.extra}</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="console-info-actions" />
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="group-calendar-empty-state">
-            <div>{'\u8bf7\u9009\u62e9\u884c\u7a0b\u5361\u7247'}</div>
-            <Button
-              type="text"
-              size="small"
-              icon={<CloseOutlined />}
-              onClick={() => setGroupCalendarVisible(false)}
-            />
-          </div>
-        )}
-      </Drawer>
+        group={groupCalendarGroup}
+        groupConsoleTypeLabel={groupConsoleTypeLabel}
+        groupConsoleUnassignedMustVisitCards={groupConsoleUnassignedMustVisitCards}
+        groupConsoleMustVisitCards={groupConsoleMustVisitCards}
+        groupConsoleMustVisitMode={groupConsoleMustVisitMode}
+        groupConsoleActivePlan={groupConsoleActivePlan}
+        groupConsoleAssignedMustVisitCount={groupConsoleAssignedMustVisitCount}
+        groupConsoleDates={groupConsoleDates}
+        groupConsoleSchedule={groupConsoleSchedule}
+        groupConsoleDropTarget={groupConsoleDropTarget}
+        formatDateString={formatDateString}
+        onCardDragStart={handleGroupConsoleCardDragStart}
+        onCardDragEnd={handleGroupConsoleCardDragEnd}
+        onClearSlot={handleGroupConsoleClearSlot}
+        onOpenCalendarDetail={() => openGroupCalendarDetail(groupCalendarGroup.id)}
+        onCellDragOver={handleGroupConsoleCellDragOver}
+        onCellDragEnter={handleGroupConsoleCellDragEnter}
+        onCellDragLeave={handleGroupConsoleCellDragLeave}
+        onDrop={handleGroupConsoleDrop}
+        onRemoveActivity={handleGroupConsoleRemoveActivity}
+      />
 
       <Modal
         open={groupCalendarDetailVisible}
@@ -3160,6 +2542,7 @@ function ItineraryDesigner() {
               groupData={groupCalendarDetailGroup}
               schedules={groupCalendarDetailSchedules}
               onUpdate={handleGroupCalendarDetailUpdate}
+              onPushedToDesigner={() => refreshActivitiesOnly()}
               showResources={groupCalendarDetailResourcesVisible}
               resourceWidth="25%"
               loading={groupCalendarDetailLoading}
@@ -3168,69 +2551,15 @@ function ItineraryDesigner() {
         </div>
       </Modal>
 
-      <Modal
-        title={`时段冲突详情 - ${selectedSlotConflict?.date || ''} ${selectedSlotConflict?.timeSlot ? getTimeSlotLabel(selectedSlotConflict.timeSlot) : ''}`}
-        open={Boolean(selectedSlotConflict)}
-        onCancel={() => setSelectedSlotConflict(null)}
-        width={760}
-        wrapClassName="itinerary-modal-wrap"
+      <SlotConflictModal
+        conflictInfo={selectedSlotConflict}
+        onClose={() => setSelectedSlotConflict(null)}
         getContainer={getDesignerContainer}
-        styles={overlayStyles}
-        footer={[
-          <Button key="close" onClick={() => setSelectedSlotConflict(null)}>
-            关闭
-          </Button>,
-          <Button
-            key="edit"
-            type="primary"
-            onClick={handleOpenEditFromConflict}
-            disabled={!selectedTimeSlot}
-          >
-            继续编辑该时段
-          </Button>
-        ]}
-      >
-        <div
-          style={{
-            marginBottom: 12,
-            padding: '10px 12px',
-            borderRadius: 8,
-            border: '1px solid #ffccc7',
-            background: '#fff1f0',
-            color: '#7a0014'
-          }}
-        >
-          当前时段检测到 {selectedSlotConflict?.conflicts?.length || 0} 项冲突，请先处理冲突再做排程调整。
-        </div>
-        <div style={{ maxHeight: 420, overflow: 'auto', display: 'grid', gap: 10 }}>
-          {(selectedSlotConflict?.conflicts || []).map((conflict, index) => (
-            <div
-              key={`${conflict.type || 'conflict'}-${conflict.groupId || 'g'}-${conflict.locationId || 'l'}-${index}`}
-              style={{
-                border: '1px solid #ffd8bf',
-                borderRadius: 8,
-                padding: '10px 12px',
-                background: '#fff7e6'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
-                <strong style={{ color: '#d46b08' }}>
-                  {getPlanningConflictReasonLabel(conflict.type)}
-                </strong>
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-                  {conflict.groupName || '未指定团组'}
-                </span>
-              </div>
-              <div style={{ fontSize: 13, color: '#262626', marginBottom: 6 }}>
-                {conflict.message}
-              </div>
-              <div style={{ fontSize: 12, color: '#595959' }}>
-                建议处理: {getPlanningConflictHandlingTip(conflict.type)}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Modal>
+        overlayStyles={overlayStyles}
+        getTimeSlotLabel={getTimeSlotLabel}
+        onOpenEdit={handleOpenEditFromConflict}
+        canOpenEdit={Boolean(selectedTimeSlot)}
+      />
 
       {/* 详情编辑弹窗 */}
       <Modal
@@ -3388,359 +2717,66 @@ function ItineraryDesigner() {
 
       
       
-      <Modal
-        title="导入排程结果(JSON/CSV)"
+      <PlanningImportModal
         open={planningImportVisible}
-        onCancel={() => setPlanningImportVisible(false)}
-        wrapClassName="itinerary-modal-wrap"
+        onClose={() => setPlanningImportVisible(false)}
         getContainer={getDesignerContainer}
-        styles={overlayStyles}
-        footer={[
-          <Button key="cancel" onClick={() => setPlanningImportVisible(false)}>
-            取消
-          </Button>,
-          <Button
-            key="rollback"
-            danger
-            onClick={handlePlanningImportRollback}
-            loading={planningImportRollbackLoading}
-            disabled={!planningImportSnapshotToken}
-          >
-            回滚最近导入
-          </Button>,
-          <Button
-            key="validate"
-            onClick={handlePlanningImportValidate}
-            loading={planningImportValidating}
-            disabled={!planningImportPayload}
-          >
-            校验
-          </Button>,
-          <Button
-            key="import"
-            type="primary"
-            onClick={handlePlanningImportApply}
-            loading={planningImportLoading}
-            disabled={!planningImportPayload || !planningImportValidatedKey}
-          >
-            导入
-          </Button>
-        ]}
-        destroyOnClose
-      >
-        <Upload.Dragger
-          accept=".json,.csv,application/json,text/csv"
-          multiple={false}
-          fileList={planningImportFileList}
-          beforeUpload={handlePlanningImportFile}
-          onRemove={handlePlanningImportRemove}
-        >
-          <p className="ant-upload-drag-icon">
-            <InboxOutlined />
-          </p>
-          <p className="ant-upload-text">点击或拖拽上传 planning_result.json / CSV 模板</p>
-          <p className="ant-upload-hint">支持 JSON（标准格式）和 CSV（人工可读格式）</p>
-        </Upload.Dragger>
-
-        {planningImportPayload ? (
-          <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
-            {planningImportFile ? (
-              <div>
-                {`文件: ${planningImportFile.name} (${(planningImportFile.size / 1024).toFixed(1)} KB)`}
-              </div>
-            ) : null}
-            <div>{`schema: ${planningImportPayload.schema}`}</div>
-            <div>{`mode: ${planningImportPayload.mode || '-'}`}</div>
-            <div>
-              {`range: ${planningImportRange ? `${planningImportRange.start} ~ ${planningImportRange.end}` : '-'}`}
-            </div>
-            <div>{`assignments: ${planningImportAssignmentsCount}`}</div>
-            <div>{`groups in file: ${planningImportPayloadGroupIds.length}`}</div>
-          </div>
-        ) : null}
-
-        <Form
-          form={planningImportForm}
-          layout="vertical"
-          onValuesChange={() => {
-            setPlanningImportValidatedKey('');
-          }}
-          initialValues={{
-            replaceExisting: false,
-            skipConflicts: true,
-            onlySelectedGroups: true,
-            groupIds: [],
-            importDateRange: []
-          }}
-          style={{ marginTop: 12 }}
-        >
-          <Form.Item
-            name="importDateRange"
-            label="导入日期范围（保护机制）"
-            rules={[{ required: true, message: '请选择导入日期范围' }]}
-          >
-            <DatePicker.RangePicker
-              getPopupContainer={getDesignerContainer}
-              disabled={!planningImportPayload}
-            />
-          </Form.Item>
-          <Form.Item name="replaceExisting" valuePropName="checked">
-            <Checkbox>覆盖日期范围内已有安排</Checkbox>
-          </Form.Item>
-          <Form.Item name="skipConflicts" valuePropName="checked">
-            <Checkbox>跳过冲突继续导入</Checkbox>
-          </Form.Item>
-          <Form.Item name="onlySelectedGroups" valuePropName="checked">
-            <Checkbox>仅导入已选团组</Checkbox>
-          </Form.Item>
-
-          {!planningImportOnlySelectedValue ? (
-            <Form.Item
-              name="groupIds"
-              label="选择团组"
-              rules={[{ required: true, message: '请选择团组' }]}
-            >
-              <Select
-                mode="multiple"
-                placeholder={planningImportPayloadGroupIds.length ? '选择需要导入的团组' : '请先上传文件'}
-                disabled={!planningImportPayload}
-                dropdownRender={(menu) => (
-                  <>
-                    <div style={{ padding: '8px', display: 'flex', gap: '8px' }}>
-                      <Button
-                        size="small"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          planningImportForm.setFieldsValue({
-                            groupIds: planningImportPayloadGroupIds
-                          });
-                        }}
-                        disabled={planningImportPayloadGroupIds.length === 0}
-                      >
-                        全选
-                      </Button>
-                      <Button
-                        size="small"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          planningImportForm.setFieldsValue({ groupIds: [] });
-                        }}
-                      >
-                        全不选
-                      </Button>
-                    </div>
-                    {menu}
-                  </>
-                )}
-              >
-                {planningImportPayloadGroupIds.map(groupId => {
-                  const group = groups.find(g => g.id === groupId);
-                  return (
-                    <Option key={groupId} value={groupId}>
-                      {group?.name || `#${groupId}`}
-                    </Option>
-                  );
-                })}
-              </Select>
-            </Form.Item>
-          ) : (
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
-              导入团组数: {planningImportSelectedGroupIds.length}
-            </div>
-          )}
-        </Form>
-
-        {planningImportResult ? (
-          <div style={{ marginTop: 12, background: '#fafafa', padding: 12, borderRadius: 6 }}>
-            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: 8 }}>
-              <span>团组: {planningImportSummary?.groups || 0}</span>
-              <span>分配: {planningImportSummary?.assignments || 0}</span>
-              <span>导入: {planningImportSummary?.inserted || 0}</span>
-              <span>跳过: {planningImportSummary?.skipped || 0}</span>
-              <span>冲突: {planningImportSummary?.conflicts || 0}</span>
-            </div>
-            {planningImportResult?.appliedRange ? (
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-                生效范围: {planningImportResult.appliedRange.startDate} ~ {planningImportResult.appliedRange.endDate}
-              </div>
-            ) : null}
-            {planningImportResult?.snapshotToken ? (
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-                回滚快照: {planningImportResult.snapshotToken}
-              </div>
-            ) : null}
-            {planningImportConflicts.length ? (
-              <div style={{ marginTop: 8, borderTop: '1px solid #ececec', paddingTop: 10 }}>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
-                  <Button
-                    size="small"
-                    type={planningConflictActiveReason === 'ALL' ? 'primary' : 'default'}
-                    onClick={() => setPlanningConflictActiveReason('ALL')}
-                  >
-                    全部 {planningConflictRows.length}
-                  </Button>
-                  {planningConflictBuckets.map((bucket) => (
-                    <Button
-                      key={bucket.reasonCode}
-                      size="small"
-                      type={planningConflictActiveReason === bucket.reasonCode ? 'primary' : 'default'}
-                      onClick={() => setPlanningConflictActiveReason(bucket.reasonCode)}
-                    >
-                      {bucket.reasonLabel} {bucket.count}
-                    </Button>
-                  ))}
-                  <Checkbox
-                    checked={planningConflictManualOnly}
-                    onChange={(event) => setPlanningConflictManualOnly(event.target.checked)}
-                  >
-                    仅看必须人工处理
-                  </Checkbox>
-                  <Checkbox
-                    checked={planningConflictTodayOnly}
-                    onChange={(event) => setPlanningConflictTodayOnly(event.target.checked)}
-                    disabled={planningConflictTodayCount === 0}
-                  >
-                    仅看今日冲突（{planningConflictTodayCount}）
-                  </Checkbox>
-                  <Select
-                    size="small"
-                    style={{ minWidth: 170 }}
-                    value={planningConflictSortBy}
-                    onChange={setPlanningConflictSortBy}
-                    options={[
-                      { label: '按日期升序', value: 'DATE_ASC' },
-                      { label: '按日期降序', value: 'DATE_DESC' },
-                      { label: '按团组名称', value: 'GROUP_ASC' }
-                    ]}
-                  />
-                </div>
-
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
-                  今日日期: {planningConflictTodayDate}，当前显示 {Math.min(planningConflictFilteredRows.length, 50)} / {planningConflictRows.length} 条
-                </div>
-
-                {planningConflictFilteredRows.length ? (
-                  <div style={{ maxHeight: 200, overflow: 'auto', fontSize: 12, color: '#d4380d' }}>
-                    {planningConflictFilteredRows.slice(0, 50).map((row) => (
-                      <div
-                        key={row.key}
-                        style={{
-                          padding: '5px 0',
-                          borderBottom: '1px dashed #f0f0f0',
-                          display: 'grid',
-                          gap: 8,
-                          gridTemplateColumns: 'minmax(0, 1fr) minmax(180px, 260px)'
-                        }}
-                      >
-                        <div>
-                          {row.groupLabel} | {row.date} | {row.slotLabel} | {row.locationLabel} | {row.reasonLabel}
-                          {row.manualRequired ? <span style={{ color: '#cf1322', fontWeight: 600 }}>（需人工）</span> : null}
-                        </div>
-                        <div style={{ color: '#595959', wordBreak: 'break-word' }}>
-                          建议: {row.suggestion}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    当前筛选条件下无冲突
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div style={{ fontSize: 12, color: '#52c41a' }}>未发现冲突</div>
-            )}
-          </div>
-        ) : null}
-      </Modal>
+        overlayStyles={overlayStyles}
+        planningImportFileList={planningImportFileList}
+        handlePlanningImportFile={handlePlanningImportFile}
+        handlePlanningImportRemove={handlePlanningImportRemove}
+        planningImportPayload={planningImportPayload}
+        planningImportFile={planningImportFile}
+        planningImportRange={planningImportRange}
+        planningImportAssignmentsCount={planningImportAssignmentsCount}
+        planningImportPayloadGroupIds={planningImportPayloadGroupIds}
+        planningImportForm={planningImportForm}
+        setPlanningImportValidatedKey={setPlanningImportValidatedKey}
+        planningImportOnlySelectedValue={planningImportOnlySelectedValue}
+        planningImportSelectedGroupIds={planningImportSelectedGroupIds}
+        groups={groups}
+        handlePlanningImportRollback={handlePlanningImportRollback}
+        planningImportRollbackLoading={planningImportRollbackLoading}
+        planningImportSnapshotToken={planningImportSnapshotToken}
+        handlePlanningImportValidate={handlePlanningImportValidate}
+        planningImportValidating={planningImportValidating}
+        handlePlanningImportApply={handlePlanningImportApply}
+        planningImportLoading={planningImportLoading}
+        planningImportValidatedKey={planningImportValidatedKey}
+        planningImportResult={planningImportResult}
+        planningImportSummary={planningImportSummary}
+        planningImportConflicts={planningImportConflicts}
+        planningConflictActiveReason={planningConflictActiveReason}
+        setPlanningConflictActiveReason={setPlanningConflictActiveReason}
+        planningConflictRows={planningConflictRows}
+        planningConflictBuckets={planningConflictBuckets}
+        planningConflictManualOnly={planningConflictManualOnly}
+        setPlanningConflictManualOnly={setPlanningConflictManualOnly}
+        planningConflictTodayOnly={planningConflictTodayOnly}
+        setPlanningConflictTodayOnly={setPlanningConflictTodayOnly}
+        planningConflictTodayCount={planningConflictTodayCount}
+        planningConflictSortBy={planningConflictSortBy}
+        setPlanningConflictSortBy={setPlanningConflictSortBy}
+        planningConflictTodayDate={planningConflictTodayDate}
+        planningConflictFilteredRows={planningConflictFilteredRows}
+      />
 
 
-      <Modal
-        title="导出排程输入包(JSON/CSV)"
+      <PlanningExportModal
         open={planningExportVisible}
-        onCancel={() => setPlanningExportVisible(false)}
-        wrapClassName="itinerary-modal-wrap"
+        onClose={() => setPlanningExportVisible(false)}
         getContainer={getDesignerContainer}
-        styles={overlayStyles}
-        footer={[
-          <Button key="cancel" onClick={() => setPlanningExportVisible(false)}>
-            取消
-          </Button>,
-          <Button
-            key="export-csv"
-            onClick={handlePlanningExportCsv}
-            loading={planningExportCsvLoading}
-          >
-            导出人工模板(CSV)
-          </Button>,
-          <Button
-            key="export"
-            type="primary"
-            onClick={handlePlanningExport}
-            loading={planningExportLoading}
-          >
-            导出
-          </Button>
-        ]}
-        destroyOnClose
-      >
-        <Form form={planningForm} layout="vertical">
-          <Form.Item
-            name="dateRange"
-            label="日期范围"
-            rules={[{ required: true, message: '请选择日期范围' }]}
-          >
-            <DatePicker.RangePicker getPopupContainer={getDesignerContainer} />
-          </Form.Item>
-
-          <Form.Item
-            name="groupIds"
-            label="选择团组"
-            rules={[{ required: true, message: '请选择团组' }]}
-          >
-            <Select
-              mode="multiple"
-              placeholder={planningAvailableGroups.length ? '选择需要导出的团组' : '请先选择日期范围'}
-              disabled={!planningDateRange || planningDateRange.length !== 2}
-              dropdownRender={(menu) => (
-                <>
-                  <div style={{ padding: '8px', display: 'flex', gap: '8px' }}>
-                    <Button
-                      size="small"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        planningForm.setFieldsValue({
-                          groupIds: planningAvailableGroups.map(group => group.id)
-                        });
-                      }}
-                      disabled={planningAvailableGroups.length === 0}
-                    >
-                      全选
-                    </Button>
-                    <Button
-                      size="small"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        planningForm.setFieldsValue({ groupIds: [] });
-                      }}
-                    >
-                      全不选
-                    </Button>
-                  </div>
-                  {menu}
-                </>
-              )}
-            >
-              {planningAvailableGroups.map(group => (
-                <Option key={group.id} value={group.id}>
-                  {group.name}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-        </Form>
-      </Modal>
+        overlayStyles={overlayStyles}
+        planningForm={planningForm}
+        planningAvailableGroups={planningAvailableGroups}
+        planningDateRange={planningDateRange}
+        handlePlanningExportCsv={handlePlanningExportCsv}
+        planningExportCsvLoading={planningExportCsvLoading}
+        handlePlanningExport={handlePlanningExport}
+        planningExportLoading={planningExportLoading}
+        planningMissingMustVisitGroupIds={planningMissingMustVisitGroupIds}
+        planningMissingMustVisitGroups={planningMissingMustVisitGroups}
+      />
 
     </div>
   );

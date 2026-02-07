@@ -84,7 +84,7 @@ graph TD
 
 ## 4. 组件架构拆分
 
-将 `ItineraryDesigner.jsx` (2300行) 拆解为原子组件。
+将 `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`（约 2800 行）拆解为原子组件。
 
 ```
 src/pages/ItineraryDesigner/
@@ -154,4 +154,3 @@ interface Diagnostic {
     *   `Del`: 删除选中活动。
     *   `Ctrl+C / Ctrl+V`: 复制/粘贴活动。
     *   `Ctrl+Z`: 撤销操作（需要引入 undo/redo 栈）。
-

@@ -25,7 +25,7 @@
 - 前端多处 debounce 保存：
   - `trip-manager/frontend/src/pages/GroupEditV2/ScheduleManagement.jsx:38`
   - `trip-manager/frontend/src/pages/GroupManagementV2/index.jsx:757`
-  - `trip-manager/frontend/src/pages/ItineraryDesigner.jsx:777`
+  - `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx:759`
 
 **为什么危险**：
 - “多端同时编辑”或“同一人开两个页面”时，只要保存请求乱序，**旧数据就会覆盖新数据**。
@@ -103,7 +103,7 @@
 **现象**：前端先更新 UI，再异步保存；保存失败只提示错误，没有回滚 UI。
 
 **相关位置**：
-- `trip-manager/frontend/src/pages/ItineraryDesigner.jsx:777`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx:759`
 - `trip-manager/frontend/src/pages/GroupManagementV2/index.jsx:757`
 
 **建议修法**：
@@ -115,7 +115,7 @@
 **现象**：时间段定义在前后端多份副本，未来容易不一致。
 
 **相关位置**：
-- 前端：`trip-manager/frontend/src/pages/ItineraryDesigner.jsx:35`
+- 前端：`trip-manager/frontend/src/pages/ItineraryDesigner/shared/timeSlots.js`
 - 后端：`trip-manager/backend/src/routes/schedules.js:14`
 - 后端：`trip-manager/backend/src/utils/aiConfig.js:3`
 
@@ -194,7 +194,7 @@
 ## 4) 是否需要拆分大文件？（结论：建议拆）
 
 **当前超大文件**（可维护性风险高）：
-- `trip-manager/frontend/src/pages/ItineraryDesigner.jsx` ~2733 行
+- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx` ~2785 行（已拆分一部分，但主文件仍偏大）
 - `trip-manager/frontend/src/pages/GroupEditV2/Calendar/index.jsx` ~1372 行
 - `trip-manager/frontend/src/pages/LocationManagement.jsx` ~1315 行
 - `trip-manager/frontend/src/pages/GroupManagementV2/index.jsx` ~1039 行

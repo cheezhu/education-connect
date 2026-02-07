@@ -11,6 +11,7 @@ const ScheduleManagement = ({
   schedules,
   onUpdate,
   onPlanChange,
+  onCustomResourcesChange,
   loading = false,
   resourceWidth,
   scheduleRevision = 0,
@@ -19,6 +20,7 @@ const ScheduleManagement = ({
 }) => {
   const [viewMode, setViewMode] = useState('calendar');
   const [localSchedules, setLocalSchedules] = useState(schedules || []);
+
   const saveTimeoutRef = useRef(null);
   const saveTokenRef = useRef(0);
   const onUpdateRef = useRef(onUpdate);
@@ -42,7 +44,6 @@ const ScheduleManagement = ({
     };
   }, []);
 
-  // 处理日程更新
   const handleScheduleUpdate = (updatedSchedules) => {
     setLocalSchedules(updatedSchedules);
     onUpdateRef.current?.(updatedSchedules);
@@ -90,7 +91,7 @@ const ScheduleManagement = ({
       {viewMode === 'demo' && (
         <Alert
           message="Google Calendar 风格日程管理"
-          description="V2 版本核心功能已实现！支持拖拽创建活动、调整时间、冲突检测等专业功能。"
+          description="V2 版本核心功能已实现，支持拖拽创建活动、调整时间、冲突检测等。"
           type="success"
           icon={<InfoCircleOutlined />}
           showIcon
@@ -113,37 +114,33 @@ const ScheduleManagement = ({
             schedules={localSchedules}
             onUpdate={handleScheduleUpdate}
             onPlanChange={onPlanChange}
+            onCustomResourcesChange={onCustomResourcesChange}
             loading={loading}
             resourceWidth={resourceWidth}
           />
         ) : (
           <>
-            {/* 原有的演示网格 */}
             <Alert
               message="演示模式"
-              description="切换到日历视图查看完整的Google Calendar风格界面"
+              description="切换到日历视图查看完整的 Google Calendar 风格界面"
               type="info"
               style={{ marginBottom: 16 }}
             />
 
-            {/* 示例活动列表 */}
             <div className="sample-activities">
               <Space direction="vertical" style={{ width: '100%' }}>
-                {localSchedules.map(schedule => (
+                {localSchedules.map((schedule) => (
                   <div
                     key={schedule.id}
                     className="activity-sample"
                     style={{
-                      background: schedule.type === 'meal' ? '#e6f7ff' :
-                                 schedule.type === 'visit' ? '#f6ffed' : '#fff7e6',
+                      background: schedule.type === 'meal' ? '#e6f7ff'
+                        : schedule.type === 'visit' ? '#f6ffed'
+                          : '#fff7e6',
                       padding: 12,
                       borderRadius: 4
                     }}
                   >
-                    {schedule.type === 'meal' && '🍽️'}
-                    {schedule.type === 'visit' && '🏛️'}
-                    {schedule.type === 'transport' && '🚌'}
-                    {' '}
                     {schedule.title} - {schedule.startTime}-{schedule.endTime} - {schedule.location}
                   </div>
                 ))}

@@ -1,0 +1,449 @@
+{
+  "summary": {
+    "groups": 12,
+    "locations": 8,
+    "assignmentsInput": 62,
+    "assignmentsOutput": 84,
+    "elapsedMs": 89032
+  },
+  "precheck": {
+    "blockingErrors": [],
+    "warnings": []
+  },
+  "phase1": {
+    "engine": "cp_sat_feasible",
+    "status": "OPTIMAL",
+    "objective": 0,
+    "diagnostics": {
+      "phase1_time_sec": 22,
+      "best_bound": 0.0
+    }
+  },
+  "optimize": {
+    "engine": "cp_sat_feasible+lns",
+    "diagnostics": {
+      "phase1_engine": "cp_sat_feasible",
+      "phase1_status": "OPTIMAL",
+      "phase1_score": 12704,
+      "lns_iterations": 2124,
+      "improvements": 1,
+      "cp_sat_used": true,
+      "release_strategy": "hotspot_lns_v2",
+      "curve": [
+        {
+          "iter": 0,
+          "iterScore": 12704,
+          "bestScore": 12704,
+          "accepted": true,
+          "releasedCount": 0,
+          "releaseMode": "phase1"
+        },
+        {
+          "iter": "base",
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": true,
+          "releasedCount": 0,
+          "releaseMode": "base_optimize"
+        },
+        {
+          "iter": 50,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 100,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 150,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 200,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 21,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.25
+        },
+        {
+          "iter": 250,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 300,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 350,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 400,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 21,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.25
+        },
+        {
+          "iter": 450,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 500,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 550,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 600,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 21,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.25
+        },
+        {
+          "iter": 650,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 700,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 750,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 800,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 21,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.25
+        },
+        {
+          "iter": 850,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 900,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 950,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 1000,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 21,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.25
+        },
+        {
+          "iter": 1050,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 1100,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 1150,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 1200,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 21,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.25
+        },
+        {
+          "iter": 1250,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 1300,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 1350,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 1400,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 21,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.25
+        },
+        {
+          "iter": 1450,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 1500,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 1550,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 1600,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 21,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.25
+        },
+        {
+          "iter": 1650,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 1700,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 1750,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 1800,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 21,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.25
+        },
+        {
+          "iter": 1850,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 1900,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 1950,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 2000,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 21,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.25
+        },
+        {
+          "iter": 2050,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": 2100,
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": false,
+          "releasedCount": 13,
+          "releaseMode": "mixed",
+          "releaseRatio": 0.15
+        },
+        {
+          "iter": "final",
+          "iterScore": 15484,
+          "bestScore": 15484,
+          "accepted": true,
+          "releasedCount": 0,
+          "releaseMode": "final"
+        }
+      ],
+      "hotspot_totals": {
+        "missing_required": 0,
+        "overloaded_capacity": 0,
+        "displaced_existing": 12744,
+        "random": 15292
+      },
+      "final_score": 15484
+    }
+  },
+  "audit": {
+    "hardViolations": [],
+    "mustVisitMissing": []
+  }
+}

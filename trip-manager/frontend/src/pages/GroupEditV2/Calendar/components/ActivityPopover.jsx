@@ -49,6 +49,7 @@ const ActivityPopover = ({
   const isEditMode = resolveMode(mode) === 'edit';
   const resourceId = activity?.resourceId ?? activity?.resource_id ?? '';
   const isDaily = typeof resourceId === 'string' && resourceId.startsWith('daily:');
+  const isPlanSync = typeof resourceId === 'string' && resourceId.startsWith('plan-sync-');
 
   useEffect(() => {
     if (!activity || !isOpen) return;
@@ -66,12 +67,12 @@ const ActivityPopover = ({
     });
     if (typeof resourceId === 'string' && resourceId.startsWith('daily:')) {
       setSourceCategory('daily');
-    } else if (derivedPlanId) {
+    } else if (derivedPlanId || isPlanSync) {
       setSourceCategory('plan');
     } else {
       setSourceCategory('custom');
     }
-  }, [activity, isOpen]);
+  }, [activity, isOpen, isPlanSync, resourceId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -109,7 +110,7 @@ const ActivityPopover = ({
     const kind = sourceCategory === 'plan' ? 'plan' : 'custom';
     return {
       kind,
-      label: kind === 'plan' ? '行程点' : '自定义'
+      label: kind === 'plan' ? '必去行程点' : '自定义'
     };
   }, [isDaily, resourceId, sourceCategory]);
 
@@ -234,7 +235,7 @@ const ActivityPopover = ({
               onClick={() => handleSourceToggle('plan')}
               disabled={isDaily}
             >
-              行程点
+              必去行程点
             </button>
             <button
               type="button"

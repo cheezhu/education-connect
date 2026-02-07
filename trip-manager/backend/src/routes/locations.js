@@ -25,6 +25,7 @@ router.post('/', requireEditLock, (req, res) => {
     name, 
     address,
     capacity = 100,
+    clusterPreferSameDay = 0,
     color = '#1890ff',
     contactPerson,
     contactPhone,
@@ -42,11 +43,11 @@ router.post('/', requireEditLock, (req, res) => {
   try {
     const result = req.db.prepare(`
       INSERT INTO locations (
-        name, address, capacity, color, contact_person,
+        name, address, capacity, cluster_prefer_same_day, color, contact_person,
         contact_phone, blocked_weekdays, open_hours, closed_dates, target_groups, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      name, address, capacity, color, contactPerson,
+      name, address, capacity, clusterPreferSameDay ? 1 : 0, color, contactPerson,
       contactPhone, blockedWeekdays, openHours, closedDates, targetGroups, notes
     );
 
@@ -68,7 +69,7 @@ router.put('/:id', requireEditLock, (req, res) => {
   const allowedFields = [
     'name', 'address', 'capacity', 'color', 'contact_person',
     'contact_phone', 'blocked_weekdays', 'open_hours', 'closed_dates', 'target_groups', 
-    'notes', 'is_active'
+    'notes', 'is_active', 'cluster_prefer_same_day'
   ];
 
   allowedFields.forEach(field => {

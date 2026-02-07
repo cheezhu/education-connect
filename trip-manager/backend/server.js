@@ -276,6 +276,10 @@ if (!locationColumns.includes('color')) {
   db.exec('ALTER TABLE locations ADD COLUMN color TEXT');
   db.exec("UPDATE locations SET color = '#1890ff' WHERE color IS NULL OR color = ''");
 }
+if (!locationColumns.includes('cluster_prefer_same_day')) {
+  db.exec('ALTER TABLE locations ADD COLUMN cluster_prefer_same_day INTEGER DEFAULT 0');
+  db.exec('UPDATE locations SET cluster_prefer_same_day = 0 WHERE cluster_prefer_same_day IS NULL');
+}
 
 const ensureUserRoleConstraint = () => {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'").get();

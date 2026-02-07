@@ -69,14 +69,24 @@
 - localStorage key：`itinerary_group_row_align`
 
 ### 相关文件
-- `trip-manager/frontend/src/pages/ItineraryDesigner.jsx`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`
   - 新增状态 `alignGroupRows`
   - 新增开关“对齐团组行”
   - 渲染逻辑支持对齐/紧凑两种生成方式
-- `trip-manager/frontend/src/pages/ItineraryDesigner.css`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/ItineraryDesigner.css`
   - 对齐模式空行样式弱化
 - `trip-manager/backend/src/routes/systemConfig.js`
   - 配置读取/保存接口
+
+### 代码结构（2026-02 重构后）
+- 页面入口：`trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`
+- 样式：`trip-manager/frontend/src/pages/ItineraryDesigner/ItineraryDesigner.css`
+- 时间轴网格：`trip-manager/frontend/src/pages/ItineraryDesigner/timeline/TimelineGrid.jsx`
+- 底部调控台抽屉：`trip-manager/frontend/src/pages/ItineraryDesigner/console/GroupConsoleDrawer.jsx`
+- 导入/导出弹窗：`trip-manager/frontend/src/pages/ItineraryDesigner/planning/PlanningImportModal.jsx`、`trip-manager/frontend/src/pages/ItineraryDesigner/planning/PlanningExportModal.jsx`
+- 导入/导出解析（CSV/JSON）：`trip-manager/frontend/src/pages/ItineraryDesigner/planning/planningIO.js`
+- 冲突 UI 与文案：`trip-manager/frontend/src/pages/ItineraryDesigner/conflicts/`
+- 公共工具（日期/时段/解析/规则/错误提示）：`trip-manager/frontend/src/pages/ItineraryDesigner/shared/`
 
 ### 可选后续优化
 - 支持系统级默认值配置
@@ -177,7 +187,7 @@
 ---
 
 ### 相关文件/模块
-- 前端（行程设计器）：`trip-manager/frontend/src/pages/ItineraryDesigner.jsx`
+- 前端（行程设计器）：`trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`
 - 前端（日历详情）：`trip-manager/frontend/src/pages/GroupEditV2/CalendarDaysView.jsx`
 - 后端（导出/导入）：`trip-manager/backend/src/routes/planning.js`
 - 后端（AI 规则/排程/历史）：`trip-manager/backend/src/routes/aiPlanner.js`

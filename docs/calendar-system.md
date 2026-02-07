@@ -384,7 +384,7 @@ const activityTypes = {
 | 功能 | 文件路径 |
 |------|----------|
 | 日历详情组件 | `trip-manager/frontend/src/pages/GroupEditV2/CalendarDaysView.jsx` |
-| 行程设计器 | `trip-manager/frontend/src/pages/ItineraryDesigner.jsx` |
+| 行程设计器 | `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx` |
 | 后端 schedule 路由 | `trip-manager/backend/src/routes/schedules.js` |
 | 后端 activity 路由 | `trip-manager/backend/src/routes/activities.js` |
 | 数据库初始化 | `trip-manager/backend/db/init.sql` |
