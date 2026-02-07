@@ -124,6 +124,7 @@ function ItineraryDesigner() {
   const [showUnscheduledGroups, setShowUnscheduledGroups] = useState(() => getStoredShowUnscheduled());
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
+  const [selectedSlotConflict, setSelectedSlotConflict] = useState(null);
   const [draggedActivity, setDraggedActivity] = useState(null);
   const cardStyle = 'minimal';
   const alignGroupRows = false;
@@ -131,12 +132,20 @@ function ItineraryDesigner() {
   const [selectedActivities, setSelectedActivities] = useState([]); // 选中的活动
   const [planningExportVisible, setPlanningExportVisible] = useState(false);
   const [planningExportLoading, setPlanningExportLoading] = useState(false);
+  const [planningExportCsvLoading, setPlanningExportCsvLoading] = useState(false);
   const [planningImportVisible, setPlanningImportVisible] = useState(false);
   const [planningImportLoading, setPlanningImportLoading] = useState(false);
   const [planningImportValidating, setPlanningImportValidating] = useState(false);
   const [planningImportPayload, setPlanningImportPayload] = useState(null);
   const [planningImportFileList, setPlanningImportFileList] = useState([]);
   const [planningImportResult, setPlanningImportResult] = useState(null);
+  const [planningImportValidatedKey, setPlanningImportValidatedKey] = useState('');
+  const [planningImportSnapshotToken, setPlanningImportSnapshotToken] = useState('');
+  const [planningImportRollbackLoading, setPlanningImportRollbackLoading] = useState(false);
+  const [planningConflictActiveReason, setPlanningConflictActiveReason] = useState('ALL');
+  const [planningConflictManualOnly, setPlanningConflictManualOnly] = useState(false);
+  const [planningConflictTodayOnly, setPlanningConflictTodayOnly] = useState(false);
+  const [planningConflictSortBy, setPlanningConflictSortBy] = useState('DATE_ASC');
   const [groupCalendarVisible, setGroupCalendarVisible] = useState(false);
   const [groupCalendarGroupId, setGroupCalendarGroupId] = useState(null);
   const [groupCalendarDetailVisible, setGroupCalendarDetailVisible] = useState(false);
@@ -425,6 +434,13 @@ function ItineraryDesigner() {
       planningForm.setFieldsValue({ groupIds: filtered });
     }
   }, [planningDateRange, groups]);
+
+  useEffect(() => {
+    setPlanningConflictActiveReason('ALL');
+    setPlanningConflictManualOnly(false);
+    setPlanningConflictTodayOnly(false);
+    setPlanningConflictSortBy('DATE_ASC');
+  }, [planningImportResult, planningImportVisible]);
 
   // 生成日期范围（7天一页）
   const generateDateRange = (startDate) => {
@@ -848,16 +864,6 @@ function ItineraryDesigner() {
     };
   };
 
-  const getFilenameFromDisposition = (disposition) => {
-    if (!disposition) return null;
-    const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
-    if (utf8Match && utf8Match[1]) {
-      return decodeURIComponent(utf8Match[1]);
-    }
-    const match = /filename=\"?([^\";]+)\"?/i.exec(disposition);
-    return match ? match[1] : null;
-  };
-
   const triggerDownload = (blob, filename) => {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -869,24 +875,521 @@ function ItineraryDesigner() {
     URL.revokeObjectURL(url);
   };
 
+  const planningConflictReasonLabels = {
+    INVALID_TIME_SLOT: '时段不合法',
+    OUT_OF_RANGE: '超出可导入日期范围',
+    GROUP_TIME_CONFLICT: '同团组同日同时段冲突',
+    INACTIVE_LOCATION: '地点已停用',
+    GROUP_TYPE: '地点不适用于该团组类型',
+    INVALID_DATE: '日期无效',
+    BLOCKED_WEEKDAY: '地点在该星期不可用',
+    CLOSED_DATE: '地点在该日期闭馆',
+    OPEN_HOURS: '地点开放时段不覆盖该时段',
+    CAPACITY: '地点容量不足'
+  };
+
+  const planningManualRequiredReasons = new Set([
+    'GROUP_TIME_CONFLICT',
+    'CAPACITY',
+    'INACTIVE_LOCATION',
+    'GROUP_TYPE',
+    'BLOCKED_WEEKDAY',
+    'CLOSED_DATE',
+    'OPEN_HOURS',
+    'INVALID_TIME_SLOT',
+    'INVALID_DATE'
+  ]);
+
+  const getPlanningConflictReasonLabel = (reason) => (
+    planningConflictReasonLabels[reason] || reason || '未知冲突'
+  );
+
+  const planningConflictHandlingTips = {
+    INVALID_TIME_SLOT: '改成标准时段（上午/下午/晚上）后重试',
+    OUT_OF_RANGE: '调整导入范围或把活动日期改到范围内',
+    GROUP_TIME_CONFLICT: '同团组同一时段有重复，保留一条其余换时段',
+    INACTIVE_LOCATION: '地点停用，替换为可用地点',
+    GROUP_TYPE: '当前地点不匹配团组类型，改匹配地点',
+    INVALID_DATE: '修正为 YYYY-MM-DD 有效日期',
+    BLOCKED_WEEKDAY: '避开地点禁用星期或改地点',
+    CLOSED_DATE: '避开闭馆日或改地点',
+    OPEN_HOURS: '改为地点开放时段',
+    CAPACITY: '换到更大容量地点或错峰安排'
+  };
+
+  const getPlanningConflictHandlingTip = (reason) => (
+    planningConflictHandlingTips[reason] || '需人工核对后处理'
+  );
+
+  const isPlanningConflictManualRequired = (reason) => (
+    planningManualRequiredReasons.has(String(reason || '').trim())
+  );
+
+  const escapeCsvValue = (value) => {
+    const text = value === null || value === undefined ? '' : String(value);
+    if (/[",\r\n]/.test(text)) {
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+    return text;
+  };
+
+  const parseCsvRows = (text) => {
+    const rows = [];
+    let row = [];
+    let cell = '';
+    let inQuotes = false;
+
+    for (let index = 0; index < text.length; index += 1) {
+      const char = text[index];
+      const nextChar = text[index + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          cell += '"';
+          index += 1;
+        } else {
+          inQuotes = !inQuotes;
+        }
+        continue;
+      }
+
+      if (char === ',' && !inQuotes) {
+        row.push(cell);
+        cell = '';
+        continue;
+      }
+
+      if (char === '\n' && !inQuotes) {
+        row.push(cell);
+        if (row.some(item => String(item || '').trim() !== '')) {
+          rows.push(row);
+        }
+        row = [];
+        cell = '';
+        continue;
+      }
+
+      if (char !== '\r') {
+        cell += char;
+      }
+    }
+
+    row.push(cell);
+    if (row.some(item => String(item || '').trim() !== '')) {
+      rows.push(row);
+    }
+    return rows;
+  };
+
+  const normalizeCsvHeader = (value) => (
+    String(value || '')
+      .replace(/^\uFEFF/, '')
+      .trim()
+      .replace(/\s+/g, '')
+      .replace(/[_-]/g, '')
+      .toLowerCase()
+  );
+
+  const normalizeImportedTimeSlot = (value) => {
+    const normalized = String(value || '').trim().toUpperCase();
+    if (!normalized) return '';
+    if (normalized === '上午') return 'MORNING';
+    if (normalized === '下午') return 'AFTERNOON';
+    if (normalized === '晚上') return 'EVENING';
+    if (normalized === 'MORNING' || normalized === 'AFTERNOON' || normalized === 'EVENING') {
+      return normalized;
+    }
+    return '';
+  };
+
+  const maxDate = (left, right) => {
+    if (!left) return right;
+    if (!right) return left;
+    return left > right ? left : right;
+  };
+
+  const minDate = (left, right) => {
+    if (!left) return right;
+    if (!right) return left;
+    return left < right ? left : right;
+  };
+
+  const iterateDateStrings = (start, end) => {
+    if (!start || !end || !dayjs(start).isValid() || !dayjs(end).isValid()) return [];
+    const result = [];
+    let cursor = dayjs(start).startOf('day');
+    const limit = dayjs(end).startOf('day');
+    while (cursor.isBefore(limit, 'day') || cursor.isSame(limit, 'day')) {
+      result.push(cursor.format('YYYY-MM-DD'));
+      cursor = cursor.add(1, 'day');
+    }
+    return result;
+  };
+
+  const parseDelimitedList = (value) => (
+    String(value || '')
+      .split(/[,\uFF0C\u3001;|\uFF5C]/)
+      .map(item => item.trim())
+      .filter(Boolean)
+  );
+
+  const parseDelimitedIdList = (value) => (
+    parseDelimitedList(value)
+      .map(item => Number(item))
+      .filter(id => Number.isFinite(id) && id > 0)
+  );
+
+  const buildPlanningTemplateCsv = (payload, selectedGroupIds = []) => {
+    const locationsById = new Map((payload?.locations || []).map(location => [Number(location.id), location]));
+    const selectedSet = new Set(
+      (selectedGroupIds || [])
+        .map(id => Number(id))
+        .filter(Number.isFinite)
+    );
+    const mustVisitByGroup = payload?.must_visit_by_group && typeof payload.must_visit_by_group === 'object'
+      ? payload.must_visit_by_group
+      : {};
+    const planItemsByGroup = payload?.plan_items_by_group && typeof payload.plan_items_by_group === 'object'
+      ? payload.plan_items_by_group
+      : {};
+    const targetGroups = (payload?.groups || [])
+      .filter(group => selectedSet.size === 0 || selectedSet.has(Number(group.id)));
+
+    const slotKeys = Array.isArray(payload?.rules?.timeSlots) && payload.rules.timeSlots.length
+      ? payload.rules.timeSlots
+      : ['MORNING', 'AFTERNOON', 'EVENING'];
+    const slotLabels = {
+      MORNING: '上午',
+      AFTERNOON: '下午',
+      EVENING: '晚上'
+    };
+
+    const existingByKey = new Map();
+    (payload?.existing?.activities || []).forEach((activity) => {
+      const groupId = Number(activity.group_id ?? activity.groupId);
+      if (!Number.isFinite(groupId)) return;
+      const key = `${groupId}|${activity.activity_date}|${activity.time_slot}`;
+      if (!existingByKey.has(key)) {
+        existingByKey.set(key, activity);
+      }
+    });
+
+    const header = [
+      '团组ID',
+      '团组名称',
+      '日期',
+      '时段',
+      '地点ID',
+      '地点名称',
+      '预计人数',
+      '必去行程点ID列表',
+      '必去行程点名称列表',
+      '本行是否必去',
+      '备注'
+    ];
+    const lines = [header.map(escapeCsvValue).join(',')];
+
+    targetGroups.forEach((group) => {
+      const groupId = Number(group.id);
+      const groupStart = maxDate(payload?.range?.startDate, group.start_date);
+      const groupEnd = minDate(payload?.range?.endDate, group.end_date);
+      const groupDates = iterateDateStrings(groupStart, groupEnd);
+      const fallbackParticipants = (group.student_count || 0) + (group.teacher_count || 0);
+      const rawMustVisitItems = Array.isArray(mustVisitByGroup[String(groupId)])
+        ? mustVisitByGroup[String(groupId)]
+        : [];
+      const rawPlanItems = rawMustVisitItems.length > 0
+        ? rawMustVisitItems
+        : (Array.isArray(planItemsByGroup[String(groupId)])
+          ? planItemsByGroup[String(groupId)]
+          : []);
+      const requiredLocationIds = Array.from(new Set(
+        rawPlanItems
+          .map(item => Number(item?.location_id ?? item?.locationId))
+          .filter(id => Number.isFinite(id) && id > 0)
+      ));
+      const requiredLocationNameById = new Map();
+      rawPlanItems.forEach((item) => {
+        const id = Number(item?.location_id ?? item?.locationId);
+        if (!Number.isFinite(id) || id <= 0) return;
+        const name = String(item?.location_name ?? item?.locationName ?? '').trim();
+        if (name) requiredLocationNameById.set(id, name);
+      });
+      const requiredLocationNames = requiredLocationIds
+        .map(locationId => (
+          requiredLocationNameById.get(locationId)
+          || locationsById.get(locationId)?.name
+          || `#${locationId}`
+        ));
+      const requiredLocationSet = new Set(requiredLocationIds);
+      const requiredIdsText = requiredLocationIds.join('|');
+      const requiredNamesText = requiredLocationNames.join(' | ');
+
+      groupDates.forEach((date) => {
+        slotKeys.forEach((slotKey) => {
+          const existing = existingByKey.get(`${groupId}|${date}|${slotKey}`);
+          const locationId = Number(existing?.location_id);
+          const location = Number.isFinite(locationId) ? locationsById.get(locationId) : null;
+          const participants = Number(existing?.participant_count);
+          const isRequired = Number.isFinite(locationId) && requiredLocationSet.has(locationId) ? '是' : '';
+          const row = [
+            groupId,
+            group.name || '',
+            date,
+            slotLabels[slotKey] || slotKey,
+            Number.isFinite(locationId) ? locationId : '',
+            location?.name || '',
+            Number.isFinite(participants) && participants > 0 ? participants : fallbackParticipants,
+            requiredIdsText,
+            requiredNamesText,
+            isRequired,
+            ''
+          ];
+          lines.push(row.map(escapeCsvValue).join(','));
+        });
+      });
+    });
+
+    return `\uFEFF${lines.join('\r\n')}`;
+  };
+
+  const buildPlanningResultPayloadFromCsv = (text, fileName) => {
+    const rows = parseCsvRows(text || '');
+    if (rows.length < 2) {
+      throw new Error('CSV 内容为空');
+    }
+
+    const headers = rows[0].map(item => String(item || '').trim());
+    const normalizedHeaders = headers.map(normalizeCsvHeader);
+    const findColumn = (aliases) => normalizedHeaders.findIndex((column) => aliases.includes(column));
+    const readCell = (row, aliases) => {
+      const index = findColumn(aliases);
+      if (index < 0) return '';
+      return String(row[index] ?? '').trim();
+    };
+
+    const groupNameToId = new Map(
+      groups
+        .map(group => [String(group.name || '').trim(), Number(group.id)])
+        .filter(([name, id]) => name && Number.isFinite(id))
+    );
+    const groupIdToName = new Map(
+      groups.map(group => [Number(group.id), String(group.name || '').trim() || `#${group.id}`])
+    );
+    const locationNameToId = new Map(
+      locations
+        .map(location => [String(location.name || '').trim(), Number(location.id)])
+        .filter(([name, id]) => name && Number.isFinite(id))
+    );
+    const locationIdToName = new Map(
+      locations
+        .map(location => [Number(location.id), String(location.name || '').trim() || `#${location.id}`])
+        .filter(([id]) => Number.isFinite(id))
+    );
+    const groupSizeById = new Map(
+      groups.map(group => [Number(group.id), (group.student_count || 0) + (group.teacher_count || 0)])
+    );
+
+    const assignments = [];
+    const errors = [];
+    const requiredByGroup = new Map();
+    const requiredNameByGroup = new Map();
+
+    rows.slice(1).forEach((row, index) => {
+      const rowNo = index + 2;
+      const groupIdText = readCell(row, ['groupid', 'group_id', '团组id', '团组编号']);
+      const groupNameText = readCell(row, ['groupname', 'group_name', '团组名称']);
+      const dateText = readCell(row, ['date', 'activitydate', '日期']);
+      const slotText = readCell(row, ['timeslot', 'time_slot', '时段']);
+      const locationIdText = readCell(row, ['locationid', 'location_id', '地点id']);
+      const locationNameText = readCell(row, ['locationname', 'location_name', '地点名称', '行程点名称']);
+      const participantText = readCell(row, ['participantcount', 'participant_count', '预计人数', '人数']);
+      const requiredLocationIdsText = readCell(row, [
+        'requiredlocationids',
+        'required_location_ids',
+        'mustlocationids',
+        'must_location_ids',
+        '必去行程点id列表',
+        '必去地点id列表',
+        '必去行程点id',
+        '必去地点id'
+      ]);
+      const requiredLocationNamesText = readCell(row, [
+        'requiredlocationnames',
+        'required_location_names',
+        'mustlocationnames',
+        'must_location_names',
+        '必去行程点名称列表',
+        '必去地点名称列表',
+        '必去行程点名称',
+        '必去地点名称'
+      ]);
+      const notes = readCell(row, ['notes', 'note', '备注']);
+
+      if (!groupIdText && !groupNameText && !dateText && !slotText && !locationIdText && !locationNameText) {
+        return;
+      }
+
+      let groupId = Number(groupIdText);
+      if (!Number.isFinite(groupId) || groupId <= 0) {
+        groupId = groupNameToId.get(groupNameText) || NaN;
+      }
+      let locationId = Number(locationIdText);
+      if (!Number.isFinite(locationId) || locationId <= 0) {
+        locationId = locationNameToId.get(locationNameText) || NaN;
+      }
+      const timeSlot = normalizeImportedTimeSlot(slotText);
+      const participantCount = Number(participantText);
+
+      if (!Number.isFinite(groupId) || groupId <= 0) {
+        errors.push(`第${rowNo}行：团组无法识别`);
+        return;
+      }
+      const groupKey = Math.floor(groupId);
+      const requiredIds = parseDelimitedIdList(requiredLocationIdsText);
+      const requiredNames = parseDelimitedList(requiredLocationNamesText);
+      if (requiredIds.length > 0) {
+        let requiredSet = requiredByGroup.get(groupKey);
+        if (!requiredSet) {
+          requiredSet = new Set();
+          requiredByGroup.set(groupKey, requiredSet);
+        }
+        let requiredNameMap = requiredNameByGroup.get(groupKey);
+        if (!requiredNameMap) {
+          requiredNameMap = new Map();
+          requiredNameByGroup.set(groupKey, requiredNameMap);
+        }
+        requiredIds.forEach((id, idx) => {
+          requiredSet.add(id);
+          const name = requiredNames[idx] || locationIdToName.get(id) || `#${id}`;
+          requiredNameMap.set(id, name);
+        });
+      }
+      if (!dayjs(dateText).isValid()) {
+        errors.push(`第${rowNo}行：日期无效`);
+        return;
+      }
+      if (!timeSlot) {
+        errors.push(`第${rowNo}行：时段无效（需为上午/下午/晚上或 MORNING/AFTERNOON/EVENING）`);
+        return;
+      }
+      if (!Number.isFinite(locationId) || locationId <= 0) {
+        errors.push(`第${rowNo}行：地点无法识别`);
+        return;
+      }
+
+      assignments.push({
+        groupId: Math.floor(groupId),
+        date: dayjs(dateText).format('YYYY-MM-DD'),
+        timeSlot,
+        locationId: Math.floor(locationId),
+        participantCount: Number.isFinite(participantCount) && participantCount > 0
+          ? Math.floor(participantCount)
+          : (groupSizeById.get(Math.floor(groupId)) || null),
+        notes: notes || `csv:${fileName || 'import'}`
+      });
+    });
+
+    if (errors.length > 0) {
+      throw new Error(errors.slice(0, 5).join('；'));
+    }
+    if (!assignments.length) {
+      throw new Error('CSV 中没有可导入的有效记录');
+    }
+
+    const assignedLocationsByGroup = new Map();
+    assignments.forEach((item) => {
+      const groupKey = Number(item.groupId);
+      const locationId = Number(item.locationId);
+      if (!Number.isFinite(groupKey) || !Number.isFinite(locationId) || locationId <= 0) return;
+      let set = assignedLocationsByGroup.get(groupKey);
+      if (!set) {
+        set = new Set();
+        assignedLocationsByGroup.set(groupKey, set);
+      }
+      set.add(locationId);
+    });
+
+    const missingRequiredErrors = [];
+    requiredByGroup.forEach((requiredSet, groupId) => {
+      if (!requiredSet || requiredSet.size === 0) return;
+      const assignedSet = assignedLocationsByGroup.get(groupId) || new Set();
+      const nameMap = requiredNameByGroup.get(groupId) || new Map();
+      const missing = Array.from(requiredSet).filter(locationId => !assignedSet.has(locationId));
+      if (missing.length === 0) return;
+      const missingText = missing
+        .map(locationId => nameMap.get(locationId) || locationIdToName.get(locationId) || `#${locationId}`)
+        .join('、');
+      const groupName = groupIdToName.get(groupId) || `#${groupId}`;
+      missingRequiredErrors.push(`${groupName} 缺少必去行程点：${missingText}`);
+    });
+    if (missingRequiredErrors.length > 0) {
+      throw new Error(missingRequiredErrors.slice(0, 5).join('；'));
+    }
+
+    return {
+      schema: 'ec-planning-result@1',
+      snapshot_id: `csv-${Date.now()}`,
+      mode: 'replaceExisting',
+      assignments,
+      unassigned: []
+    };
+  };
+
   const handlePlanningExport = async () => {
     try {
       const values = await planningForm.validateFields();
       setPlanningExportLoading(true);
-      const response = await api.post('/planning/export', buildPlanningPayload(values), {
-        responseType: 'blob'
-      });
-      const disposition = response.headers?.['content-disposition'];
-      const filename = getFilenameFromDisposition(disposition)
-        || `planning_input_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.json`;
-      const blob = new Blob([response.data], { type: 'application/json' });
+      const response = await api.post('/planning/export', buildPlanningPayload(values));
+      const payload = typeof response.data === 'string'
+        ? JSON.parse(response.data)
+        : response.data;
+      const snapshotId = String(payload?.snapshot_id || dayjs().toISOString()).replace(/[:.]/g, '-');
+      const filename = `planning_input_${snapshotId}.json`;
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       triggerDownload(blob, filename);
       message.success('导出成功');
       setPlanningExportVisible(false);
     } catch (error) {
-      message.error('导出失败');
+      const data = error?.response?.data;
+      if (data && typeof data === 'object') {
+        const details = Array.isArray(data.details) && data.details.length
+          ? `：${data.details.slice(0, 3).join('；')}`
+          : '';
+        message.error(`${data.error || '导出失败'}${details}`);
+      } else {
+        message.error('导出失败');
+      }
     } finally {
       setPlanningExportLoading(false);
+    }
+  };
+
+  const handlePlanningExportCsv = async () => {
+    try {
+      const values = await planningForm.validateFields();
+      setPlanningExportCsvLoading(true);
+      const response = await api.post('/planning/export', buildPlanningPayload(values));
+      const payload = typeof response.data === 'string'
+        ? JSON.parse(response.data)
+        : response.data;
+      const csvText = buildPlanningTemplateCsv(payload, values.groupIds || []);
+      const filename = `planning_template_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.csv`;
+      const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+      triggerDownload(blob, filename);
+      message.success('已导出人工模板 CSV');
+    } catch (error) {
+      const data = error?.response?.data;
+      if (data && typeof data === 'object') {
+        const details = Array.isArray(data.details) && data.details.length
+          ? `：${data.details.slice(0, 3).join('；')}`
+          : '';
+        message.error(`${data.error || '导出 CSV 失败'}${details}`);
+      } else {
+        message.error('导出 CSV 失败');
+      }
+    } finally {
+      setPlanningExportCsvLoading(false);
     }
   };
 
@@ -921,12 +1424,15 @@ function ItineraryDesigner() {
     setPlanningImportPayload(null);
     setPlanningImportFileList([]);
     setPlanningImportResult(null);
+    setPlanningImportValidatedKey('');
+    setPlanningImportSnapshotToken('');
     planningImportForm.resetFields();
     planningImportForm.setFieldsValue({
       replaceExisting: false,
       skipConflicts: true,
       onlySelectedGroups: true,
-      groupIds: []
+      groupIds: [],
+      importDateRange: []
     });
   };
 
@@ -939,29 +1445,44 @@ function ItineraryDesigner() {
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const parsed = JSON.parse(event.target?.result || '');
+        const rawText = event.target?.result || '';
+        const lowerName = String(file?.name || '').toLowerCase();
+        const isCsv = lowerName.endsWith('.csv') || file?.type === 'text/csv';
+        const parsed = isCsv
+          ? buildPlanningResultPayloadFromCsv(rawText, file?.name || '')
+          : JSON.parse(rawText);
         const payload = parsed?.payload && parsed.payload.schema ? parsed.payload : parsed;
         if (!payload || payload.schema !== 'ec-planning-result@1') {
           message.error('文件格式不正确（schema不匹配）');
           setPlanningImportPayload(null);
           setPlanningImportResult(null);
           setPlanningImportFileList([]);
+          setPlanningImportValidatedKey('');
+          setPlanningImportSnapshotToken('');
           return;
         }
         setPlanningImportPayload(payload);
         setPlanningImportResult(null);
+        setPlanningImportValidatedKey('');
+        setPlanningImportSnapshotToken('');
         const payloadGroupIds = extractPlanningGroupIds(payload);
+        const payloadRange = extractPlanningRange(payload);
         planningImportForm.setFieldsValue({
           replaceExisting: payload.mode === 'replaceExisting',
           skipConflicts: true,
           onlySelectedGroups: true,
-          groupIds: payloadGroupIds
+          groupIds: payloadGroupIds,
+          importDateRange: payloadRange
+            ? [dayjs(payloadRange.start), dayjs(payloadRange.end)]
+            : []
         });
       } catch (error) {
-        message.error('文件解析失败');
+        message.error(error?.message || '文件解析失败');
         setPlanningImportPayload(null);
         setPlanningImportResult(null);
         setPlanningImportFileList([]);
+        setPlanningImportValidatedKey('');
+        setPlanningImportSnapshotToken('');
       }
     };
     reader.readAsText(file);
@@ -973,6 +1494,8 @@ function ItineraryDesigner() {
     setPlanningImportPayload(null);
     setPlanningImportFileList([]);
     setPlanningImportResult(null);
+    setPlanningImportValidatedKey('');
+    setPlanningImportSnapshotToken('');
   };
 
   const resolvePlanningImportGroupIds = (values) => {
@@ -990,31 +1513,71 @@ function ItineraryDesigner() {
     return Array.from(new Set(targetGroupIds));
   };
 
+  const buildPlanningImportOptions = (values, dryRun) => {
+    const groupIds = resolvePlanningImportGroupIds(values);
+    const [rangeStart, rangeEnd] = values.importDateRange || [];
+    const fallbackRange = extractPlanningRange(planningImportPayload);
+    const startDate = rangeStart
+      ? rangeStart.format('YYYY-MM-DD')
+      : (fallbackRange?.start || null);
+    const endDate = rangeEnd
+      ? rangeEnd.format('YYYY-MM-DD')
+      : (fallbackRange?.end || null);
+
+    return {
+      groupIds,
+      replaceExisting: values.replaceExisting !== false,
+      skipConflicts: values.skipConflicts !== false,
+      startDate,
+      endDate,
+      dryRun
+    };
+  };
+
+  const buildPlanningImportValidationKey = (payload, options) => JSON.stringify({
+    snapshot: payload?.snapshot_id || '',
+    assignments: extractPlanningAssignments(payload).length,
+    groupIds: (options.groupIds || []).map(id => Number(id)).filter(Number.isFinite).sort((a, b) => a - b),
+    replaceExisting: Boolean(options.replaceExisting),
+    skipConflicts: Boolean(options.skipConflicts),
+    startDate: options.startDate || '',
+    endDate: options.endDate || ''
+  });
+
   const runPlanningImport = async (dryRun) => {
     if (!planningImportPayload) {
-      message.error('请先上传 planning_result.json');
+      message.error('请先上传 planning_result.json 或 CSV 模板');
       return;
     }
 
     try {
       const values = await planningImportForm.validateFields();
-      const groupIds = resolvePlanningImportGroupIds(values);
-      if (groupIds.length === 0) {
+      const options = buildPlanningImportOptions(values, dryRun);
+      if ((options.groupIds || []).length === 0) {
         message.error('未选择可导入的团组');
+        return;
+      }
+      if (!options.startDate || !options.endDate) {
+        message.error('请先确认导入日期范围');
+        return;
+      }
+
+      const validationKey = buildPlanningImportValidationKey(planningImportPayload, {
+        ...options,
+        dryRun: false
+      });
+      if (!dryRun && planningImportValidatedKey !== validationKey) {
+        message.warning('请先执行校验，校验通过后再导入');
         return;
       }
 
       const request = {
         payload: planningImportPayload,
-        options: {
-          groupIds,
-          replaceExisting: values.replaceExisting !== false,
-          skipConflicts: values.skipConflicts !== false,
-          dryRun
-        }
+        options
       };
 
       if (dryRun) {
+        setPlanningImportValidatedKey('');
         setPlanningImportValidating(true);
       } else {
         setPlanningImportLoading(true);
@@ -1023,16 +1586,21 @@ function ItineraryDesigner() {
       const response = await api.post('/planning/import', request);
       setPlanningImportResult(response.data);
       if (dryRun) {
+        setPlanningImportValidatedKey(validationKey);
         message.success('校验完成');
       } else {
+        setPlanningImportValidatedKey('');
+        setPlanningImportSnapshotToken(response.data?.snapshotToken || '');
         message.success(`导入完成，成功 ${response.data?.summary?.inserted || 0} 条`);
-        setPlanningImportVisible(false);
         refreshData();
       }
     } catch (error) {
       const data = error.response?.data;
       if (data?.conflicts) {
         setPlanningImportResult(data);
+      }
+      if (dryRun) {
+        setPlanningImportValidatedKey('');
       }
       message.error(data?.error || (dryRun ? '校验失败' : '导入失败'));
     } finally {
@@ -1043,6 +1611,28 @@ function ItineraryDesigner() {
 
   const handlePlanningImportValidate = () => runPlanningImport(true);
   const handlePlanningImportApply = () => runPlanningImport(false);
+
+  const handlePlanningImportRollback = async () => {
+    if (!planningImportSnapshotToken) {
+      message.warning('当前没有可回滚的导入快照');
+      return;
+    }
+    try {
+      setPlanningImportRollbackLoading(true);
+      await api.post('/planning/import/rollback', {
+        snapshotToken: planningImportSnapshotToken
+      });
+      setPlanningImportSnapshotToken('');
+      setPlanningImportValidatedKey('');
+      message.success('已回滚最近一次导入');
+      refreshData();
+    } catch (error) {
+      const data = error.response?.data;
+      message.error(data?.error || '回滚失败');
+    } finally {
+      setPlanningImportRollbackLoading(false);
+    }
+  };
 
   function filterGroupsByRange(range) {
     if (!Array.isArray(range) || range.length !== 2 || !range[0] || !range[1]) {
@@ -1067,6 +1657,141 @@ function ItineraryDesigner() {
              selectedGroups.includes(activity.groupId);
     });
   };
+
+  const groupsById = useMemo(() => (
+    new Map(groups.map(group => [Number(group.id), group]))
+  ), [groups]);
+
+  const locationsById = useMemo(() => (
+    new Map(locations.map(location => [Number(location.id), location]))
+  ), [locations]);
+
+  const buildTimelineSlotConflicts = (dateString, slotActivities) => {
+    if (!Array.isArray(slotActivities) || slotActivities.length === 0) return [];
+
+    const conflicts = [];
+    const conflictKeys = new Set();
+    const weekdayIndex = dayjs(dateString).day();
+    const weekdayLabel = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][weekdayIndex] || '当日';
+
+    const pushConflict = (conflict) => {
+      const dedupeKey = `${conflict.type}|${conflict.groupId || ''}|${conflict.locationId || ''}|${conflict.message}`;
+      if (conflictKeys.has(dedupeKey)) return;
+      conflictKeys.add(dedupeKey);
+      conflicts.push(conflict);
+    };
+
+    const groupBuckets = new Map();
+    slotActivities.forEach((activity) => {
+      const groupId = Number(activity.groupId);
+      if (!Number.isFinite(groupId)) return;
+      if (!groupBuckets.has(groupId)) {
+        groupBuckets.set(groupId, []);
+      }
+      groupBuckets.get(groupId).push(activity);
+    });
+    groupBuckets.forEach((groupActivities, groupId) => {
+      if (groupActivities.length <= 1) return;
+      const group = groupsById.get(groupId);
+      pushConflict({
+        type: 'GROUP_TIME_CONFLICT',
+        groupId,
+        groupName: group?.name || `#${groupId}`,
+        message: `${group?.name || `#${groupId}`} 在同一时段有 ${groupActivities.length} 条活动安排`
+      });
+    });
+
+    const locationBuckets = new Map();
+    slotActivities.forEach((activity) => {
+      const locationId = Number(activity.locationId);
+      if (!Number.isFinite(locationId) || locationId <= 0) return;
+      if (!locationBuckets.has(locationId)) {
+        locationBuckets.set(locationId, []);
+      }
+      locationBuckets.get(locationId).push(activity);
+    });
+    locationBuckets.forEach((locationActivities, locationId) => {
+      const location = locationsById.get(locationId);
+      if (!location) return;
+      const capacity = Number(location.capacity);
+      if (!Number.isFinite(capacity) || capacity <= 0) return;
+      const totalParticipants = locationActivities.reduce(
+        (sum, activity) => sum + Number(activity.participantCount || 0),
+        0
+      );
+      if (totalParticipants <= capacity) return;
+      pushConflict({
+        type: 'CAPACITY',
+        locationId,
+        locationName: location.name || `#${locationId}`,
+        message: `${location.name || `#${locationId}`} 容量超限：${totalParticipants}/${capacity} 人`
+      });
+    });
+
+    slotActivities.forEach((activity) => {
+      const groupId = Number(activity.groupId);
+      const locationId = Number(activity.locationId);
+      const group = groupsById.get(groupId);
+      const location = locationsById.get(locationId);
+      if (!group || !location) return;
+
+      const blockedWeekdays = String(location.blocked_weekdays || '')
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean);
+      if (blockedWeekdays.includes(String(weekdayIndex))) {
+        pushConflict({
+          type: 'BLOCKED_WEEKDAY',
+          groupId,
+          groupName: group.name || `#${groupId}`,
+          locationId,
+          locationName: location.name || `#${locationId}`,
+          message: `${location.name || `#${locationId}`} 在 ${weekdayLabel} 不可用`
+        });
+      }
+
+      const targetGroups = String(location.target_groups || 'all').trim();
+      if (targetGroups !== 'all' && targetGroups !== group.type) {
+        pushConflict({
+          type: 'GROUP_TYPE',
+          groupId,
+          groupName: group.name || `#${groupId}`,
+          locationId,
+          locationName: location.name || `#${locationId}`,
+          message: `${location.name || `#${locationId}`} 不适用于${group.type === 'primary' ? '小学' : '中学'}团组`
+        });
+      }
+    });
+
+    return conflicts;
+  };
+
+  const timelineSlotConflictMap = useMemo(() => {
+    const slotActivityMap = new Map();
+    activities.forEach((activity) => {
+      if (!selectedGroups.includes(activity.groupId)) return;
+      const key = `${activity.date}|${activity.timeSlot}`;
+      if (!slotActivityMap.has(key)) {
+        slotActivityMap.set(key, []);
+      }
+      slotActivityMap.get(key).push(activity);
+    });
+
+    const result = new Map();
+    slotActivityMap.forEach((slotActivities, key) => {
+      const [dateString, timeSlot] = key.split('|');
+      const conflicts = buildTimelineSlotConflicts(dateString, slotActivities);
+      if (!conflicts.length) return;
+      result.set(key, {
+        key,
+        date: dateString,
+        timeSlot,
+        activities: slotActivities,
+        conflicts
+      });
+    });
+    return result;
+  }, [activities, selectedGroups, groupsById, locationsById]);
 
   // 团组控制台
   const renderGroupPanel = (showTitle = true) => (
@@ -1344,18 +2069,25 @@ function ItineraryDesigner() {
               const rowGroupNames = alignGroupRows
                 ? orderedGroupNames
                 : Array.from(groupedByName.keys()).sort((a, b) => a.localeCompare(b, 'zh'));
+              const slotConflictInfo = timelineSlotConflictMap.get(`${dateString}|${timeSlot.key}`) || null;
+              const hasSlotConflict = Boolean(slotConflictInfo?.conflicts?.length);
 
               return (
                 <div
                   key={`${timeSlot.key}-${dateIndex}`}
-                  className={`timeline-cell ${alignGroupRows ? 'aligned-rows' : ''}`}
-                  style={{ backgroundColor: timeSlot.color }}
-                  onClick={() => handleCellClick(date, timeSlot.key, slotActivities)}
+                  className={`timeline-cell ${alignGroupRows ? 'aligned-rows' : ''} ${hasSlotConflict ? 'conflict conflict-hot' : ''}`}
+                  style={{ backgroundColor: hasSlotConflict ? 'rgba(120, 6, 26, 0.26)' : timeSlot.color }}
+                  onClick={() => handleCellClick(date, timeSlot.key, slotActivities, slotConflictInfo)}
                   onDragOver={handleDragOver}
                   onDragEnter={handleDragEnter}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, date, timeSlot.key)}
                 >
+                  {hasSlotConflict ? (
+                    <div className="cell-conflict-badge">
+                      冲突 {slotConflictInfo.conflicts.length}
+                    </div>
+                  ) : null}
                   {rowGroupNames.length === 0 ? (
                     <div className="empty-cell">
                       <PlusOutlined style={{ color: 'var(--text-muted)' }} />
@@ -1396,9 +2128,9 @@ function ItineraryDesigner() {
                               return (
                                 <div
                                   key={activity.id}
-                                  draggable={!batchMode}
-                                  onDragStart={(e) => !batchMode && handleDragStart(e, activity)}
-                                  onDragEnd={!batchMode && handleDragEnd}
+                                  draggable
+                                  onDragStart={(e) => handleDragStart(e, activity)}
+                                  onDragEnd={handleDragEnd}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (batchMode) {
@@ -1683,12 +2415,30 @@ function ItineraryDesigner() {
   };
 
   // 点击时间格子
-  const handleCellClick = (date, timeSlot, activities) => {
-    setSelectedTimeSlot({
-      date: formatDateString(date),
+  const handleCellClick = (date, timeSlot, activities, slotConflictInfo = null) => {
+    const nextSelectedTimeSlot = {
+      date: date ? formatDateString(date) : '',
       timeSlot,
       activities
-    });
+    };
+    setSelectedTimeSlot(nextSelectedTimeSlot);
+
+    if (slotConflictInfo?.conflicts?.length) {
+      setModalVisible(false);
+      setSelectedSlotConflict({
+        ...slotConflictInfo,
+        date: nextSelectedTimeSlot.date,
+        timeSlot
+      });
+      return;
+    }
+
+    setSelectedSlotConflict(null);
+    setModalVisible(true);
+  };
+
+  const handleOpenEditFromConflict = () => {
+    setSelectedSlotConflict(null);
     setModalVisible(true);
   };
 
@@ -1892,15 +2642,15 @@ function ItineraryDesigner() {
   // 拖拽进入
   const handleDragEnter = (e) => {
     e.preventDefault();
-    if (e.target.classList.contains('timeline-cell')) {
-      e.target.classList.add('drag-over');
+    if (e.currentTarget.classList.contains('timeline-cell')) {
+      e.currentTarget.classList.add('drag-over');
     }
   };
 
   // 拖拽离开
   const handleDragLeave = (e) => {
-    if (e.target.classList.contains('timeline-cell')) {
-      e.target.classList.remove('drag-over');
+    if (e.currentTarget.classList.contains('timeline-cell')) {
+      e.currentTarget.classList.remove('drag-over');
     }
   };
 
@@ -1976,7 +2726,9 @@ function ItineraryDesigner() {
   // 放置
   const handleDrop = async (e, targetDate, targetTimeSlot) => {
     e.preventDefault();
-    e.target.classList.remove('drag-over');
+    if (e.currentTarget.classList.contains('timeline-cell')) {
+      e.currentTarget.classList.remove('drag-over');
+    }
 
     if (!draggedActivity) return;
 
@@ -1987,20 +2739,11 @@ function ItineraryDesigner() {
       return;
     }
 
-    // 检查冲突
-    const conflicts = checkConflicts(
-      draggedActivity.id,
-      draggedActivity.groupId,
-      draggedActivity.locationId,
-      targetDateString,
-      targetTimeSlot,
-      draggedActivity.participantCount
-    );
-
     try {
       await handleUpdateActivity(draggedActivity.id, {
         date: targetDateString,
-        timeSlot: targetTimeSlot
+        timeSlot: targetTimeSlot,
+        ignoreConflicts: true
       });
 
       message.success('活动时间调整成功');
@@ -2024,6 +2767,107 @@ function ItineraryDesigner() {
     : (planningImportGroupIds || []).filter(id => planningImportPayloadGroupIds.includes(id));
   const planningImportSummary = planningImportResult?.summary || null;
   const planningImportConflicts = planningImportResult?.conflicts || [];
+  const planningConflictTodayDate = dayjs().format('YYYY-MM-DD');
+  const planningSlotOrder = {
+    MORNING: 0,
+    AFTERNOON: 1,
+    EVENING: 2
+  };
+  const planningConflictRows = useMemo(() => (
+    planningImportConflicts.map((item, index) => {
+      const rawReasons = Array.isArray(item.reasons) && item.reasons.length
+        ? item.reasons
+        : [item.reason].filter(Boolean);
+      const reasonCode = String(rawReasons[0] || '').trim() || 'UNKNOWN';
+      const groupId = Number(item.groupId ?? item.group_id);
+      const locationId = Number(item.locationId ?? item.location_id);
+      const groupLabel = item.groupName
+        || item.group_name
+        || (groups.find(g => g.id === groupId)?.name || (Number.isFinite(groupId) ? `#${groupId}` : '未知团组'));
+      const locationLabel = item.locationName
+        || item.location_name
+        || (Number.isFinite(locationId) ? (locations.find(loc => loc.id === locationId)?.name || `#${locationId}`) : '未指定地点');
+      const slotKey = item.timeSlot ?? item.time_slot ?? '';
+      const slotLabel = slotKey ? getTimeSlotLabel(slotKey) : '未知时段';
+      const reasonLabel = item.reasonMessage || getPlanningConflictReasonLabel(reasonCode);
+      const manualRequired = rawReasons.some(isPlanningConflictManualRequired);
+      const suggestion = getPlanningConflictHandlingTip(reasonCode);
+      const dateText = item.date || '-';
+      const dateValue = dayjs(dateText).isValid() ? dayjs(dateText).valueOf() : Number.MAX_SAFE_INTEGER;
+      return {
+        key: `${groupId || 'g'}-${item.date || 'd'}-${slotKey || 's'}-${locationId || 'l'}-${reasonCode}-${index}`,
+        date: dateText,
+        dateValue,
+        groupId: Number.isFinite(groupId) ? groupId : null,
+        groupLabel,
+        locationId: Number.isFinite(locationId) ? locationId : null,
+        locationLabel,
+        slotKey,
+        slotLabel,
+        reasonCode,
+        reasonLabel,
+        manualRequired,
+        suggestion
+      };
+    })
+  ), [planningImportConflicts, groups, locations]);
+  const planningConflictBuckets = useMemo(() => {
+    const bucketMap = new Map();
+    planningConflictRows.forEach((row) => {
+      const key = row.reasonCode || 'UNKNOWN';
+      if (!bucketMap.has(key)) {
+        bucketMap.set(key, {
+          reasonCode: key,
+          reasonLabel: getPlanningConflictReasonLabel(key),
+          count: 0,
+          manualRequiredCount: 0
+        });
+      }
+      const bucket = bucketMap.get(key);
+      bucket.count += 1;
+      if (row.manualRequired) bucket.manualRequiredCount += 1;
+    });
+    return Array.from(bucketMap.values()).sort((a, b) => b.count - a.count);
+  }, [planningConflictRows]);
+  const planningConflictFilteredRows = useMemo(() => {
+    const filtered = planningConflictRows.filter((row) => {
+      if (planningConflictManualOnly && !row.manualRequired) return false;
+      if (planningConflictActiveReason !== 'ALL' && row.reasonCode !== planningConflictActiveReason) return false;
+      if (planningConflictTodayOnly && row.date !== planningConflictTodayDate) return false;
+      return true;
+    });
+    return filtered.sort((left, right) => {
+      if (planningConflictSortBy === 'GROUP_ASC') {
+        if (left.groupLabel !== right.groupLabel) {
+          return String(left.groupLabel).localeCompare(String(right.groupLabel), 'zh-CN');
+        }
+        if (left.dateValue !== right.dateValue) return left.dateValue - right.dateValue;
+        return (planningSlotOrder[left.slotKey] ?? 99) - (planningSlotOrder[right.slotKey] ?? 99);
+      }
+      if (planningConflictSortBy === 'DATE_DESC') {
+        if (left.dateValue !== right.dateValue) return right.dateValue - left.dateValue;
+        if ((planningSlotOrder[left.slotKey] ?? 99) !== (planningSlotOrder[right.slotKey] ?? 99)) {
+          return (planningSlotOrder[right.slotKey] ?? 99) - (planningSlotOrder[left.slotKey] ?? 99);
+        }
+        return String(left.groupLabel).localeCompare(String(right.groupLabel), 'zh-CN');
+      }
+      if (left.dateValue !== right.dateValue) return left.dateValue - right.dateValue;
+      if ((planningSlotOrder[left.slotKey] ?? 99) !== (planningSlotOrder[right.slotKey] ?? 99)) {
+        return (planningSlotOrder[left.slotKey] ?? 99) - (planningSlotOrder[right.slotKey] ?? 99);
+      }
+      return String(left.groupLabel).localeCompare(String(right.groupLabel), 'zh-CN');
+    });
+  }, [
+    planningConflictRows,
+    planningConflictManualOnly,
+    planningConflictActiveReason,
+    planningConflictTodayOnly,
+    planningConflictTodayDate,
+    planningConflictSortBy
+  ]);
+  const planningConflictTodayCount = useMemo(() => (
+    planningConflictRows.filter((row) => row.date === planningConflictTodayDate).length
+  ), [planningConflictRows, planningConflictTodayDate]);
   const planningImportFile = planningImportFileList[0];
   const groupCalendarDetailGroup = groups.find(group => group.id === groupCalendarDetailGroupId);
   const groupCalendarDetailAvailableHeight = groupCalendarVisible ? groupCalendarHeight : 0;
@@ -2324,6 +3168,70 @@ function ItineraryDesigner() {
         </div>
       </Modal>
 
+      <Modal
+        title={`时段冲突详情 - ${selectedSlotConflict?.date || ''} ${selectedSlotConflict?.timeSlot ? getTimeSlotLabel(selectedSlotConflict.timeSlot) : ''}`}
+        open={Boolean(selectedSlotConflict)}
+        onCancel={() => setSelectedSlotConflict(null)}
+        width={760}
+        wrapClassName="itinerary-modal-wrap"
+        getContainer={getDesignerContainer}
+        styles={overlayStyles}
+        footer={[
+          <Button key="close" onClick={() => setSelectedSlotConflict(null)}>
+            关闭
+          </Button>,
+          <Button
+            key="edit"
+            type="primary"
+            onClick={handleOpenEditFromConflict}
+            disabled={!selectedTimeSlot}
+          >
+            继续编辑该时段
+          </Button>
+        ]}
+      >
+        <div
+          style={{
+            marginBottom: 12,
+            padding: '10px 12px',
+            borderRadius: 8,
+            border: '1px solid #ffccc7',
+            background: '#fff1f0',
+            color: '#7a0014'
+          }}
+        >
+          当前时段检测到 {selectedSlotConflict?.conflicts?.length || 0} 项冲突，请先处理冲突再做排程调整。
+        </div>
+        <div style={{ maxHeight: 420, overflow: 'auto', display: 'grid', gap: 10 }}>
+          {(selectedSlotConflict?.conflicts || []).map((conflict, index) => (
+            <div
+              key={`${conflict.type || 'conflict'}-${conflict.groupId || 'g'}-${conflict.locationId || 'l'}-${index}`}
+              style={{
+                border: '1px solid #ffd8bf',
+                borderRadius: 8,
+                padding: '10px 12px',
+                background: '#fff7e6'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
+                <strong style={{ color: '#d46b08' }}>
+                  {getPlanningConflictReasonLabel(conflict.type)}
+                </strong>
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+                  {conflict.groupName || '未指定团组'}
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: '#262626', marginBottom: 6 }}>
+                {conflict.message}
+              </div>
+              <div style={{ fontSize: 12, color: '#595959' }}>
+                建议处理: {getPlanningConflictHandlingTip(conflict.type)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Modal>
+
       {/* 详情编辑弹窗 */}
       <Modal
         title={`编辑行程 - ${selectedTimeSlot?.date} ${timeSlots.find(t => t.key === selectedTimeSlot?.timeSlot)?.label}`}
@@ -2481,7 +3389,7 @@ function ItineraryDesigner() {
       
       
       <Modal
-        title="导入排程结果(JSON)"
+        title="导入排程结果(JSON/CSV)"
         open={planningImportVisible}
         onCancel={() => setPlanningImportVisible(false)}
         wrapClassName="itinerary-modal-wrap"
@@ -2490,6 +3398,15 @@ function ItineraryDesigner() {
         footer={[
           <Button key="cancel" onClick={() => setPlanningImportVisible(false)}>
             取消
+          </Button>,
+          <Button
+            key="rollback"
+            danger
+            onClick={handlePlanningImportRollback}
+            loading={planningImportRollbackLoading}
+            disabled={!planningImportSnapshotToken}
+          >
+            回滚最近导入
           </Button>,
           <Button
             key="validate"
@@ -2504,7 +3421,7 @@ function ItineraryDesigner() {
             type="primary"
             onClick={handlePlanningImportApply}
             loading={planningImportLoading}
-            disabled={!planningImportPayload}
+            disabled={!planningImportPayload || !planningImportValidatedKey}
           >
             导入
           </Button>
@@ -2512,7 +3429,7 @@ function ItineraryDesigner() {
         destroyOnClose
       >
         <Upload.Dragger
-          accept=".json,application/json"
+          accept=".json,.csv,application/json,text/csv"
           multiple={false}
           fileList={planningImportFileList}
           beforeUpload={handlePlanningImportFile}
@@ -2521,8 +3438,8 @@ function ItineraryDesigner() {
           <p className="ant-upload-drag-icon">
             <InboxOutlined />
           </p>
-          <p className="ant-upload-text">点击或拖拽上传 planning_result.json</p>
-          <p className="ant-upload-hint">仅支持 JSON 文件</p>
+          <p className="ant-upload-text">点击或拖拽上传 planning_result.json / CSV 模板</p>
+          <p className="ant-upload-hint">支持 JSON（标准格式）和 CSV（人工可读格式）</p>
         </Upload.Dragger>
 
         {planningImportPayload ? (
@@ -2545,14 +3462,28 @@ function ItineraryDesigner() {
         <Form
           form={planningImportForm}
           layout="vertical"
+          onValuesChange={() => {
+            setPlanningImportValidatedKey('');
+          }}
           initialValues={{
             replaceExisting: false,
             skipConflicts: true,
             onlySelectedGroups: true,
-            groupIds: []
+            groupIds: [],
+            importDateRange: []
           }}
           style={{ marginTop: 12 }}
         >
+          <Form.Item
+            name="importDateRange"
+            label="导入日期范围（保护机制）"
+            rules={[{ required: true, message: '请选择导入日期范围' }]}
+          >
+            <DatePicker.RangePicker
+              getPopupContainer={getDesignerContainer}
+              disabled={!planningImportPayload}
+            />
+          </Form.Item>
           <Form.Item name="replaceExisting" valuePropName="checked">
             <Checkbox>覆盖日期范围内已有安排</Checkbox>
           </Form.Item>
@@ -2628,18 +3559,94 @@ function ItineraryDesigner() {
               <span>跳过: {planningImportSummary?.skipped || 0}</span>
               <span>冲突: {planningImportSummary?.conflicts || 0}</span>
             </div>
+            {planningImportResult?.appliedRange ? (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                生效范围: {planningImportResult.appliedRange.startDate} ~ {planningImportResult.appliedRange.endDate}
+              </div>
+            ) : null}
+            {planningImportResult?.snapshotToken ? (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                回滚快照: {planningImportResult.snapshotToken}
+              </div>
+            ) : null}
             {planningImportConflicts.length ? (
-              <div style={{ maxHeight: 160, overflow: 'auto', fontSize: 12, color: '#d4380d' }}>
-                {planningImportConflicts.slice(0, 20).map((item, index) => {
-                  const groupLabel = item.groupName || (groups.find(g => g.id === item.groupId)?.name || `#${item.groupId}`);
-                  const locationLabel = item.locationName || (item.locationId ? `#${item.locationId}` : '');
-                  const slotLabel = item.timeSlot ? getTimeSlotLabel(item.timeSlot) : '';
-                  return (
-                    <div key={`${item.groupId || 'g'}-${item.date || 'd'}-${index}`}>
-                      {groupLabel} ? {item.date} ? {slotLabel} ? {locationLabel} ? {item.reason}
-                    </div>
-                  );
-                })}
+              <div style={{ marginTop: 8, borderTop: '1px solid #ececec', paddingTop: 10 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+                  <Button
+                    size="small"
+                    type={planningConflictActiveReason === 'ALL' ? 'primary' : 'default'}
+                    onClick={() => setPlanningConflictActiveReason('ALL')}
+                  >
+                    全部 {planningConflictRows.length}
+                  </Button>
+                  {planningConflictBuckets.map((bucket) => (
+                    <Button
+                      key={bucket.reasonCode}
+                      size="small"
+                      type={planningConflictActiveReason === bucket.reasonCode ? 'primary' : 'default'}
+                      onClick={() => setPlanningConflictActiveReason(bucket.reasonCode)}
+                    >
+                      {bucket.reasonLabel} {bucket.count}
+                    </Button>
+                  ))}
+                  <Checkbox
+                    checked={planningConflictManualOnly}
+                    onChange={(event) => setPlanningConflictManualOnly(event.target.checked)}
+                  >
+                    仅看必须人工处理
+                  </Checkbox>
+                  <Checkbox
+                    checked={planningConflictTodayOnly}
+                    onChange={(event) => setPlanningConflictTodayOnly(event.target.checked)}
+                    disabled={planningConflictTodayCount === 0}
+                  >
+                    仅看今日冲突（{planningConflictTodayCount}）
+                  </Checkbox>
+                  <Select
+                    size="small"
+                    style={{ minWidth: 170 }}
+                    value={planningConflictSortBy}
+                    onChange={setPlanningConflictSortBy}
+                    options={[
+                      { label: '按日期升序', value: 'DATE_ASC' },
+                      { label: '按日期降序', value: 'DATE_DESC' },
+                      { label: '按团组名称', value: 'GROUP_ASC' }
+                    ]}
+                  />
+                </div>
+
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
+                  今日日期: {planningConflictTodayDate}，当前显示 {Math.min(planningConflictFilteredRows.length, 50)} / {planningConflictRows.length} 条
+                </div>
+
+                {planningConflictFilteredRows.length ? (
+                  <div style={{ maxHeight: 200, overflow: 'auto', fontSize: 12, color: '#d4380d' }}>
+                    {planningConflictFilteredRows.slice(0, 50).map((row) => (
+                      <div
+                        key={row.key}
+                        style={{
+                          padding: '5px 0',
+                          borderBottom: '1px dashed #f0f0f0',
+                          display: 'grid',
+                          gap: 8,
+                          gridTemplateColumns: 'minmax(0, 1fr) minmax(180px, 260px)'
+                        }}
+                      >
+                        <div>
+                          {row.groupLabel} | {row.date} | {row.slotLabel} | {row.locationLabel} | {row.reasonLabel}
+                          {row.manualRequired ? <span style={{ color: '#cf1322', fontWeight: 600 }}>（需人工）</span> : null}
+                        </div>
+                        <div style={{ color: '#595959', wordBreak: 'break-word' }}>
+                          建议: {row.suggestion}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    当前筛选条件下无冲突
+                  </div>
+                )}
               </div>
             ) : (
               <div style={{ fontSize: 12, color: '#52c41a' }}>未发现冲突</div>
@@ -2650,7 +3657,7 @@ function ItineraryDesigner() {
 
 
       <Modal
-        title="导出排程输入包(JSON)"
+        title="导出排程输入包(JSON/CSV)"
         open={planningExportVisible}
         onCancel={() => setPlanningExportVisible(false)}
         wrapClassName="itinerary-modal-wrap"
@@ -2659,6 +3666,13 @@ function ItineraryDesigner() {
         footer={[
           <Button key="cancel" onClick={() => setPlanningExportVisible(false)}>
             取消
+          </Button>,
+          <Button
+            key="export-csv"
+            onClick={handlePlanningExportCsv}
+            loading={planningExportCsvLoading}
+          >
+            导出人工模板(CSV)
           </Button>,
           <Button
             key="export"

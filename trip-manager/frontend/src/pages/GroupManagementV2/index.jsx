@@ -472,11 +472,12 @@ const GroupManagementV2 = () => {
   const [filteredGroups, setFilteredGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeGroupId, setActiveGroupId] = useState(null);
-  const [activeTab, setActiveTab] = useState('schedule');
+  const [activeTab, setActiveTab] = useState('profile');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [groupSchedules, setGroupSchedules] = useState([]);
   const [hasMembers, setHasMembers] = useState(false);
   const [itineraryPlans, setItineraryPlans] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [rightPanelWidth, setRightPanelWidth] = useState(260);
 
   const [filters, setFilters] = useState({
@@ -575,6 +576,15 @@ const GroupManagementV2 = () => {
     }
   };
 
+  const fetchLocations = async () => {
+    try {
+      const response = await api.get('/locations');
+      setLocations(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      setLocations([]);
+    }
+  };
+
   const fetchMemberCount = async (groupId) => {
     if (!groupId) {
       setHasMembers(false);
@@ -592,6 +602,7 @@ const GroupManagementV2 = () => {
   useEffect(() => {
     fetchGroups();
     fetchItineraryPlans();
+    fetchLocations();
   }, []);
 
   useEffect(() => {
@@ -670,6 +681,8 @@ const GroupManagementV2 = () => {
     tags: group.tags,
     notes: group.notes,
     itinerary_plan_id: group.itinerary_plan_id,
+    must_visit_mode: group.must_visit_mode,
+    manual_must_visit_location_ids: group.manual_must_visit_location_ids,
     status: group.status
   });
 
@@ -946,6 +959,7 @@ const GroupManagementV2 = () => {
             schedules={groupSchedules}
             hasMembers={hasMembers}
             itineraryPlans={itineraryPlans}
+            locations={locations}
             onUpdate={handleGroupUpdate}
             onDelete={handleDeleteGroup}
             rightPanelWidth={rightPanelWidth}

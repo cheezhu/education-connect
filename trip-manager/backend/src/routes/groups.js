@@ -66,11 +66,58 @@ const normalizeTags = (value) => {
 
 const serializeTags = (value) => JSON.stringify(normalizeTags(value));
 
+const normalizeMustVisitMode = (value, fallback = 'plan') => {
+  const mode = String(value || '').trim().toLowerCase();
+  if (mode === 'plan' || mode === 'manual') {
+    return mode;
+  }
+  return fallback;
+};
+
+const normalizeManualMustVisitLocationIds = (value) => {
+  if (Array.isArray(value)) {
+    return Array.from(new Set(
+      value
+        .map(item => Number(item))
+        .filter(id => Number.isFinite(id) && id > 0)
+    ));
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return normalizeManualMustVisitLocationIds(parsed);
+      }
+    } catch (error) {
+      // ignore parse error and fallback to split
+    }
+    return Array.from(new Set(
+      trimmed
+        .split(/[,\uFF0C\u3001;|]/)
+        .map(item => Number(item.trim()))
+        .filter(id => Number.isFinite(id) && id > 0)
+    ));
+  }
+
+  return [];
+};
+
+const serializeManualMustVisitLocationIds = (value) => (
+  JSON.stringify(normalizeManualMustVisitLocationIds(value))
+);
+
 const hydrateGroup = (group) => {
   if (!group) return group;
+  const manualMustVisitLocationIds = normalizeManualMustVisitLocationIds(group.manual_must_visit_location_ids);
+  const fallbackMode = manualMustVisitLocationIds.length > 0 ? 'manual' : 'plan';
   return {
     ...group,
-    tags: normalizeTags(group.tags)
+    tags: normalizeTags(group.tags),
+    must_visit_mode: normalizeMustVisitMode(group.must_visit_mode, fallbackMode),
+    manual_must_visit_location_ids: manualMustVisitLocationIds
   };
 };
 
@@ -84,7 +131,11 @@ const normalizeGroupPayload = (payload = {}) => {
   const teacherCount = payload.teacherCount ?? payload.teacher_count ?? 4;
   const duration = payload.duration ?? calculateDuration(startDate, endDate);
   const color = payload.color ?? getRandomGroupColor();
-  const itineraryPlanId = payload.itineraryPlanId ?? payload.itinerary_plan_id ?? null;
+  const mustVisitModeRaw = payload.mustVisitMode ?? payload.must_visit_mode;
+  const manualMustVisitLocationIdsRaw = payload.manualMustVisitLocationIds ?? payload.manual_must_visit_location_ids;
+  const mustVisitMode = normalizeMustVisitMode(mustVisitModeRaw, 'plan');
+  const itineraryPlanIdRaw = payload.itineraryPlanId ?? payload.itinerary_plan_id ?? null;
+  const itineraryPlanId = mustVisitMode === 'manual' ? null : itineraryPlanIdRaw;
   const status = payload.status ?? null;
   const contactPerson = payload.contactPerson ?? payload.contact_person;
   const contactPhone = payload.contactPhone ?? payload.contact_phone;
@@ -93,6 +144,9 @@ const normalizeGroupPayload = (payload = {}) => {
   const accommodation = payload.accommodation ?? '';
   const tags = serializeTags(payload.tags);
   const notes = payload.notes ?? '';
+  const manualMustVisitLocationIds = mustVisitMode === 'manual'
+    ? serializeManualMustVisitLocationIds(manualMustVisitLocationIdsRaw)
+    : '[]';
 
   return {
     name,
@@ -111,7 +165,9 @@ const normalizeGroupPayload = (payload = {}) => {
     emergencyPhone,
     accommodation,
     tags,
-    notes
+    notes,
+    mustVisitMode,
+    manualMustVisitLocationIds
   };
 };
 
@@ -127,8 +183,9 @@ router.post('/batch', requireEditLock, (req, res) => {
     INSERT INTO groups (
       name, type, student_count, teacher_count,
       start_date, end_date, duration, color, itinerary_plan_id, contact_person,
-      contact_phone, emergency_contact, emergency_phone, accommodation, tags, notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      contact_phone, emergency_contact, emergency_phone, accommodation, tags, notes,
+      must_visit_mode, manual_must_visit_location_ids
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const selectStmt = req.db.prepare('SELECT * FROM groups WHERE id = ?');
 
@@ -158,7 +215,9 @@ router.post('/batch', requireEditLock, (req, res) => {
         normalized.emergencyPhone,
         normalized.accommodation,
         normalized.tags,
-        normalized.notes
+        normalized.notes,
+        normalized.mustVisitMode,
+        normalized.manualMustVisitLocationIds
       );
 
       created.push(selectStmt.get(result.lastInsertRowid));
@@ -195,6 +254,10 @@ router.post('/', requireEditLock, (req, res) => {
     accommodation,
     tags,
     notes,
+    mustVisitMode,
+    must_visit_mode,
+    manualMustVisitLocationIds,
+    manual_must_visit_location_ids,
     student_count,
     teacher_count,
     start_date,
@@ -217,9 +280,14 @@ router.post('/', requireEditLock, (req, res) => {
   const resolvedContactPhone = contactPhone ?? contact_phone;
   const resolvedEmergencyContact = emergencyContact ?? emergency_contact ?? null;
   const resolvedEmergencyPhone = emergencyPhone ?? emergency_phone ?? null;
-  const resolvedItineraryPlanId = itineraryPlanId ?? itinerary_plan_id ?? null;
+  const resolvedMustVisitMode = normalizeMustVisitMode(mustVisitMode ?? must_visit_mode, 'plan');
+  const resolvedItineraryPlanIdRaw = itineraryPlanId ?? itinerary_plan_id ?? null;
+  const resolvedItineraryPlanId = resolvedMustVisitMode === 'manual' ? null : resolvedItineraryPlanIdRaw;
   const resolvedAccommodation = accommodation ?? '';
   const resolvedTags = serializeTags(tags);
+  const resolvedManualMustVisitLocationIds = resolvedMustVisitMode === 'manual'
+    ? serializeManualMustVisitLocationIds(manualMustVisitLocationIds ?? manual_must_visit_location_ids ?? [])
+    : '[]';
 
   if (!name || !type || !resolvedStartDate || !resolvedEndDate) {
     return res.status(400).json({ 
@@ -232,13 +300,15 @@ router.post('/', requireEditLock, (req, res) => {
       INSERT INTO groups (
         name, type, student_count, teacher_count, 
         start_date, end_date, duration, color, itinerary_plan_id, status, contact_person,
-        contact_phone, emergency_contact, emergency_phone, accommodation, tags, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        contact_phone, emergency_contact, emergency_phone, accommodation, tags, notes,
+        must_visit_mode, manual_must_visit_location_ids
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name, type, resolvedStudentCount, resolvedTeacherCount,
       resolvedStartDate, resolvedEndDate, resolvedDuration, resolvedColor, resolvedItineraryPlanId,
       resolvedStatus, resolvedContactPerson, resolvedContactPhone, resolvedEmergencyContact, resolvedEmergencyPhone,
-      resolvedAccommodation, resolvedTags, notes
+      resolvedAccommodation, resolvedTags, notes,
+      resolvedMustVisitMode, resolvedManualMustVisitLocationIds
     );
 
     const newGroup = req.db.prepare('SELECT * FROM groups WHERE id = ?').get(result.lastInsertRowid);
@@ -341,23 +411,39 @@ router.put('/:id', requireEditLock, (req, res) => {
   const { id } = req.params;
   const updates = [];
   const values = [];
-  const shouldClearSchedules = req.body.status === CANCELLED_STATUS;
+  const normalizedBody = { ...req.body };
+  const shouldClearSchedules = normalizedBody.status === CANCELLED_STATUS;
+
+  if (normalizedBody.must_visit_mode !== undefined) {
+    const mode = normalizeMustVisitMode(normalizedBody.must_visit_mode, 'plan');
+    normalizedBody.must_visit_mode = mode;
+    if (mode === 'manual') {
+      normalizedBody.itinerary_plan_id = null;
+    } else {
+      normalizedBody.manual_must_visit_location_ids = [];
+    }
+  }
 
   // 构建更新字段
   const allowedFields = [
     'name', 'type', 'student_count', 'teacher_count',
     'start_date', 'end_date', 'duration', 'color', 'contact_person',
     'contact_phone', 'emergency_contact', 'emergency_phone',
-    'accommodation', 'tags', 'notes', 'itinerary_plan_id', 'status'
+    'accommodation', 'tags', 'notes', 'itinerary_plan_id', 'status',
+    'must_visit_mode', 'manual_must_visit_location_ids'
   ];
 
   allowedFields.forEach(field => {
-    if (req.body[field] !== undefined) {
+    if (normalizedBody[field] !== undefined) {
       updates.push(`${field} = ?`);
       if (field === 'tags') {
-        values.push(serializeTags(req.body[field]));
+        values.push(serializeTags(normalizedBody[field]));
+      } else if (field === 'must_visit_mode') {
+        values.push(normalizeMustVisitMode(normalizedBody[field], 'plan'));
+      } else if (field === 'manual_must_visit_location_ids') {
+        values.push(serializeManualMustVisitLocationIds(normalizedBody[field]));
       } else {
-        values.push(req.body[field]);
+        values.push(normalizedBody[field]);
       }
     }
   });

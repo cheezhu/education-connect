@@ -55,14 +55,55 @@ const normalizeNotes = (value) => {
   return text;
 };
 
-const buildBaseProperties = (group, itineraryPlans, hasMembers) => {
+const normalizeMustVisitMode = (value, fallback = 'plan') => {
+  const mode = String(value || '').trim().toLowerCase();
+  if (mode === 'plan' || mode === 'manual') {
+    return mode;
+  }
+  return fallback;
+};
+
+const normalizeManualMustVisitLocationIds = (value) => {
+  if (Array.isArray(value)) {
+    return Array.from(new Set(
+      value
+        .map(item => Number(item))
+        .filter(id => Number.isFinite(id) && id > 0)
+    ));
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return normalizeManualMustVisitLocationIds(parsed);
+      }
+    } catch (error) {
+      // ignore parse error and fallback to split
+    }
+    return Array.from(new Set(
+      trimmed
+        .split(/[,\uFF0C\u3001;|]/)
+        .map(item => Number(item.trim()))
+        .filter(id => Number.isFinite(id) && id > 0)
+    ));
+  }
+  return [];
+};
+
+const extractPlanLocationIds = (items = []) => (
+  Array.from(new Set(
+    (Array.isArray(items) ? items : [])
+      .map((item) => Number(item?.location_id))
+      .filter((id) => Number.isFinite(id) && id > 0)
+  ))
+);
+
+const buildBaseProperties = (group, hasMembers) => {
   const tagsValue = Array.isArray(group.tags) ? group.tags.join(', ') : (group.tags || '');
   const dateValue = buildDateValue(group.start_date, group.end_date);
   const totalCount = (group.student_count || 0) + (group.teacher_count || 0);
-  const planOptions = (itineraryPlans || []).map((plan) => ({
-    value: String(plan.id),
-    label: plan.name
-  }));
   const typeOptions = [
     { value: 'primary', label: '小学' },
     { value: 'secondary', label: '中学' }
@@ -124,15 +165,6 @@ const buildBaseProperties = (group, itineraryPlans, hasMembers) => {
       icon: '#',
       field: 'total',
       readOnly: true
-    },
-    {
-      id: 'plan',
-      key: '行程方案',
-      value: group.itinerary_plan_id ? String(group.itinerary_plan_id) : '',
-      type: 'select',
-      icon: 'v',
-      field: 'itinerary_plan_id',
-      options: planOptions
     },
     {
       id: 'accommodation',
@@ -309,26 +341,16 @@ const ProfileView = ({
   group,
   schedules,
   itineraryPlans = [],
+  locations = [],
   onUpdate,
   hasMembers,
-  rightPanelWidth = 260,
-  onResizeRightPanel,
   onNavigateTab
 }) => {
   const [draft, setDraft] = useState(group || null);
   const [properties, setProperties] = useState([]);
-  const containerRef = useRef(null);
-  const resizeStateRef = useRef({ startX: 0, startWidth: 260, containerWidth: 0 });
-  const resizerWidth = 6;
-  const minCenter = 420;
-  const minRightPanel = 220;
   const hydrateRef = useRef(false);
   const debounceRef = useRef(null);
   const lastDraftRef = useRef(null);
-
-  const overviewRef = useRef(null);
-  const dashboardRef = useRef(null);
-  const dailyRef = useRef(null);
 
   useEffect(() => {
     if (!group) {
@@ -338,9 +360,9 @@ const ProfileView = ({
     }
     hydrateRef.current = true;
     setDraft({ ...group, notes: normalizeNotes(group.notes) });
-    const base = buildBaseProperties(group, itineraryPlans, hasMembers);
+    const base = buildBaseProperties(group, hasMembers);
     setProperties(mergeCustomProperties(base, group.properties));
-  }, [group?.id, itineraryPlans, hasMembers]);
+  }, [group?.id, hasMembers]);
 
   useEffect(() => {
     if (!group?.id || !onUpdate) return;
@@ -401,10 +423,6 @@ const ProfileView = ({
         <div className="profile-center">
           <div className="empty-state">请选择团组以查看详情</div>
         </div>
-        <div className="profile-resizer" />
-        <div className="profile-right">
-          <div className="empty-state">暂无目录</div>
-        </div>
       </div>
     );
   }
@@ -441,10 +459,6 @@ const ProfileView = ({
           if (updated.field === 'student_count' || updated.field === 'teacher_count') {
             const numeric = Number(updates.value);
             nextDraft[updated.field] = Number.isFinite(numeric) ? numeric : 0;
-            return nextDraft;
-          }
-          if (updated.field === 'itinerary_plan_id') {
-            nextDraft.itinerary_plan_id = updates.value ? Number(updates.value) : null;
             return nextDraft;
           }
           if (updated.field === 'tags') {
@@ -497,45 +511,6 @@ const ProfileView = ({
     return newId;
   };
 
-  const handleResizeStart = (event) => {
-    event.preventDefault();
-    resizeStateRef.current = {
-      startX: event.clientX,
-      startWidth: rightPanelWidth,
-      containerWidth: containerRef.current?.getBoundingClientRect().width || 0
-    };
-
-    const handleMouseMove = (moveEvent) => {
-      const delta = moveEvent.clientX - resizeStateRef.current.startX;
-      const containerWidth = resizeStateRef.current.containerWidth;
-      if (!containerWidth) return;
-      const maxRight = Math.max(minRightPanel, containerWidth - minCenter - resizerWidth);
-      const nextRightWidth = Math.min(
-        Math.max(resizeStateRef.current.startWidth - delta, minRightPanel),
-        maxRight
-      );
-      onResizeRightPanel?.(Math.round(nextRightWidth));
-    };
-
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
-
-  const scrollToSection = (ref) => {
-    if (ref?.current) {
-      ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
   const statusOptions = [
     { value: null, label: '自动' },
     { value: '准备中', label: '准备中' },
@@ -544,20 +519,111 @@ const ProfileView = ({
     { value: '已取消', label: '已取消' }
   ];
 
-  return (
-    <div className="profile-layout profile-doc" ref={containerRef}>
-      <div className="profile-center doc-container">
-        <div className="doc-actions">
-          <div className="breadcrumb">
-            <span>团组管理</span>
-            <span className="breadcrumb-sep">/</span>
-            <span>{draft.name || '未命名团组'}</span>
-          </div>
-          <div className="doc-status">自动保存</div>
-        </div>
+  const locationMap = new Map(
+    (locations || []).map((location) => [Number(location.id), location])
+  );
+  const manualMustVisitIds = normalizeManualMustVisitLocationIds(draft.manual_must_visit_location_ids);
+  const mode = normalizeMustVisitMode(
+    draft.must_visit_mode,
+    manualMustVisitIds.length > 0 ? 'manual' : 'plan'
+  );
+  const activePlan = (itineraryPlans || []).find(
+    (plan) => Number(plan.id) === Number(draft.itinerary_plan_id)
+  ) || null;
+  const planMustVisitIds = extractPlanLocationIds(activePlan?.items || []);
+  const selectedMustVisitIds = (mode === 'plan' && manualMustVisitIds.length === 0)
+    ? planMustVisitIds
+    : manualMustVisitIds;
+  const resolvedMustVisit = selectedMustVisitIds.map((locationId, index) => {
+    const fromPlan = mode === 'plan' && manualMustVisitIds.length === 0;
+    const location = locationMap.get(locationId);
+    return {
+      location_id: locationId,
+      location_name: location?.name || `#${locationId}`,
+      sort_order: index,
+      source: fromPlan ? 'plan' : 'manual'
+    };
+  });
+  const mustVisitConfigured = resolvedMustVisit.length > 0;
 
+  const handleMustVisitPlanChange = (value) => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const planId = value ? Number(value) : null;
+      const nextPlan = (itineraryPlans || []).find((plan) => Number(plan.id) === planId);
+      const nextIds = extractPlanLocationIds(nextPlan?.items || []);
+      return {
+        ...prev,
+        must_visit_mode: nextIds.length > 0 ? 'manual' : 'plan',
+        itinerary_plan_id: Number.isFinite(planId) ? planId : null,
+        manual_must_visit_location_ids: nextIds
+      };
+    });
+  };
+
+  const handleApplyCurrentPlan = () => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const planId = Number(prev.itinerary_plan_id);
+      if (!Number.isFinite(planId)) return prev;
+      const plan = (itineraryPlans || []).find((item) => Number(item.id) === planId);
+      const nextIds = extractPlanLocationIds(plan?.items || []);
+      return {
+        ...prev,
+        must_visit_mode: nextIds.length > 0 ? 'manual' : 'plan',
+        manual_must_visit_location_ids: nextIds
+      };
+    });
+  };
+
+  const handleToggleManualMustVisit = (locationId) => {
+    const normalizedLocationId = Number(locationId);
+    if (!Number.isFinite(normalizedLocationId) || normalizedLocationId <= 0) {
+      return;
+    }
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const previousMode = normalizeMustVisitMode(prev.must_visit_mode, 'plan');
+      const currentManualIds = normalizeManualMustVisitLocationIds(prev.manual_must_visit_location_ids);
+      let currentIds = currentManualIds;
+      if (previousMode === 'plan' && currentManualIds.length === 0) {
+        const previousPlan = (itineraryPlans || []).find(
+          (plan) => Number(plan.id) === Number(prev.itinerary_plan_id)
+        );
+        currentIds = extractPlanLocationIds(previousPlan?.items || []);
+      }
+      const nextSet = new Set(currentIds);
+      if (nextSet.has(normalizedLocationId)) {
+        nextSet.delete(normalizedLocationId);
+      } else {
+        nextSet.add(normalizedLocationId);
+      }
+      return {
+        ...prev,
+        must_visit_mode: 'manual',
+        itinerary_plan_id: prev.itinerary_plan_id ?? null,
+        manual_must_visit_location_ids: Array.from(nextSet)
+      };
+    });
+  };
+
+  const handleClearManualMustVisit = () => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        must_visit_mode: 'manual',
+        itinerary_plan_id: prev.itinerary_plan_id ?? null,
+        manual_must_visit_location_ids: []
+      };
+    });
+  };
+
+  return (
+    <div className="profile-layout profile-doc">
+      <div className="profile-center doc-container">
         <div className="doc-content">
-          <div ref={overviewRef}>
+          <div>
             <div className="doc-icon">🗂️</div>
             <input
               className="doc-title"
@@ -584,7 +650,96 @@ const ProfileView = ({
             onAddProperty={handleAddProperty}
           />
 
-          <div className="dashboard-section" ref={dashboardRef}>
+          <div className="must-visit-module">
+            <div className="must-visit-head">
+              <div className="must-visit-title">必去行程点配置</div>
+              <span className={`must-visit-badge ${mustVisitConfigured ? 'ok' : 'warn'}`}>
+                {mustVisitConfigured ? `已配置 ${resolvedMustVisit.length} 项` : '未配置'}
+              </span>
+            </div>
+
+            <div className="must-visit-edit-row">
+              <label className="must-visit-label">快捷方案</label>
+              <div className="must-visit-plan-row">
+                <div className="must-visit-plan-actions">
+                  <select
+                    className="prop-input"
+                    value={draft.itinerary_plan_id ? String(draft.itinerary_plan_id) : ''}
+                    onChange={(event) => handleMustVisitPlanChange(event.target.value)}
+                  >
+                    <option value="">不使用方案（仅手动）</option>
+                    {(itineraryPlans || []).map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="must-visit-link-btn"
+                    onClick={handleApplyCurrentPlan}
+                    disabled={!draft.itinerary_plan_id}
+                  >
+                    套用当前方案
+                  </button>
+                </div>
+                <span className="must-visit-tip">
+                  选择方案后会自动填充下方多选，可继续手动微调。
+                </span>
+              </div>
+            </div>
+
+            <div className="must-visit-edit-row">
+              <label className="must-visit-label">手动必去行程点</label>
+              <div className="must-visit-manual-panel">
+                <div className="must-visit-manual-tools">
+                  <span className="must-visit-tip">点击卡片即可多选，无需按住 Ctrl</span>
+                  <button
+                    type="button"
+                    className="must-visit-link-btn"
+                    onClick={handleClearManualMustVisit}
+                    disabled={selectedMustVisitIds.length === 0}
+                  >
+                    清空
+                  </button>
+                </div>
+                <div className="must-visit-option-grid">
+                  {(locations || []).length === 0 && (
+                    <span className="muted">暂无可选地点</span>
+                  )}
+                  {(locations || []).map((location) => {
+                    const locationId = Number(location.id);
+                    const isSelected = selectedMustVisitIds.includes(locationId);
+                    return (
+                      <button
+                        key={location.id}
+                        type="button"
+                        className={`must-visit-option ${isSelected ? 'active' : ''}`}
+                        onClick={() => handleToggleManualMustVisit(locationId)}
+                      >
+                        <span className="must-visit-option-check">{isSelected ? '✓' : '+'}</span>
+                        <span className="must-visit-option-name">{location.name || `#${location.id}`}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="must-visit-list">
+              {resolvedMustVisit.length === 0 ? (
+                <span className="muted">未配置必去行程点，行程设计器导出会被拦截。</span>
+              ) : (
+                resolvedMustVisit.map((item, index) => (
+                  <span className="schedule-chip" key={`${item.location_id}-${index}`}>
+                    {item.location_name}
+                  </span>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="dashboard-section">
             <div className="dash-header">
               <div className="dash-title">准备进度概览</div>
               <button className="dash-btn" type="button">导出报表</button>
@@ -631,9 +786,10 @@ const ProfileView = ({
                 ))}
               </div>
             </div>
+
           </div>
 
-          <div className="day-block" ref={dailyRef}>
+          <div className="day-block">
             <div className="day-header">
               <div className="day-title">每日卡片预览</div>
               <button
@@ -761,22 +917,9 @@ const ProfileView = ({
         </div>
       </div>
 
-      <div className="profile-resizer" onMouseDown={handleResizeStart} />
-
-      <div
-        className="profile-right toc-panel"
-        style={{
-          width: rightPanelWidth,
-          flex: `0 0 ${typeof rightPanelWidth === 'number' ? `${rightPanelWidth}px` : rightPanelWidth}`
-        }}
-      >
-        <div className="toc-head">目录</div>
-        <div className="toc-item" onClick={() => scrollToSection(overviewRef)}>概览</div>
-        <div className="toc-item" onClick={() => scrollToSection(dashboardRef)}>进度概览</div>
-        <div className="toc-item" onClick={() => scrollToSection(dailyRef)}>每日卡片预览</div>
-      </div>
     </div>
   );
 };
 
 export default ProfileView;
+

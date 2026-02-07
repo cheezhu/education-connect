@@ -343,6 +343,24 @@
   border: 1px solid #ff4d4f;
   background: rgba(255, 77, 79, 0.1);
 }
+.timeline-cell.conflict-hot {
+  border: 1px solid #8b0017;
+  background: rgba(120, 6, 26, 0.24);
+}
+.cell-conflict-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 16px;
+  color: #fff;
+  background: #930a22;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
 /* 动画效果 */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
@@ -1285,6 +1303,16 @@
 .itinerary-designer .timeline-cell.conflict {
   border: 1px solid var(--color-conflict);
   background: rgba(241, 76, 76, 0.12);
+}
+.itinerary-designer .timeline-cell.conflict-hot {
+  border: 1px solid #8b0017;
+  background: rgba(120, 6, 26, 0.24);
+}
+.itinerary-designer .timeline-cell.conflict-hot:hover {
+  background: rgba(120, 6, 26, 0.3);
+}
+.itinerary-designer .cell-conflict-badge {
+  background: #930a22;
 }
 .itinerary-designer .activity-card-minimal:hover {
   background: rgba(22, 119, 255, 0.06) !important;

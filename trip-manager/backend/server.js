@@ -183,6 +183,25 @@ db.exec(`
 `);
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS planning_import_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_token TEXT NOT NULL UNIQUE,
+    created_by TEXT,
+    selected_group_ids TEXT NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    replace_existing INTEGER DEFAULT 0,
+    backup_activities TEXT NOT NULL,
+    backup_schedules TEXT NOT NULL,
+    summary TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    rolled_back_at DATETIME
+  );
+  CREATE INDEX IF NOT EXISTS idx_planning_import_snapshots_created_at ON planning_import_snapshots(created_at);
+  CREATE INDEX IF NOT EXISTS idx_planning_import_snapshots_token ON planning_import_snapshots(snapshot_token);
+`);
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS group_members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
@@ -236,6 +255,15 @@ if (!groupColumns.includes('schedule_revision')) {
   db.exec('ALTER TABLE groups ADD COLUMN schedule_revision INTEGER DEFAULT 0');
   db.exec('UPDATE groups SET schedule_revision = 0 WHERE schedule_revision IS NULL');
 }
+if (!groupColumns.includes('must_visit_mode')) {
+  db.exec('ALTER TABLE groups ADD COLUMN must_visit_mode TEXT');
+}
+if (!groupColumns.includes('manual_must_visit_location_ids')) {
+  db.exec('ALTER TABLE groups ADD COLUMN manual_must_visit_location_ids TEXT');
+}
+db.exec("UPDATE groups SET must_visit_mode = 'plan' WHERE must_visit_mode IS NULL OR TRIM(must_visit_mode) = ''");
+db.exec("UPDATE groups SET must_visit_mode = 'plan' WHERE must_visit_mode NOT IN ('plan', 'manual')");
+db.exec("UPDATE groups SET manual_must_visit_location_ids = '[]' WHERE manual_must_visit_location_ids IS NULL OR TRIM(manual_must_visit_location_ids) = ''");
 
 const locationColumns = db.prepare("PRAGMA table_info(locations)").all().map(col => col.name);
 if (!locationColumns.includes('open_hours')) {

@@ -45,6 +45,18 @@ const parseBlockedWeekdays = (value) => {
 };
 
 const DEFAULT_RESULT_SCHEMA = 'ec-planning-result@1';
+const CONFLICT_REASON_LABELS = {
+  INVALID_TIME_SLOT: '时段不合法',
+  OUT_OF_RANGE: '超出可导入日期范围',
+  GROUP_TIME_CONFLICT: '同团组同日同时段冲突',
+  INACTIVE_LOCATION: '地点已停用',
+  GROUP_TYPE: '地点不适用于该团组类型',
+  INVALID_DATE: '日期无效',
+  BLOCKED_WEEKDAY: '地点在该星期不可用',
+  CLOSED_DATE: '地点在该日期闭馆',
+  OPEN_HOURS: '地点开放时段不覆盖该时段',
+  CAPACITY: '地点容量不足'
+};
 
 const normalizeSlotWindows = (input) => {
   if (!input || typeof input !== 'object') {
@@ -112,6 +124,53 @@ const buildFilename = (snapshotId) => {
   return `planning_input_${safe}.json`;
 };
 
+const maxDate = (left, right) => {
+  if (!left) return right;
+  if (!right) return left;
+  return left > right ? left : right;
+};
+
+const minDate = (left, right) => {
+  if (!left) return right;
+  if (!right) return left;
+  return left < right ? left : right;
+};
+
+const normalizeMustVisitMode = (value, fallback = 'plan') => {
+  const mode = String(value || '').trim().toLowerCase();
+  if (mode === 'plan' || mode === 'manual') {
+    return mode;
+  }
+  return fallback;
+};
+
+const normalizeLocationIdList = (value) => {
+  if (Array.isArray(value)) {
+    return Array.from(new Set(
+      value
+        .map(item => Number(item))
+        .filter(id => Number.isFinite(id) && id > 0)
+    ));
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    const parsed = parseJsonSafe(trimmed, null);
+    if (Array.isArray(parsed)) {
+      return normalizeLocationIdList(parsed);
+    }
+    return Array.from(new Set(
+      trimmed
+        .split(/[,\uFF0C\u3001;|]/)
+        .map(item => Number(item.trim()))
+        .filter(id => Number.isFinite(id) && id > 0)
+    ));
+  }
+  return [];
+};
+
+const getReasonLabel = (reason) => CONFLICT_REASON_LABELS[reason] || reason || '未知冲突';
+
 router.post('/export', (req, res) => {
   const {
     groupIds,
@@ -143,7 +202,8 @@ router.post('/export', (req, res) => {
 
   const placeholders = uniqueGroupIds.map(() => '?').join(', ');
   const groups = req.db.prepare(`
-    SELECT id, name, type, student_count, teacher_count, start_date, end_date, itinerary_plan_id
+    SELECT id, name, type, student_count, teacher_count, start_date, end_date,
+      itinerary_plan_id, must_visit_mode, manual_must_visit_location_ids
     FROM groups
     WHERE id IN (${placeholders})
   `).all(...uniqueGroupIds);
@@ -163,31 +223,97 @@ router.post('/export', (req, res) => {
   const filteredGroupIds = filteredGroups.map(group => group.id);
   const filteredPlaceholders = filteredGroupIds.map(() => '?').join(', ');
 
-  const locations = req.db.prepare(`
+  const allLocations = req.db.prepare(`
     SELECT id, name, address, capacity, blocked_weekdays, open_hours, closed_dates, target_groups, is_active
     FROM locations
-    WHERE is_active = 1
   `).all();
+  const activeLocations = allLocations.filter(location => Boolean(location.is_active));
+  const locationMap = new Map(
+    allLocations.map(location => [Number(location.id), location])
+  );
+
+  const planItemQuery = req.db.prepare(`
+    SELECT p.location_id, p.sort_order, l.name AS location_name
+    FROM itinerary_plan_items p
+    LEFT JOIN locations l ON l.id = p.location_id
+    WHERE p.plan_id = ?
+    ORDER BY p.sort_order, p.id
+  `);
 
   const planItemsByGroup = {};
-  if (includePlanItemsByGroup) {
-    const planItemQuery = req.db.prepare(`
-      SELECT location_id, sort_order
-      FROM itinerary_plan_items
-      WHERE plan_id = ?
-      ORDER BY sort_order, id
-    `);
+  const mustVisitByGroup = {};
+  const exportValidationErrors = [];
 
-    filteredGroups.forEach(group => {
+  filteredGroups.forEach(group => {
+    const groupId = Number(group.id);
+    const groupKey = String(groupId);
+    const groupName = group.name || `#${groupId}`;
+    const manualIds = normalizeLocationIdList(group.manual_must_visit_location_ids);
+    const mode = normalizeMustVisitMode(
+      group.must_visit_mode,
+      manualIds.length > 0 ? 'manual' : 'plan'
+    );
+
+    let rawItems = [];
+    if (mode === 'plan') {
       if (!group.itinerary_plan_id) {
-        planItemsByGroup[String(group.id)] = [];
+        exportValidationErrors.push(`${groupName} 未绑定行程方案`);
+      } else {
+        rawItems = planItemQuery.all(group.itinerary_plan_id);
+        if (!rawItems || rawItems.length === 0) {
+          exportValidationErrors.push(`${groupName} 的必去行程点为空`);
+        }
+      }
+    } else {
+      if (manualIds.length === 0) {
+        exportValidationErrors.push(`${groupName} 的手动必去行程点为空`);
+      } else {
+        rawItems = manualIds.map((locationId, index) => ({
+          location_id: locationId,
+          sort_order: index
+        }));
+      }
+    }
+
+    const normalizedMustVisit = [];
+    rawItems.forEach((item, index) => {
+      const locationId = Number(item.location_id);
+      const sortOrder = Number.isFinite(Number(item.sort_order))
+        ? Number(item.sort_order)
+        : index;
+      if (!Number.isFinite(locationId) || locationId <= 0) {
+        exportValidationErrors.push(`${groupName} 存在无效必去地点ID：${item.location_id}`);
         return;
       }
-      planItemsByGroup[String(group.id)] = planItemQuery.all(group.itinerary_plan_id)
-        .map(item => ({
-          location_id: item.location_id,
-          sort_order: item.sort_order
-        }));
+      const location = locationMap.get(locationId);
+      if (!location) {
+        exportValidationErrors.push(`${groupName} 的必去地点不存在：#${locationId}`);
+        return;
+      }
+      if (!location.is_active) {
+        exportValidationErrors.push(`${groupName} 的必去地点已停用：${location.name || `#${locationId}`}`);
+        return;
+      }
+      normalizedMustVisit.push({
+        location_id: locationId,
+        location_name: location.name || '',
+        sort_order: sortOrder,
+        source: mode
+      });
+    });
+
+    planItemsByGroup[groupKey] = normalizedMustVisit.map(item => ({
+      location_id: item.location_id,
+      sort_order: item.sort_order
+    }));
+    mustVisitByGroup[groupKey] = normalizedMustVisit;
+  });
+
+  if (exportValidationErrors.length > 0) {
+    return res.status(409).json({
+      error: '导出前校验失败，请先修复必去行程点配置',
+      code: 'EXPORT_VALIDATION_FAILED',
+      details: exportValidationErrors.slice(0, 50)
     });
   }
 
@@ -225,9 +351,14 @@ router.post('/export', (req, res) => {
       teacher_count: group.teacher_count,
       start_date: group.start_date,
       end_date: group.end_date,
-      itinerary_plan_id: group.itinerary_plan_id
+      itinerary_plan_id: group.itinerary_plan_id,
+      must_visit_mode: normalizeMustVisitMode(
+        group.must_visit_mode,
+        normalizeLocationIdList(group.manual_must_visit_location_ids).length > 0 ? 'manual' : 'plan'
+      ),
+      manual_must_visit_location_ids: normalizeLocationIdList(group.manual_must_visit_location_ids)
     })),
-    locations: locations.map(location => ({
+    locations: activeLocations.map(location => ({
       id: location.id,
       name: location.name,
       address: location.address,
@@ -239,6 +370,7 @@ router.post('/export', (req, res) => {
       is_active: location.is_active ? 1 : 0
     })),
     plan_items_by_group: includePlanItemsByGroup ? planItemsByGroup : {},
+    must_visit_by_group: includePlanItemsByGroup ? mustVisitByGroup : {},
     existing: {
       activities,
       schedules
@@ -328,13 +460,14 @@ router.post('/import', requireEditLock, (req, res) => {
   }
 
   const selectedGroupSet = new Set(selectedGroupIds);
-  const filteredAssignments = normalizedAssignments.filter(item => selectedGroupSet.has(item.groupId));
 
   const payloadRange = payload.range || {};
   let startDate = payloadRange.startDate || payloadRange.start_date || payload.startDate || payload.start_date;
   let endDate = payloadRange.endDate || payloadRange.end_date || payload.endDate || payload.end_date;
   if (!isValidDate(startDate) || !isValidDate(endDate)) {
-    const derivedRange = getDateRangeFromAssignments(filteredAssignments);
+    const derivedRange = getDateRangeFromAssignments(
+      normalizedAssignments.filter(item => selectedGroupSet.has(item.groupId))
+    );
     startDate = derivedRange?.startDate;
     endDate = derivedRange?.endDate;
   }
@@ -342,6 +475,30 @@ router.post('/import', requireEditLock, (req, res) => {
   if (!isValidDate(startDate) || !isValidDate(endDate) || startDate > endDate) {
     return res.status(400).json({ error: 'Invalid date range' });
   }
+
+  const optionStartDateRaw = options.startDate || options.start_date || null;
+  const optionEndDateRaw = options.endDate || options.end_date || null;
+  if ((optionStartDateRaw && !optionEndDateRaw) || (!optionStartDateRaw && optionEndDateRaw)) {
+    return res.status(400).json({ error: 'Scoped range requires both startDate and endDate' });
+  }
+  if (optionStartDateRaw && !isValidDate(optionStartDateRaw)) {
+    return res.status(400).json({ error: 'Invalid scoped startDate' });
+  }
+  if (optionEndDateRaw && !isValidDate(optionEndDateRaw)) {
+    return res.status(400).json({ error: 'Invalid scoped endDate' });
+  }
+
+  const effectiveStartDate = maxDate(startDate, optionStartDateRaw);
+  const effectiveEndDate = minDate(endDate, optionEndDateRaw);
+  if (!effectiveStartDate || !effectiveEndDate || effectiveStartDate > effectiveEndDate) {
+    return res.status(400).json({ error: 'Scoped range has no overlap with payload range' });
+  }
+
+  const filteredAssignments = normalizedAssignments.filter(item => (
+    selectedGroupSet.has(item.groupId)
+    && item.date >= effectiveStartDate
+    && item.date <= effectiveEndDate
+  ));
 
   const placeholders = selectedGroupIds.map(() => '?').join(', ');
   const groups = req.db.prepare(`
@@ -400,7 +557,7 @@ router.post('/import', requireEditLock, (req, res) => {
     SELECT group_id, location_id, activity_date, time_slot, participant_count
     FROM activities
     WHERE activity_date BETWEEN ? AND ?
-  `).all(startDate, endDate);
+  `).all(effectiveStartDate, effectiveEndDate);
 
   const existingUsage = new Map();
   const existingGroupSlots = new Set();
@@ -448,7 +605,9 @@ router.post('/import', requireEditLock, (req, res) => {
     locationId: item.locationId,
     locationName: location?.name || '',
     reason: reasons[0],
-    reasons
+    reasonMessage: getReasonLabel(reasons[0]),
+    reasons,
+    reasonMessages: reasons.map(reason => getReasonLabel(reason))
   });
 
   sortedAssignments.forEach(item => {
@@ -460,7 +619,7 @@ router.post('/import', requireEditLock, (req, res) => {
       reasons.push('INVALID_TIME_SLOT');
     }
 
-    if (item.date < startDate || item.date > endDate) {
+    if (item.date < effectiveStartDate || item.date > effectiveEndDate) {
       reasons.push('OUT_OF_RANGE');
     }
 
@@ -554,13 +713,54 @@ router.post('/import', requireEditLock, (req, res) => {
         inserted: 0,
         skipped: totalAssignments
       },
-      conflicts
+      conflicts,
+      appliedRange: {
+        startDate: effectiveStartDate,
+        endDate: effectiveEndDate
+      }
     });
   }
 
   if (dryRun) {
-    return res.json({ summary, conflicts });
+    return res.json({
+      summary,
+      conflicts,
+      appliedRange: {
+        startDate: effectiveStartDate,
+        endDate: effectiveEndDate
+      }
+    });
   }
+
+  const selectBackupActivities = req.db.prepare(`
+    SELECT id, schedule_id, is_plan_item, group_id, location_id, activity_date, time_slot, participant_count, notes, created_at, updated_at
+    FROM activities
+    WHERE group_id IN (${placeholders})
+      AND activity_date BETWEEN ? AND ?
+    ORDER BY id
+  `);
+  const selectBackupSchedules = req.db.prepare(`
+    SELECT id, group_id, activity_date, start_time, end_time, type, title, location, description, color, resource_id, is_from_resource, location_id, created_at, updated_at
+    FROM schedules
+    WHERE group_id IN (${placeholders})
+      AND activity_date BETWEEN ? AND ?
+      AND is_from_resource = 1
+    ORDER BY id
+  `);
+  const backupActivities = selectBackupActivities.all(...selectedGroupIds, effectiveStartDate, effectiveEndDate);
+  const backupSchedules = selectBackupSchedules.all(...selectedGroupIds, effectiveStartDate, effectiveEndDate);
+  const snapshotToken = buildSnapshotId();
+  const insertSnapshot = req.db.prepare(`
+    INSERT INTO planning_import_snapshots (
+      snapshot_token, created_by, selected_group_ids, start_date, end_date, replace_existing,
+      backup_activities, backup_schedules, summary
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const updateSnapshotSummary = req.db.prepare(`
+    UPDATE planning_import_snapshots
+    SET summary = ?
+    WHERE snapshot_token = ?
+  `);
 
   const deleteActivities = req.db.prepare(`
     DELETE FROM activities
@@ -591,9 +791,21 @@ router.post('/import', requireEditLock, (req, res) => {
   `);
 
   const transaction = req.db.transaction(() => {
+    insertSnapshot.run(
+      snapshotToken,
+      req.user || null,
+      JSON.stringify(selectedGroupIds),
+      effectiveStartDate,
+      effectiveEndDate,
+      replaceExisting ? 1 : 0,
+      JSON.stringify(backupActivities),
+      JSON.stringify(backupSchedules),
+      null
+    );
+
     if (replaceExisting) {
-      deleteActivities.run(...selectedGroupIds, startDate, endDate);
-      deleteSchedules.run(...selectedGroupIds, startDate, endDate);
+      deleteActivities.run(...selectedGroupIds, effectiveStartDate, effectiveEndDate);
+      deleteSchedules.run(...selectedGroupIds, effectiveStartDate, effectiveEndDate);
     }
 
     if (createPlans) {
@@ -635,6 +847,7 @@ router.post('/import', requireEditLock, (req, res) => {
   });
 
   transaction();
+  updateSnapshotSummary.run(JSON.stringify(summary), snapshotToken);
 
   const touchedGroupIds = new Set();
   if (replaceExisting) {
@@ -649,7 +862,142 @@ router.post('/import', requireEditLock, (req, res) => {
     bumpScheduleRevision(req.db, id);
   });
 
-  res.json({ summary, conflicts });
+  res.json({
+    summary,
+    conflicts,
+    snapshotToken,
+    appliedRange: {
+      startDate: effectiveStartDate,
+      endDate: effectiveEndDate
+    }
+  });
+});
+
+router.post('/import/rollback', requireEditLock, (req, res) => {
+  const snapshotToken = String(req.body?.snapshotToken || '').trim();
+  if (!snapshotToken) {
+    return res.status(400).json({ error: 'Missing snapshotToken' });
+  }
+
+  const snapshot = req.db.prepare(`
+    SELECT snapshot_token, selected_group_ids, start_date, end_date, backup_activities, backup_schedules, rolled_back_at
+    FROM planning_import_snapshots
+    WHERE snapshot_token = ?
+  `).get(snapshotToken);
+
+  if (!snapshot) {
+    return res.status(404).json({ error: 'Snapshot not found' });
+  }
+  if (snapshot.rolled_back_at) {
+    return res.status(409).json({ error: 'Snapshot already rolled back' });
+  }
+
+  const selectedGroupIds = parseArraySafe(snapshot.selected_group_ids)
+    .map(id => Number(id))
+    .filter(Number.isFinite);
+  if (selectedGroupIds.length === 0) {
+    return res.status(400).json({ error: 'Snapshot has no valid group scope' });
+  }
+
+  const startDate = snapshot.start_date;
+  const endDate = snapshot.end_date;
+  if (!isValidDate(startDate) || !isValidDate(endDate) || startDate > endDate) {
+    return res.status(400).json({ error: 'Snapshot range is invalid' });
+  }
+
+  const placeholders = selectedGroupIds.map(() => '?').join(', ');
+  const backupActivities = parseArraySafe(snapshot.backup_activities);
+  const backupSchedules = parseArraySafe(snapshot.backup_schedules);
+
+  const deleteActivities = req.db.prepare(`
+    DELETE FROM activities
+    WHERE group_id IN (${placeholders})
+      AND activity_date BETWEEN ? AND ?
+  `);
+  const deleteSchedules = req.db.prepare(`
+    DELETE FROM schedules
+    WHERE group_id IN (${placeholders})
+      AND activity_date BETWEEN ? AND ?
+      AND is_from_resource = 1
+  `);
+
+  const restoreSchedule = req.db.prepare(`
+    INSERT OR REPLACE INTO schedules (
+      id, group_id, activity_date, start_time, end_time, type, title, location, description, color,
+      resource_id, is_from_resource, location_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const restoreActivity = req.db.prepare(`
+    INSERT OR REPLACE INTO activities (
+      id, schedule_id, is_plan_item, group_id, location_id, activity_date, time_slot, participant_count, notes, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const markRolledBack = req.db.prepare(`
+    UPDATE planning_import_snapshots
+    SET rolled_back_at = CURRENT_TIMESTAMP
+    WHERE snapshot_token = ?
+  `);
+
+  const transaction = req.db.transaction(() => {
+    deleteActivities.run(...selectedGroupIds, startDate, endDate);
+    deleteSchedules.run(...selectedGroupIds, startDate, endDate);
+
+    backupSchedules.forEach((row) => {
+      restoreSchedule.run(
+        row.id,
+        row.group_id,
+        row.activity_date,
+        row.start_time,
+        row.end_time,
+        row.type,
+        row.title,
+        row.location,
+        row.description,
+        row.color,
+        row.resource_id,
+        row.is_from_resource ? 1 : 0,
+        row.location_id ?? null,
+        row.created_at || null,
+        row.updated_at || null
+      );
+    });
+
+    backupActivities.forEach((row) => {
+      restoreActivity.run(
+        row.id,
+        row.schedule_id ?? null,
+        row.is_plan_item ? 1 : 0,
+        row.group_id,
+        row.location_id ?? null,
+        row.activity_date,
+        row.time_slot,
+        row.participant_count ?? null,
+        row.notes ?? null,
+        row.created_at || null,
+        row.updated_at || null
+      );
+    });
+
+    markRolledBack.run(snapshotToken);
+  });
+
+  transaction();
+
+  selectedGroupIds.forEach((id) => {
+    bumpScheduleRevision(req.db, id);
+  });
+
+  return res.json({
+    snapshotToken,
+    restored: {
+      schedules: backupSchedules.length,
+      activities: backupActivities.length
+    },
+    appliedRange: {
+      startDate,
+      endDate
+    }
+  });
 });
 
 module.exports = router;

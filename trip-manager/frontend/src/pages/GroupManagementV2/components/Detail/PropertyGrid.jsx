@@ -87,6 +87,30 @@ const PropertyRow = ({
       );
     }
 
+    if (property.type === 'multi-select' && Array.isArray(property.options)) {
+      const selectedValues = Array.isArray(property.value)
+        ? property.value.map(item => String(item))
+        : [];
+      return (
+        <select
+          className="prop-input prop-input-multi"
+          value={selectedValues}
+          onChange={(event) => {
+            const nextValues = Array.from(event.target.selectedOptions).map(option => option.value);
+            onChangeValue?.(nextValues);
+          }}
+          disabled={property.readOnly}
+          multiple
+        >
+          {property.options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      );
+    }
+
     if (property.type === 'number') {
       return <input type="number" {...commonProps} />;
     }

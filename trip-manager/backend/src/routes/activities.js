@@ -323,7 +323,7 @@ router.post('/', requireEditLock, (req, res) => {
 // 更新活动（需要编辑锁）
 router.put('/:id', requireEditLock, (req, res) => {
   const { id } = req.params;
-  const { locationId, date, timeSlot, participantCount, notes } = req.body;
+  const { locationId, date, timeSlot, participantCount, notes, ignoreConflicts = false } = req.body;
   
   // 获取当前活动信息
   const activity = req.db.prepare('SELECT * FROM activities WHERE id = ?').get(id);
@@ -332,23 +332,24 @@ router.put('/:id', requireEditLock, (req, res) => {
   }
   
   // 检查新的安排是否有冲突
-  const conflicts = checkConflicts(req.db, {
-    groupId: activity.group_id,
-    locationId: locationId ?? activity.location_id,
-    date: date ?? activity.activity_date,
-    timeSlot: timeSlot ?? activity.time_slot,
-    participantCount: participantCount ?? activity.participant_count,
-    excludeId: id
-  });
-  
-  if (conflicts.length > 0) {
-    return res.status(400).json({ 
-      error: '存在冲突',
-      conflicts 
+  if (ignoreConflicts !== true) {
+    const conflicts = checkConflicts(req.db, {
+      groupId: activity.group_id,
+      locationId: locationId ?? activity.location_id,
+      date: date ?? activity.activity_date,
+      timeSlot: timeSlot ?? activity.time_slot,
+      participantCount: participantCount ?? activity.participant_count,
+      excludeId: id
     });
+    
+    if (conflicts.length > 0) {
+      return res.status(400).json({ 
+        error: '瀛樺湪鍐茬獊',
+        conflicts 
+      });
+    }
   }
   
-  // 更新活动
   const updates = [];
   const values = [];
   

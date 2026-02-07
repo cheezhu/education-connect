@@ -1592,6 +1592,11 @@
   background: rgba(46, 170, 220, 0.1);
 }
 
+.group-command-center .prop-input-multi {
+  min-height: 72px;
+  overflow-y: auto;
+}
+
 .group-command-center .date-range {
   display: flex;
   align-items: center;
@@ -1762,6 +1767,27 @@
   .group-command-center .add-prop-wrapper {
     grid-column: span 1;
   }
+
+  .group-command-center .profile-doc .must-visit-edit-row {
+    grid-template-columns: 1fr;
+  }
+
+  .group-command-center .profile-doc .must-visit-label {
+    padding-top: 0;
+  }
+
+  .group-command-center .profile-doc .must-visit-manual-tools {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .group-command-center .profile-doc .must-visit-option-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .group-command-center .profile-doc .must-visit-plan-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 
@@ -1808,9 +1834,9 @@
 .group-command-center .profile-doc .doc-content {
   flex: 1;
   overflow-y: auto;
-  padding: 32px 80px 80px;
-  max-width: 1000px;
-  margin: 0 auto;
+  padding: 24px 32px 80px;
+  max-width: none;
+  margin: 0;
   width: 100%;
 }
 
@@ -1865,6 +1891,190 @@
   display: grid;
   grid-template-columns: 1fr 2fr;
   gap: 20px;
+}
+
+.group-command-center .profile-doc .must-visit-module {
+  margin-top: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+.group-command-center .profile-doc .must-visit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.group-command-center .profile-doc .must-visit-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.group-command-center .profile-doc .must-visit-badge {
+  font-size: 11px;
+  border-radius: 999px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+}
+
+.group-command-center .profile-doc .must-visit-badge.ok {
+  color: #2d9d78;
+  background: rgba(45, 157, 120, 0.12);
+  border-color: rgba(45, 157, 120, 0.24);
+}
+
+.group-command-center .profile-doc .must-visit-badge.warn {
+  color: #d9730d;
+  background: rgba(217, 115, 13, 0.12);
+  border-color: rgba(217, 115, 13, 0.24);
+}
+
+.group-command-center .profile-doc .must-visit-mode-row {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.group-command-center .profile-doc .must-visit-mode-btn {
+  border: 1px solid var(--border);
+  background: #fafafa;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-mute);
+}
+
+.group-command-center .profile-doc .must-visit-mode-btn.active {
+  color: var(--accent);
+  border-color: rgba(79, 70, 229, 0.32);
+  background: rgba(79, 70, 229, 0.08);
+}
+
+.group-command-center .profile-doc .must-visit-edit-row {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.group-command-center .profile-doc .must-visit-label {
+  font-size: 12px;
+  color: var(--text-mute);
+  padding-top: 6px;
+}
+
+.group-command-center .profile-doc .must-visit-list {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.group-command-center .profile-doc .must-visit-manual-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.group-command-center .profile-doc .must-visit-plan-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group-command-center .profile-doc .must-visit-plan-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.group-command-center .profile-doc .must-visit-manual-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.group-command-center .profile-doc .must-visit-tip {
+  font-size: 12px;
+  color: var(--text-mute);
+}
+
+.group-command-center .profile-doc .must-visit-link-btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.group-command-center .profile-doc .must-visit-link-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.group-command-center .profile-doc .must-visit-option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.group-command-center .profile-doc .must-visit-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.group-command-center .profile-doc .must-visit-option:hover {
+  border-color: rgba(79, 70, 229, 0.24);
+  transform: translateY(-1px);
+}
+
+.group-command-center .profile-doc .must-visit-option.active {
+  border-color: rgba(79, 70, 229, 0.45);
+  background: rgba(79, 70, 229, 0.08);
+}
+
+.group-command-center .profile-doc .must-visit-option-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: #eef2ff;
+  color: #4f46e5;
+  flex-shrink: 0;
+}
+
+.group-command-center .profile-doc .must-visit-option.active .must-visit-option-check {
+  background: #4f46e5;
+  color: #fff;
+}
+
+.group-command-center .profile-doc .must-visit-option-name {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text);
 }
 
 .group-command-center .profile-doc .progress-card {
