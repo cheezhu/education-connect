@@ -1,11 +1,16 @@
-# 行程设计器升级前审查报告（2026-02-06）
+﻿# 行程设计器升级前审查报告（2026-02-06）
+
+> 更新（2026-02-07）：已落地“必去行程点（manual_must_visit_location_ids）导出强校验 + 导出弹窗内补齐并自动保存”的流程，用于减少导出阻塞并明确硬约束。
+> 更新（2026-02-07）：已将行程设计器的 planning 导入/导出状态与业务逻辑从 `index.jsx` 抽离到 hooks（`usePlanningExport` / `usePlanningImport`），降低耦合并缩小主文件体积。
+> 更新（2026-02-07）：已进一步拆分 `ItineraryDesigner/index.jsx`：抽离顶部工具栏/团组选择抽屉/编辑行程弹窗，并抽离配置读取与“团组日历详情防抖保存”逻辑到 hooks。
+> 更新（2026-02-08）：继续拆分 `ItineraryDesigner/index.jsx`：抽离数据加载、活动 CRUD、调控台拖拽/清空、调控台高度拖拽；主文件降至约 640 行。
 
 ## 1. 本次审查范围
 
 本次重点检查了与“行程设计器升级”和“日历详情 AI 助手”直接相关的模块：
 
 - 文档：`docs/itinerary-designer.md`、`docs/calendar-system.md`、`docs/api/api-reference.md`、`docs/db-schema.md`、`docs/code-review-issues.md`
-- 前端：`trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`、`trip-manager/frontend/src/pages/GroupEditV2/Calendar/index.jsx`、`trip-manager/frontend/src/pages/GroupEditV2/Calendar/components/AICoPilot.jsx`
+- 前端：`trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`、`trip-manager/frontend/src/features/calendar-detail/CalendarDetailWorkspace/index.jsx`、`trip-manager/frontend/src/features/calendar-detail/CalendarDetailWorkspace/components/CalendarDetailCopilot.jsx`
 - 后端：`trip-manager/backend/server.js`、`trip-manager/backend/src/routes/planning.js`、`trip-manager/backend/src/routes/schedules.js`、`trip-manager/backend/src/routes/systemConfig.js`、`trip-manager/backend/src/utils/aiConfig.js`
 
 ---
@@ -14,14 +19,48 @@
 
 ### 2.1 前端关键模块
 
-- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`（约 2800 行，已拆分一部分 UI/工具）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`（约 640 行，已进一步拆分数据加载/CRUD/调控台拖拽/高度拖拽等逻辑，主文件更聚焦“页面编排”）
   - 同时承担：周时间轴、团组详情弹层、导入导出、拖拽、保存、配置读取
   - 是当前改造主战场
+- `trip-manager/frontend/src/pages/ItineraryDesigner/components/ItineraryDesignerHeader.jsx`
+  - 顶部工具栏（周切换/日期选择/时间段开关/导入导出入口）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/components/GroupSelectorDrawer.jsx`
+  - 左侧团组选择抽屉（筛选/批量/缺必去点提示等）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/components/ActivityEditModal.jsx`
+  - “编辑行程”弹窗（新增/编辑/删除活动）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/components/GroupCalendarDetailModal.jsx`
+  - 团组日历详情弹窗（上部弹层 UI，资源栏开关 + 关闭）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/timeline/ActivityCard.jsx`
+  - 时间轴内活动卡片 UI（arrival/departure 标记 + 删除/双击编辑入口）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/timeline/useTimelineDnD.js`
+  - 时间轴拖拽逻辑（drag start/end/over/enter/leave/drop）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/console/useGroupConsoleModel.js`
+  - 底部调控台数据拼装（必去行程点卡片 + 上午/下午网格数据）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/conflicts/useTimelineSlotConflictMap.js`
+  - 时间轴冲突计算（按 date+slot 聚合，产出冲突 map）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/conflicts/checkConflicts.js`
+  - 活动新增/编辑用的冲突检查（同团组同 slot、容量、不可用日、团组类型）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/shared/locationAvailability.js`
+  - 地点可用性规则（停用/不可用星期/闭馆日）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/hooks/useItineraryDesignerData.js`
+  - 数据加载与刷新（groups/activities/locations/itineraryPlans/selectedGroups）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/hooks/useActivityCrud.js`
+  - activities 的新增/更新/删除（并修复“从卡片删除时 selectedTimeSlot 为空导致崩溃”的风险）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/hooks/useGroupCalendarResize.js`
+  - 底部调控台高度拖拽（vh resize + debounce persist）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/console/useGroupConsoleDnD.js`
+  - 调控台拖拽/清空/移除等交互逻辑（和 UI 抽屉解耦）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/hooks/useItineraryDesignerConfig.js`
+  - 周起始、时段显示、日聚焦、控制台高度等配置读写与 localStorage
+- `trip-manager/frontend/src/pages/ItineraryDesigner/hooks/useGroupCalendarDetail.js`
+  - 团组日历详情：打开/加载 + 防抖保存（revision/token guard）+ 资源栏开关状态
+- `trip-manager/frontend/src/pages/ItineraryDesigner/planning/usePlanningExport.js`、`trip-manager/frontend/src/pages/ItineraryDesigner/planning/usePlanningImport.js`
+  - planning 导入/导出状态与业务逻辑（表单 watch、导出必去点强校验、导入校验/回滚/冲突汇总）
 - `trip-manager/frontend/src/pages/ItineraryDesigner/ItineraryDesigner.css`（约 1560 行）
   - 承担布局、弹层、主题覆盖、控制台样式
-- `trip-manager/frontend/src/pages/GroupEditV2/Calendar/index.jsx`（约 1199 行）
+- `trip-manager/frontend/src/features/calendar-detail/CalendarDetailWorkspace/index.jsx`（约 1200+ 行）
   - 日历详情内的活动渲染、拖拽、资源侧栏、AI 面板挂载
-- `trip-manager/frontend/src/pages/GroupEditV2/Calendar/components/AICoPilot.jsx`（56 行）
+- `trip-manager/frontend/src/features/calendar-detail/CalendarDetailWorkspace/components/CalendarDetailCopilot.jsx`（约 50+ 行）
   - 当前是静态演示 UI，不是后端 AI 对话
 
 ### 2.2 后端关键模块
@@ -32,7 +71,7 @@
   - 负责 `planning/export`、`planning/import`
   - `import` 是“导入 AI 结果”的数据校验与写库，不负责调用大模型
 - `trip-manager/backend/src/routes/schedules.js`（约 237 行）
-  - `POST /groups/:groupId/schedules/batch` 采用“整组全量替换”
+  - `POST /groups/:groupId/schedules/batch` 采用“整组全量替换”（但已加入 revision 校验，避免并发覆盖）
 - `trip-manager/backend/src/routes/systemConfig.js` 与 `trip-manager/backend/src/utils/aiConfig.js`
   - AI provider/model/apiKey/timeout 的配置读取与保存
 
@@ -46,12 +85,11 @@
 
 证据：
 
-- `trip-manager/frontend/src/pages/GroupEditV2/Calendar/components/AICoPilot.jsx:13`
-  - 仅将输入透传给 `onSend`
-- `trip-manager/frontend/src/pages/GroupEditV2/Calendar/index.jsx:1133`
-  - `handleAutoPlan` 仅 `message.info('AI 自动排程正在接入中')`
-- `trip-manager/frontend/src/pages/GroupEditV2/Calendar/index.jsx:1336`
-  - `onSend` 仅提示 `AI 提示已收到`
+- `trip-manager/frontend/src/features/calendar-detail/CalendarDetailWorkspace/components/CalendarDetailCopilot.jsx`
+  - 仅将输入透传给 `onSend`（当前是静态演示 UI）
+- `trip-manager/frontend/src/features/calendar-detail/CalendarDetailWorkspace/index.jsx`
+  - `handleAutoPlan` / `handleOptimizeRoute` 仅 `message.info('...正在接入中')`
+  - `onSend` 仅提示 `AI 提示已收到：...`
 - `trip-manager/backend/server.js:322`
   - 未见 AI chat 路由挂载
 
@@ -91,8 +129,9 @@
 
 证据：
 
-- `trip-manager/backend/src/routes/schedules.js:223`
+- `trip-manager/backend/src/routes/schedules.js`
   - `DELETE FROM schedules WHERE group_id = ?`
+  - 同时存在 revision 校验（409 + `x-schedule-revision`），用于避免并发覆盖
 
 影响：
 
@@ -108,10 +147,10 @@
 
 证据：
 
-- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx:189`
-  - `getDesignerContainer` 有 `document.body` 回退
-- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx:2497`
-  - 详情弹窗 `width="100%"`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`
+  - `getDesignerContainer` 有 `document.body` 回退（container 锚点不稳定时易覆盖导航栏）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/components/GroupCalendarDetailModal.jsx`
+  - 详情弹窗为全宽 overlay，需要确保 `getContainer` 锚定在设计器容器内
 - `trip-manager/frontend/src/pages/ItineraryDesigner/ItineraryDesigner.css:747`
   - `.itinerary-modal-wrap { position:absolute; inset:0; }`
 - `trip-manager/frontend/src/pages/ItineraryDesigner/ItineraryDesigner.css:735`
@@ -132,7 +171,7 @@
 
 证据：
 
-- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx` 约 2800 行
+- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx` 约 640 行
 - `trip-manager/frontend/src/pages/ItineraryDesigner/ItineraryDesigner.css` 约 1560 行
 
 影响：
@@ -142,12 +181,24 @@
 建议拆分（当前已落地一部分）：
 
 - `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`（页面编排）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/components/ItineraryDesignerHeader.jsx`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/components/GroupSelectorDrawer.jsx`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/components/ActivityEditModal.jsx`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/hooks/useItineraryDesignerConfig.js`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/hooks/useGroupCalendarDetail.js`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/hooks/useItineraryDesignerData.js`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/hooks/useActivityCrud.js`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/hooks/useGroupCalendarResize.js`
 - `trip-manager/frontend/src/pages/ItineraryDesigner/timeline/TimelineGrid.jsx`
 - `trip-manager/frontend/src/pages/ItineraryDesigner/console/GroupConsoleDrawer.jsx`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/console/useGroupConsoleDnD.js`
 - `trip-manager/frontend/src/pages/ItineraryDesigner/planning/PlanningImportModal.jsx`
 - `trip-manager/frontend/src/pages/ItineraryDesigner/planning/PlanningExportModal.jsx`
 - `trip-manager/frontend/src/pages/ItineraryDesigner/planning/planningIO.js`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/planning/usePlanningExport.js`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/planning/usePlanningImport.js`
 - `trip-manager/frontend/src/pages/ItineraryDesigner/conflicts/SlotConflictModal.jsx`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/conflicts/checkConflicts.js`
 - `trip-manager/frontend/src/pages/ItineraryDesigner/shared/`（dates/timeSlots/parse/groupRules/messages）
 
 ### 3.6 缺少自动化测试

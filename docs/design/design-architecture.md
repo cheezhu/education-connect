@@ -1,4 +1,4 @@
-# 行程设计器 v2.0 (Pro Workstation) - 架构设计文档
+﻿# 行程设计器 v2.0 (Pro Workstation) - 架构设计文档
 
 ## 1. 设计目标
 
@@ -84,7 +84,7 @@ graph TD
 
 ## 4. 组件架构拆分
 
-将 `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`（约 2800 行）拆解为原子组件。
+将 `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`（已降至约 640 行）继续拆解为更细的原子组件与 hooks，降低耦合与回归风险。
 
 ```
 src/pages/ItineraryDesigner/

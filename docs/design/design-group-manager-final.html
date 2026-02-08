@@ -3,197 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EC Group Center - Full Interactive Master</title>
+    <title>EC Group Center - High Density Roster</title>
     <style>
         :root {
-            --bg-app: #f4f7fe;
-            --bg-sidebar: #ffffff;
-            --bg-content: #ffffff;
-            --border: #e5e7eb;
-            --text-main: #37352f;
-            --text-mute: #9b9a97;
-            --accent: #4f46e5;
-            --hover: #f5f5f5;
-            --selected: #eff6ff;
+            --bg-app: #f8f9fc;
+            --bg-card: #ffffff;
+            --border: #eef2f6;
+            --text-main: #1f2937;
+            --text-mute: #6b7280;
+            --accent: #6366f1;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { height: 100%; width: 100%; overflow: hidden; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg-app);
             color: var(--text-main);
             font-size: 13px;
             display: flex;
         }
 
-        /* Sidebar & Layout */
-        .activity-bar { width: 48px; background: #111827; display: flex; flex-direction: column; align-items: center; padding-top: 16px; flex-shrink: 0; }
-        .activity-icon { font-size: 20px; color: rgba(255,255,255,0.5); margin-bottom: 24px; cursor: pointer; }
-        .activity-icon.active { color: white; border-left: 2px solid white; width: 100%; text-align: center; }
-        
-        .group-list { width: 240px; border-right: 1px solid var(--border); background: #fff; flex-shrink: 0; display: flex; flex-direction: column; height: 100%; }
-        .list-header { padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 700; color: #888; font-size: 11px; text-transform: uppercase; }
-        .list-item { padding: 12px 20px; border-bottom: 1px solid #f3f4f6; cursor: pointer; }
-        .list-item.active { background: var(--selected); border-right: 2px solid var(--accent); }
-
+        /* Shell & Tab Styles (Preserved) */
+        .activity-bar { width: 56px; background: #0f172a; display: flex; flex-direction: column; align-items: center; padding-top: 20px; flex-shrink: 0; }
+        .activity-icon { font-size: 20px; color: rgba(255,255,255,0.4); margin-bottom: 28px; cursor: pointer; }
+        .activity-icon.active { color: #fff; }
+        .group-list { width: 240px; border-right: 1px solid var(--border); background: #fff; flex-shrink: 0; }
         .layout { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #fff; height: 100%; }
-        .tab-container { background: #fff; border-bottom: 1px solid var(--border); display: flex; padding: 0 20px; height: 48px; align-items: center; gap: 24px; flex-shrink: 0; }
-        .tab-item { font-size: 13px; color: var(--text-mute); cursor: pointer; height: 100%; display: flex; align-items: center; position: relative; }
+        .tab-container { background: #fff; border-bottom: 1px solid var(--border); display: flex; padding: 0 24px; height: 48px; align-items: center; gap: 24px; flex-shrink: 0; }
+        .tab-item { font-size: 13px; color: var(--text-mute); font-weight: 500; cursor: pointer; height: 100%; display: flex; align-items: center; position: relative; }
         .tab-item.active { color: var(--accent); font-weight: 600; }
-        .tab-item.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: var(--accent); }
-
-        .tab-content { flex: 1; overflow: hidden; position: relative; height: 100%; }
+        .tab-item.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: var(--accent); }
+        .tab-content { flex: 1; overflow: hidden; position: relative; height: 100%; background: var(--bg-app); }
         .content-pane { display: none; height: 100%; width: 100%; }
         .content-pane.active { display: flex; }
 
-        /* --- PROFILE VIEW --- */
-        .profile-layout { display: flex; height: 100%; width: 100%; overflow: hidden; background: #fff; }
-        .profile-center { flex: 1; padding: 40px 60px; overflow-y: auto; display: flex; flex-direction: column; gap: 32px; }
-
-        .identity-header { margin-bottom: 10px; }
-        .id-input { font-size: 32px; font-weight: 700; border: none; width: 100%; outline: none; margin-bottom: 12px; color: #333; }
+        /* --- MEMBERS VIEW (High Density List) --- */
+        .members-view { flex: 1; padding: 32px 48px; overflow-y: auto; max-width: 1200px; margin: 0 auto; width: 100%; }
         
-        /* Two-Column Property Grid */
-        .prop-grid { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 0 40px; 
-            border-bottom: 1px solid var(--border); 
-            padding-bottom: 24px; 
+        .roster-header { 
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;
+            background: white; padding: 16px 20px; border-radius: 8px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);
         }
         
-        .prop-row { 
-            display: flex; align-items: center; padding: 4px 0; min-height: 34px; border-radius: 4px; transition: background 0.1s;
+        /* The List Container */
+        .member-list { 
+            background: white; border-radius: 8px; border: 1px solid var(--border); overflow: hidden;
+            box-shadow: var(--shadow-sm);
         }
-        .prop-row:hover { background: rgba(55, 53, 47, 0.03); }
         
-        /* Key (Left) */
-        .prop-key-area { width: 130px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-        .prop-icon { width: 16px; text-align: center; opacity: 0.6; font-size: 12px; }
-        .prop-key-label { color: var(--text-mute); font-size: 13px; border: none; background: transparent; outline: none; width: 100%; cursor: text; border-radius: 3px; padding: 2px 4px; }
-        .prop-key-label:focus { background: #f0f0f0; color: var(--text-main); }
-
-        /* Value (Right) */
-        .prop-val-area { flex: 1; min-width: 0; }
-        .prop-input { 
-            width: 100%; border: none; background: transparent; padding: 4px 8px; font-size: 13px; outline: none; border-radius: 4px; color: #333;
+        /* Header Row */
+        .list-head { 
+            display: grid; grid-template-columns: 50px 140px 80px 100px 150px 1fr 80px; gap: 12px;
+            background: #fafafa; padding: 10px 16px; border-bottom: 1px solid #eef2f6;
+            font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .prop-input:focus { background: rgba(46, 170, 220, 0.1); }
-
-        /* Add Button & Menu */
-        .add-prop-wrapper { position: relative; grid-column: span 2; margin-top: 8px; }
-        .add-prop-btn { color: var(--text-mute); font-size: 13px; cursor: pointer; padding: 8px 0; display: flex; align-items: center; gap: 6px; width: fit-content; }
-        .add-prop-btn:hover { color: var(--text-main); }
-
-        .type-menu { 
-            position: absolute; top: 30px; left: 0; width: 220px; background: white; 
-            border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-radius: 6px; 
-            z-index: 100; display: none; flex-direction: column; padding: 4px;
+        
+        /* Member Row */
+        .member-row { 
+            display: grid; grid-template-columns: 50px 140px 80px 100px 150px 1fr 80px; gap: 12px;
+            align-items: center; padding: 10px 16px; border-bottom: 1px solid #f9fafb;
+            transition: background 0.1s;
         }
-        .type-menu.visible { display: flex; }
-        .type-item { padding: 6px 10px; display: flex; align-items: center; gap: 10px; cursor: pointer; border-radius: 4px; color: #37352f; font-size: 13px; }
-        .type-item:hover { background: #f0f0f0; }
+        .member-row:last-child { border-bottom: none; }
+        .member-row:hover { background: #f8fafc; }
+        
+        .col-id-index { font-family: monospace; color: #999; text-align: center; }
+        .col-name { display: flex; align-items: center; gap: 8px; font-weight: 600; color: #111827; }
+        .col-role { }
+        .role-pill { font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
+        .role-teacher { background: #fef3c7; color: #b45309; }
+        .role-student { background: #e0e7ff; color: #4338ca; }
+        
+        .col-gender { color: #6b7280; font-size: 12px; }
+        .col-phone { font-family: monospace; color: #4b5563; font-size: 12px; }
+        .col-idcard { font-family: monospace; color: #9ca3af; font-size: 11px; }
+        
+        .col-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+        .tag-danger { background: #fee2e2; color: #b91c1c; font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+        
+        .col-actions { text-align: right; opacity: 0; transition: opacity 0.2s; }
+        .member-row:hover .col-actions { opacity: 1; }
+        .btn-icon { color: #9ca3af; cursor: pointer; padding: 4px; }
+        .btn-icon:hover { color: var(--accent); }
 
-        /* Doc Body */
-        .doc-body { font-size: 15px; line-height: 1.6; color: #37352f; }
-        .doc-title { font-weight: 600; color: #999; text-transform: uppercase; font-size: 11px; margin-bottom: 12px; letter-spacing: 1px; }
-
-        /* Right Sidebar Context */
-        .profile-right { width: 260px; background: #fafafa; border-left: 1px solid var(--border); overflow-y: auto; padding: 20px 16px; flex-shrink: 0; }
-        .mini-event { background: #fff; border: 1px solid #eee; border-left: 2px solid var(--accent); border-radius: 4px; padding: 8px; margin-bottom: 6px; font-size: 12px; }
     </style>
 </head>
-<body onclick="closeMenu()">
+<body>
 
     <div class="activity-bar"><div class="activity-icon active">📄</div></div>
-    <div class="group-list">
-        <div class="list-header">Active Groups</div>
-        <div class="list-item active">深圳实验中学</div>
-    </div>
+    <div class="group-list"></div>
 
     <div class="layout">
         <div class="tab-container">
-            <div class="tab-item active">团组信息</div>
-            <div class="tab-item">旅行资源</div>
+            <div class="tab-item" onclick="switchTab('profile', this)">团组信息</div>
+            <div class="tab-item" onclick="switchTab('logistics', this)">旅行资源</div>
+            <div class="tab-item" onclick="switchTab('itinerary', this)">行程详情</div>
+            <div class="tab-item active" onclick="switchTab('members', this)">人员信息</div>
         </div>
 
         <div class="tab-content">
-            <div id="pane-profile" class="content-pane active">
-                <div class="profile-layout">
+            
+            <div id="pane-members" class="content-pane active">
+                <div class="members-view">
                     
-                    <div class="profile-center">
-                        <div class="identity-header">
-                            <input class="id-input" value="深圳实验中学 (高二)">
-                        </div>
-
-                        <!-- Grid -->
-                        <div class="prop-grid" id="propGrid">
-                            <!-- Pre-filled Fields -->
-                            <div class="prop-row"><div class="prop-key-area"><span class="prop-icon">🗓️</span><input class="prop-key-label" value="Dates"></div><div class="prop-val-area"><input class="prop-input" value="2025-09-12 → 2025-09-18"></div></div>
-                            <div class="prop-row"><div class="prop-key-area"><span class="prop-icon">#</span><input class="prop-key-label" value="Students"></div><div class="prop-val-area"><input class="prop-input" value="45"></div></div>
-                            <div class="prop-row"><div class="prop-key-area"><span class="prop-icon">👤</span><input class="prop-key-label" value="Main Contact"></div><div class="prop-val-area"><input class="prop-input" value="张老师"></div></div>
-                            <div class="prop-row"><div class="prop-key-area"><span class="prop-icon">🏠</span><input class="prop-key-label" value="Accommodation"></div><div class="prop-val-area"><input class="prop-input" value="园区专家公寓"></div></div>
-                            
-                            <!-- Add Property Section -->
-                            <div class="add-prop-wrapper" id="addWrapper">
-                                <div class="add-prop-btn" onclick="toggleMenu(event)">+ Add a property</div>
-                                <div id="typeMenu" class="type-menu" onclick="event.stopPropagation()">
-                                    <div class="type-item" onclick="addProp('Aa', 'Text')"><span>Aa</span> Text</div>
-                                    <div class="type-item" onclick="addProp('#', 'Number')"><span>#</span> Number</div>
-                                    <div class="type-item" onclick="addProp('▼', 'Select')"><span>▼</span> Select</div>
-                                    <div class="type-item" onclick="addProp('👤', 'Person')"><span>👤</span> Person</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="doc-body">
-                            <div class="doc-title">备注说明</div>
-                            <p style="color:#d3d1cb">Click to add detailed notes...</p>
+                    <div class="roster-header">
+                        <div style="font-size:18px; font-weight:700">团组花名册 (48人)</div>
+                        <div style="display:flex; gap:8px">
+                            <button style="padding:6px 12px; background:white; border:1px solid #e5e7eb; border-radius:6px; cursor:pointer; font-size:12px">📥 批量导入</button>
+                            <button style="padding:6px 12px; background:var(--accent); color:white; border:none; border-radius:6px; cursor:pointer; font-size:12px">+ 添加人员</button>
                         </div>
                     </div>
 
-                    <div class="profile-right">
-                        <div style="font-weight:700; color:#aaa; font-size:11px; margin-bottom:16px">TIMELINE</div>
-                        <div class="mini-event">09:00 科技馆</div>
+                    <div class="member-list">
+                        <!-- Head -->
+                        <div class="list-head">
+                            <div class="col-id-index">#</div>
+                            <div>姓名</div>
+                            <div>身份</div>
+                            <div>性别</div>
+                            <div>联系电话</div>
+                            <div>备注/标签</div>
+                            <div style="text-align:right">操作</div>
+                        </div>
+
+                        <!-- Row 1 (Teacher) -->
+                        <div class="member-row">
+                            <div class="col-id-index">01</div>
+                            <div class="col-name">张伟老师</div>
+                            <div class="col-role"><span class="role-pill role-teacher">TEACHER</span></div>
+                            <div class="col-gender">男</div>
+                            <div class="col-phone">13800138000</div>
+                            <div class="col-tags">-</div>
+                            <div class="col-actions"><span class="btn-icon">✎</span></div>
+                        </div>
+
+                        <!-- Row 2 (Student with Warning) -->
+                        <div class="member-row">
+                            <div class="col-id-index">02</div>
+                            <div class="col-name">陈小明</div>
+                            <div class="col-role"><span class="role-pill role-student">STUDENT</span></div>
+                            <div class="col-gender">男</div>
+                            <div class="col-phone">-</div>
+                            <div class="col-tags"><span class="tag-danger">⚠️ 花生过敏</span></div>
+                            <div class="col-actions"><span class="btn-icon">✎</span><span class="btn-icon">✕</span></div>
+                        </div>
+
+                        <!-- Row 3 (Student) -->
+                        <div class="member-row">
+                            <div class="col-id-index">03</div>
+                            <div class="col-name">李秀兰</div>
+                            <div class="col-role"><span class="role-pill role-student">STUDENT</span></div>
+                            <div class="col-gender">女</div>
+                            <div class="col-phone">13900001111</div>
+                            <div class="col-tags"><span style="color:#9ca3af; font-size:10px">ID: 4403...</span></div>
+                            <div class="col-actions"><span class="btn-icon">✎</span></div>
+                        </div>
+
+                        <!-- More dummy rows... -->
+                        <div class="member-row"><div class="col-id-index">04</div><div class="col-name">王大力</div><div class="col-role"><span class="role-pill role-student">STUDENT</span></div><div class="col-gender">男</div><div class="col-phone">-</div><div class="col-tags">-</div><div class="col-actions"></div></div>
                     </div>
+
                 </div>
             </div>
+
+            <!-- Placeholders -->
+            <div id="pane-profile" class="content-pane">...</div>
+            <div id="pane-logistics" class="content-pane">...</div>
+            <div id="pane-itinerary" class="content-pane">...</div>
+
         </div>
     </div>
 
     <script>
-        function toggleMenu(e) {
-            e.stopPropagation();
-            document.getElementById('typeMenu').classList.toggle('visible');
-        }
-        function closeMenu() {
-            document.getElementById('typeMenu').classList.remove('visible');
-        }
-
-        function addProp(icon, typeName) {
-            closeMenu();
-            const grid = document.getElementById('propGrid');
-            const wrapper = document.getElementById('addWrapper');
-            
-            const newRow = document.createElement('div');
-            newRow.className = 'prop-row';
-            newRow.innerHTML = `
-                <div class="prop-key-area">
-                    <span class="prop-icon">${icon}</span>
-                    <input class="prop-key-label" value="${typeName}">
-                </div>
-                <div class="prop-val-area">
-                    <input class="prop-input" placeholder="Empty">
-                </div>
-            `;
-            
-            grid.insertBefore(newRow, wrapper);
-            
-            // Logic: Focus Key first and SELECT text
-            const keyInp = newRow.querySelector('.prop-key-label');
-            keyInp.focus();
-            keyInp.select();
+        function switchTab(id, el) {
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            document.querySelectorAll('.content-pane').forEach(p => p.classList.remove('active'));
+            document.getElementById('pane-' + id).classList.add('active');
         }
     </script>
 </body>

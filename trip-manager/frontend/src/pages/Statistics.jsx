@@ -1,11 +1,10 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Table, Button, DatePicker, Select, message, Statistic } from 'antd';
+import { Card, Row, Col, Table, Button, DatePicker, message, Statistic } from 'antd';
 import { DownloadOutlined, BarChartOutlined } from '@ant-design/icons';
 import api from '../services/api';
 import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;
-const { Option } = Select;
 
 function Statistics() {
   const [statistics, setStatistics] = useState({});
@@ -13,7 +12,6 @@ function Statistics() {
   const [loading, setLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
   const [dateRange, setDateRange] = useState(null);
-  const [exportFormat, setExportFormat] = useState('json');
 
   // 加载统计数据
   const loadStatistics = async () => {
@@ -60,7 +58,7 @@ function Statistics() {
   const handleExport = async () => {
     setExportLoading(true);
     try {
-      const params = { format: exportFormat };
+      const params = { format: 'json' };
       if (dateRange) {
         params.startDate = dateRange[0].format('YYYY-MM-DD');
         params.endDate = dateRange[1].format('YYYY-MM-DD');
@@ -68,36 +66,22 @@ function Statistics() {
 
       const response = await api.get('/statistics/export', {
         params,
-        responseType: exportFormat === 'csv' ? 'blob' : 'json'
+        responseType: 'json'
       });
 
-      if (exportFormat === 'csv') {
-        // 下载 CSV 文件
-        const blob = new Blob([response.data], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `activities_${dayjs().format('YYYY-MM-DD')}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        message.success('CSV 文件已下载');
-      } else {
-        // 下载 JSON 文件
-        const blob = new Blob([JSON.stringify(response.data, null, 2)], {
-          type: 'application/json'
-        });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `activities_${dayjs().format('YYYY-MM-DD')}.json`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        message.success('JSON 文件已下载');
-      }
+      // 下载 JSON 文件
+      const blob = new Blob([JSON.stringify(response.data, null, 2)], {
+        type: 'application/json'
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `activities_${dayjs().format('YYYY-MM-DD')}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      message.success('JSON 文件已下载');
     } catch (error) {
       message.error('导出失败');
     } finally {
@@ -248,14 +232,6 @@ function Statistics() {
               onChange={handleDateChange}
               placeholder={['开始日期', '结束日期']}
             />
-            <Select
-              value={exportFormat}
-              onChange={setExportFormat}
-              style={{ width: '100px' }}
-            >
-              <Option value="json">JSON</Option>
-              <Option value="csv">CSV</Option>
-            </Select>
             <Button
               type="primary"
               icon={<DownloadOutlined />}

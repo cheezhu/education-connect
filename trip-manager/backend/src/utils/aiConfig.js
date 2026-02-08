@@ -1,9 +1,10 @@
 const { getConfigRow, upsertConfig } = require('./configStore');
+const { timeSlotWindows, toHours } = require('../../../shared/domain/time.cjs');
 
 const DEFAULT_TIME_SLOTS = {
-  MORNING: { start: 6, end: 12 },
-  AFTERNOON: { start: 12, end: 18 },
-  EVENING: { start: 18, end: 20.75 }
+  MORNING: { start: toHours(timeSlotWindows.MORNING.start) ?? 6, end: toHours(timeSlotWindows.MORNING.end) ?? 12 },
+  AFTERNOON: { start: toHours(timeSlotWindows.AFTERNOON.start) ?? 12, end: toHours(timeSlotWindows.AFTERNOON.end) ?? 18 },
+  EVENING: { start: toHours(timeSlotWindows.EVENING.start) ?? 18, end: toHours(timeSlotWindows.EVENING.end) ?? 20.75 }
 };
 
 const DEFAULT_AI_RULES = {
@@ -85,7 +86,8 @@ const resolveAiSettings = (db) => {
 
   const envProvider = process.env.AI_PROVIDER;
   const envModel = process.env.AI_MODEL;
-  const envApiKey = process.env.AI_api_key;
+  // Prefer conventional env var name; keep legacy name for backward-compat.
+  const envApiKey = process.env.AI_API_KEY || process.env.AI_api_key;
   const envTimeout = process.env.AI_TIMEOUT_MS;
 
   const providerValue = providerRow && providerRow.value

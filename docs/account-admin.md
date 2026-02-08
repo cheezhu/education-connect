@@ -1,91 +1,89 @@
-﻿﻿﻿# 账号与后台管理设计（Account Admin）
+﻿# 账号与权限（当前实现）
 
-本说明用于定义本项目的账号体系与后台管理能力，作为实施与验收依据。
+记录日期：2026-02-08
 
-## 现状摘要（基于现有代码）
-- 认证方式：HTTP Basic Auth（后端 `express-basic-auth`）
-- 用户数据：SQLite `users` 表（bcrypt 密码）
-- 默认账号：admin/admin123、viewer1/admin123
-- 前端：无登录页，`api.js` 固定注入 Basic Auth
-- 权限：主要靠编辑锁（admin 自动获取锁），缺少细粒度权限
+## 1) 认证方式（现在就是这么做的）
 
-## 目标
-- 提供可用的登录/登出流程（前端可见）
-- 支持账号管理（增删改、重置密码、禁用）
-- 角色与权限可扩展（admin / editor / viewer 等）
-- 兼容现有 Basic Auth（短期过渡）
+- HTTP Basic Auth
+- 后端：从 SQLite `users` 表读取用户并用 bcrypt 校验密码（见 `trip-manager/backend/server.js`）
+- 前端：`/login` 页面用 `GET /api/users/me` 校验凭证，成功后把 `Authorization`（Basic xxx）保存到 localStorage（key=`ec_basic_auth`）
+- 每次请求：`trip-manager/frontend/src/services/api.js` 会自动注入 `Authorization`
 
-## 角色与权限（建议）
-| 角色 | 权限范围 |
-| --- | --- |
-| admin | 全量读写、账号管理、系统设置 |
-| editor | 业务数据读写、不可管理账号/系统设置 |
-| viewer | 只读 |
+## 2) 默认用户（仅本地 init-db 后存在）
 
-## 数据模型（建议）
-### users
-| 字段 | 说明 |
-| --- | --- |
-| id | 主键 |
-| username | 唯一用户名 |
-| password | bcrypt hash |
-| display_name | 显示名 |
-| role | admin/editor/viewer |
-| is_active | 启用/禁用 |
-| created_at / updated_at | 时间戳 |
-| last_login | 最近登录 |
+`npm run init-db` 会写入默认用户（用于本地开发/演示）：
 
-### sessions / tokens（任选其一）
-1) **JWT**（无状态）
-   - token 存本地
-   - 过期时间 + refresh
-2) **Session 表**（有状态）
-   - `session_id` / `user_id` / `expires_at`
-   - 服务端可强制失效
+| username | password | role |
+|---|---|---|
+| admin | admin123 | admin |
+| viewer1 | admin123 | viewer |
 
-## 认证流程（建议）
-1. `/auth/login` 传 username/password
-2. 成功返回 token + user profile
-3. 前端将 token 存储并随请求附带（Authorization: Bearer）
-4. `/auth/logout` 或本地清除 token
+上线前必须处理：
+- 删除默认用户或修改密码
+- 避免把 `trip.db`（含明文敏感信息）直接拷贝到不可信环境
 
-> 过渡方案：保留 Basic Auth，新增 Bearer Auth，逐步迁移前端请求头。
+## 3) 角色定义
 
-## API 设计（建议）
-### Auth
-- POST `/api/auth/login`
-- POST `/api/auth/logout`
-- GET  `/api/auth/me`
+- admin：全量访问 + 全量写入 + 用户管理 + 系统设置
+- editor：业务数据读写（团组/地点/日历/资源/成员/食行卡片），不可访问用户管理与系统设置
+- viewer：只读
 
-### Users
-- GET  `/api/users`（列表）
-- POST `/api/users`（创建）
-- PUT  `/api/users/:id`（更新）
-- PUT  `/api/users/:id/password`（重置密码）
-- PUT  `/api/users/:id/disable`（禁用/启用）
+## 4) 前端权限矩阵（以 `useAuth.jsx` 为准）
 
-## 前端页面与交互（建议）
-- `/login`：登录页
-- `/settings`：账号管理 Tab（仅 admin）
-  - 用户列表 + 新增/编辑/禁用
-  - 重置密码
-  - 角色切换
+| 功能 | admin | editor | viewer |
+|---|---|---|---|
+| 行程设计器（/designer） | 访问 | 禁止 | 禁止 |
+| 团组管理（/groups） | 读写 | 读写 | 只读 |
+| 行程资源（/locations） | 读写 | 读写 | 只读 |
+| 统计（/statistics） | 只读 | 只读 | 只读 |
+| 用户管理（/users） | 读写 | 禁止 | 禁止 |
+| 系统设置（/settings） | 读写 | 禁止 | 禁止 |
 
-## 权限策略（建议）
-- 后端路由中间件：
-  - `requireAuth`：已登录
-  - `requireRole('admin')`
-- 前端 UI 按角色隐藏不可用功能
+实现位置：
+- `trip-manager/frontend/src/hooks/useAuth.jsx`
 
-## 安全建议
-- 强制密码最小长度、复杂度
-- 登录失败节流（防暴力）
-- 管理员操作审计（可选）
-- 禁用账号立即失效 token/session
+## 5) 后端路由权限（概览）
 
-## 迁移与实施步骤（建议）
-1. 增加 `is_active` 字段与索引
-2. 新增 auth 路由与中间件
-3. 前端登录页 + token 注入
-4. 权限中间件替换当前“只要 Basic Auth 就可写”的策略
-5. 移除或弱化 Basic Auth
+以 `trip-manager/backend/server.js` 为准：
+
+- admin-only：
+  - `/api/lock/*`
+  - `/api/activities/*`
+  - `/api/planning/*`
+  - `/api/config/*`
+  - `/api/users/*`（除 `GET /api/users/me`）
+- admin/editor 可写、viewer 只读：
+  - `/api/groups`
+  - `/api/locations`
+  - `/api/itinerary-plans`
+  - `/api/groups/:id/schedules`
+  - `/api/groups/:id/logistics`
+  - `/api/groups/:id/members`
+  - `/api/resources/*`
+
+备注：
+- `/api/groups/:groupId/schedules/designer-source`、`/api/groups/:groupId/schedules/push-to-designer` 为 admin-only（写入/同步用）。
+
+## 6) 编辑锁（写入保护）
+
+- 许多写接口会挂 `requireEditLock`（见 `trip-manager/backend/src/middleware/editLock.js`）
+- 自动获取：锁空闲时，admin/editor 会自动获取 5 分钟锁并继续写入
+- 手动获取接口：`POST /api/lock/acquire` 为 admin-only（见 `trip-manager/backend/src/routes/lock.js`）
+
+## 7) 如何重置密码（两种方式）
+
+方式 A（推荐，走 UI）：
+- 用 admin 登录 -> `/users` 用户管理页 -> 编辑用户 -> 重置密码
+
+方式 B（走 API，仅 admin）：
+- `PUT /api/users/:id`
+- body 示例：
+```json
+{ "password": "newPassword123" }
+```
+
+## 8) 安全提示（别跳过）
+
+- Basic Auth 凭证存 localStorage：一旦发生 XSS，会被直接窃取（详见 `docs/code-review-issues.md`）
+- AI Key 可被写入 system_config 明文保存：需要按生产安全标准加固
+

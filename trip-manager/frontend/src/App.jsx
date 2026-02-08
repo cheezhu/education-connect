@@ -2,7 +2,6 @@
 import { Layout, Result, Spin } from 'antd';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import GroupManagementV2 from './pages/GroupManagementV2';
-import GroupEditV2 from './pages/GroupEditV2';
 import LocationManagement from './pages/LocationManagement';
 import Statistics from './pages/Statistics';
 import ItineraryDesigner from './pages/ItineraryDesigner';
@@ -113,22 +112,6 @@ function AppLayout() {
               element={(
                 <ProtectedRoute permission="settings">
                   <Settings />
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/groups/v2/edit/:id"
-              element={(
-                <ProtectedRoute permission="groups" action="write">
-                  <GroupEditV2 />
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/groups/v2/new"
-              element={(
-                <ProtectedRoute permission="groups" action="write">
-                  <GroupEditV2 />
                 </ProtectedRoute>
               )}
             />

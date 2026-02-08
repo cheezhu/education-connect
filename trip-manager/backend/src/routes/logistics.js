@@ -195,7 +195,7 @@ const fetchLogistics = (db, groupId) => {
   return Array.from(dayMap.values());
 };
 
-// 获取团组每日卡片
+// 获取团组食行卡片
 router.get('/groups/:groupId/logistics', (req, res) => {
   const groupId = Number(req.params.groupId);
   if (!Number.isFinite(groupId)) {
@@ -205,7 +205,7 @@ router.get('/groups/:groupId/logistics', (req, res) => {
   return res.json(fetchLogistics(req.db, groupId));
 });
 
-// 批量保存每日卡片（替换团组全部数据）
+// 批量保存食行卡片（替换团组全部数据）
 router.post('/groups/:groupId/logistics', requireEditLock, (req, res) => {
   const groupId = Number(req.params.groupId);
   if (!Number.isFinite(groupId)) {
@@ -217,7 +217,7 @@ router.post('/groups/:groupId/logistics', requireEditLock, (req, res) => {
     : (Array.isArray(req.body) ? req.body : []);
 
   if (!Array.isArray(logisticsList)) {
-    return res.status(400).json({ error: '无效的每日卡片数据' });
+    return res.status(400).json({ error: '无效的食行卡片数据' });
   }
 
   const insertDay = req.db.prepare(`
@@ -501,8 +501,8 @@ router.post('/groups/:groupId/logistics', requireEditLock, (req, res) => {
     const refreshed = fetchLogistics(req.db, groupId);
     return res.json(refreshed);
   } catch (error) {
-    console.error('保存每日卡片失败:', error);
-    return res.status(500).json({ error: '保存每日卡片失败' });
+    console.error('保存食行卡片失败:', error);
+    return res.status(500).json({ error: '保存食行卡片失败' });
   }
 });
 

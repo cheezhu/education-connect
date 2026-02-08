@@ -1,5 +1,5 @@
 import React from 'react';
-import ScheduleManagement from '../../../GroupEditV2/ScheduleManagement';
+import CalendarDetailController from '../../../../features/calendar-detail/CalendarDetailController';
 
 const FullCalendarWrapper = ({
   group,
@@ -16,7 +16,7 @@ const FullCalendarWrapper = ({
   }
 
   return (
-    <ScheduleManagement
+    <CalendarDetailController
       groupId={group.id}
       groupData={group}
       schedules={schedules}

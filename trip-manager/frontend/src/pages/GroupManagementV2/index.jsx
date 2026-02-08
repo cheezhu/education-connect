@@ -3,17 +3,28 @@ import { message } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import api from '../../services/api';
+import {
+  buildShixingResourceId,
+  parseShixingResourceId,
+  isCustomResourceId,
+  isPlanResourceId,
+  isShixingResourceId,
+  getResourceId
+} from '../../domain/resourceId';
+import { toMinutes } from '../../domain/time';
+import { hashString } from '../../domain/hash';
 import GroupList from './components/Sidebar/GroupList';
 import TabBar from './components/Detail/TabBar';
 import ProfileView from './components/Detail/ProfileView';
 import FullCalendarWrapper from './components/Detail/FullCalendarWrapper';
 import LogisticsView from './components/Detail/Logistics/LogisticsView';
+import ItineraryTextDetail from './components/Detail/ItineraryTextDetail';
 import BulkCreateModal from './components/Modals/BulkCreateModal';
-import MemberManagement from '../GroupEditV2/MemberManagement';
+import MembersView from './components/Detail/MembersView';
 import GroupCommandCenterSkeleton from './components/GroupCommandCenterSkeleton';
 import './GroupCommandCenter.css';
 
-const DAILY_MEAL_DEFAULTS = {
+const SHIXING_MEAL_DEFAULTS = {
   breakfast: { start: '07:30', end: '08:30' },
   lunch: { start: '12:00', end: '13:00' },
   dinner: { start: '18:00', end: '19:00' }
@@ -25,39 +36,20 @@ const MEAL_LABELS = {
   dinner: '晚餐'
 };
 
-const buildDailyResourceId = (date, category, key) => {
-  if (!date) return '';
-  if (category === 'meal') {
-    return `daily:${date}:meal:${key}`;
-  }
-  return `daily:${date}:${category}`;
-};
-
-const parseDailyResourceId = (resourceId) => {
-  if (typeof resourceId !== 'string') return null;
-  if (!resourceId.startsWith('daily:')) return null;
-  const parts = resourceId.split(':');
-  const date = parts[1];
-  const category = parts[2];
-  const key = parts[3];
-  if (!date || !category) return null;
-  return { date, category, key };
-};
-
-const collectDailyResourceIds = (schedules = []) => {
+const collectShixingResourceIds = (schedules = []) => {
   const set = new Set();
   schedules.forEach((schedule) => {
     const resourceId = getResourceId(schedule);
-    if (isDailyResourceId(resourceId)) {
+    if (isShixingResourceId(resourceId)) {
       set.add(resourceId);
     }
   });
   return set;
 };
 
-const clearDailyResourceFields = (logistics = [], removedIds = []) => {
+const clearShixingResourceFields = (logistics = [], removedIds = []) => {
   if (!Array.isArray(logistics) || removedIds.length === 0) return logistics;
-  const parsed = removedIds.map(parseDailyResourceId).filter(Boolean);
+  const parsed = removedIds.map(parseShixingResourceId).filter(Boolean);
   if (parsed.length === 0) return logistics;
   const byDate = new Map();
   parsed.forEach((item) => {
@@ -116,15 +108,6 @@ const clearDailyResourceFields = (logistics = [], removedIds = []) => {
   });
 };
 
-const toMinutes = (timeValue) => {
-  if (!timeValue) return null;
-  const [hourStr, minuteStr] = String(timeValue).split(':');
-  const hour = Number(hourStr);
-  const minute = Number(minuteStr);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
-  return hour * 60 + minute;
-};
-
 const calcDurationMinutes = (startTime, endTime) => {
   const start = toMinutes(startTime);
   const end = toMinutes(endTime);
@@ -132,28 +115,6 @@ const calcDurationMinutes = (startTime, endTime) => {
   const diff = end - start;
   return diff > 0 ? diff : null;
 };
-
-const hashString = (input) => {
-  let hash = 5381;
-  const str = String(input);
-  for (let i = 0; i < str.length; i += 1) {
-    hash = ((hash << 5) + hash) + str.charCodeAt(i);
-    hash &= 0xffffffff;
-  }
-  return (hash >>> 0).toString(16);
-};
-
-const getResourceId = (schedule) => (
-  schedule?.resourceId ?? schedule?.resource_id ?? ''
-);
-
-const isDailyResourceId = (resourceId) => (
-  typeof resourceId === 'string' && resourceId.startsWith('daily:')
-);
-
-const isPlanResourceId = (resourceId) => (
-  typeof resourceId === 'string' && (resourceId.startsWith('plan-') || resourceId.startsWith('plan-sync-'))
-);
 
 const isMealFilled = (meals, key) => {
   if (!meals || meals[`${key}_disabled`]) return false;
@@ -191,7 +152,7 @@ const buildCustomResource = (schedule) => {
   const hash = hashString(`${type}|${title}|${durationMinutes}`);
   const resourceId = getResourceId(schedule);
   const id = (
-    typeof resourceId === 'string' && resourceId.startsWith('custom:')
+    isCustomResourceId(resourceId)
       ? resourceId
       : `custom:${hash}`
   );
@@ -217,7 +178,7 @@ const mergeCustomResources = (existing = [], schedules = []) => {
 
   schedules.forEach((schedule) => {
     const resourceId = getResourceId(schedule);
-    if (resourceId && (isDailyResourceId(resourceId) || isPlanResourceId(resourceId))) return;
+    if (resourceId && (isShixingResourceId(resourceId) || isPlanResourceId(resourceId))) return;
 
     const resource = buildCustomResource(schedule);
     if (!map.has(resource.id)) {
@@ -253,7 +214,7 @@ const syncLogisticsFromSchedules = (logistics = [], schedules = []) => {
   const scheduleMap = new Map();
   schedules.forEach((schedule) => {
     const resourceId = getResourceId(schedule);
-    if (isDailyResourceId(resourceId)) {
+    if (isShixingResourceId(resourceId)) {
       scheduleMap.set(resourceId, schedule);
     }
   });
@@ -264,7 +225,7 @@ const syncLogisticsFromSchedules = (logistics = [], schedules = []) => {
     const dropoff = { ...(row.dropoff || {}) };
 
     ['breakfast', 'lunch', 'dinner'].forEach((key) => {
-      const resourceId = buildDailyResourceId(row.date, 'meal', key);
+      const resourceId = buildShixingResourceId(row.date, 'meal', key);
       const schedule = scheduleMap.get(resourceId);
       if (schedule) {
         meals[`${key}_time`] = schedule.startTime || schedule.start_time || '';
@@ -277,7 +238,7 @@ const syncLogisticsFromSchedules = (logistics = [], schedules = []) => {
       }
     });
 
-    const pickupId = buildDailyResourceId(row.date, 'pickup');
+    const pickupId = buildShixingResourceId(row.date, 'pickup');
     const pickupSchedule = scheduleMap.get(pickupId);
     if (pickupSchedule) {
       pickup.time = pickupSchedule.startTime || pickupSchedule.start_time || '';
@@ -289,7 +250,7 @@ const syncLogisticsFromSchedules = (logistics = [], schedules = []) => {
       pickup.detached = false;
     }
 
-    const dropoffId = buildDailyResourceId(row.date, 'dropoff');
+    const dropoffId = buildShixingResourceId(row.date, 'dropoff');
     const dropoffSchedule = scheduleMap.get(dropoffId);
     if (dropoffSchedule) {
       dropoff.time = dropoffSchedule.startTime || dropoffSchedule.start_time || '';
@@ -354,7 +315,7 @@ const mergeSchedulesWithLogistics = (schedules = [], logistics = [], groupId) =>
     const dropoff = row.dropoff || {};
 
     ['breakfast', 'lunch', 'dinner'].forEach((key) => {
-      const resourceId = buildDailyResourceId(date, 'meal', key);
+      const resourceId = buildShixingResourceId(date, 'meal', key);
       if (!isMealFilled(meals, key)) {
         removeByResource(resourceId);
         return;
@@ -383,7 +344,7 @@ const mergeSchedulesWithLogistics = (schedules = [], logistics = [], groupId) =>
         return;
       }
 
-      const defaultTime = DAILY_MEAL_DEFAULTS[key] || {};
+      const defaultTime = SHIXING_MEAL_DEFAULTS[key] || {};
       const startTime = meals[`${key}_time`] || defaultTime.start;
       const endTime = meals[`${key}_end`] || defaultTime.end;
       if (!startTime || !endTime) return;
@@ -396,7 +357,7 @@ const mergeSchedulesWithLogistics = (schedules = [], logistics = [], groupId) =>
     });
 
     const handleTransfer = (key, label, data) => {
-      const resourceId = buildDailyResourceId(date, key);
+      const resourceId = buildShixingResourceId(date, key);
       if (!hasPickupContent(data)) {
         removeByResource(resourceId);
         return;
@@ -569,7 +530,7 @@ const GroupManagementV2 = () => {
         group.id === groupId ? { ...group, logistics } : group
       )));
     } catch (error) {
-      message.error('加载每日卡片失败');
+      message.error('加载食行卡片失败');
     }
   };
 
@@ -687,7 +648,6 @@ const GroupManagementV2 = () => {
     tags: group.tags,
     notes: group.notes,
     itinerary_plan_id: group.itinerary_plan_id,
-    must_visit_mode: group.must_visit_mode,
     manual_must_visit_location_ids: group.manual_must_visit_location_ids,
     status: group.status
   });
@@ -712,16 +672,16 @@ const GroupManagementV2 = () => {
           )));
         }
       } catch (error) {
-        message.error('保存每日卡片失败');
+        message.error('保存食行卡片失败');
       }
     }, 400);
   }, [activeGroupId]);
 
   const applyScheduleSync = useCallback((schedules) => {
     const previousSchedules = scheduleSnapshotRef.current || [];
-    const prevDaily = collectDailyResourceIds(previousSchedules);
-    const nextDaily = collectDailyResourceIds(schedules);
-    const removedDailyIds = Array.from(prevDaily).filter(id => !nextDaily.has(id));
+    const prevShixing = collectShixingResourceIds(previousSchedules);
+    const nextShixing = collectShixingResourceIds(schedules);
+    const removedShixingIds = Array.from(prevShixing).filter(id => !nextShixing.has(id));
 
     setGroupSchedules(schedules);
     scheduleSignatureRef.current = buildScheduleSignature(schedules);
@@ -731,8 +691,8 @@ const GroupManagementV2 = () => {
     setGroups(prev => prev.map(group => {
       if (group.id !== activeGroupId) return group;
       let nextLogistics = syncLogisticsFromSchedules(group.logistics || [], schedules);
-      if (removedDailyIds.length) {
-        nextLogistics = clearDailyResourceFields(nextLogistics, removedDailyIds);
+      if (removedShixingIds.length) {
+        nextLogistics = clearShixingResourceFields(nextLogistics, removedShixingIds);
       }
       nextLogisticsSnapshot = nextLogistics;
       const nextCustomResources = mergeCustomResources(group.customResources || [], schedules);
@@ -1008,15 +968,16 @@ const GroupManagementV2 = () => {
             }}
           />
         );
+      case 'itinerary':
+        return (
+          <ItineraryTextDetail
+            group={activeGroup}
+            schedules={groupSchedules}
+          />
+        );
       case 'members':
         return (
-          <div className="members-pane">
-            {activeGroup ? (
-              <MemberManagement groupId={activeGroup.id} />
-            ) : (
-              <div className="empty-state">请选择团组</div>
-            )}
-          </div>
+          <MembersView groupId={activeGroup?.id ?? null} />
         );
       default:
         return null;
@@ -1032,7 +993,10 @@ const GroupManagementV2 = () => {
             totalCount={groups.length}
             activeGroupId={activeGroupId}
             onSelectGroup={setActiveGroupId}
-            onCreateGroup={() => navigate('/groups/v2/new')}
+            onCreateGroup={() => {
+              resetBulkForm();
+              setBulkOpen(true);
+            }}
             onBulkCreate={() => setBulkOpen(true)}
             filters={filters}
             onSearchChange={updateSearch}

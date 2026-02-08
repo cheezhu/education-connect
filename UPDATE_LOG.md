@@ -1,2 +1,14 @@
-2026-01-26 19:43：行程设计器卡片新增到/离日小圆点标记
-2026-01-27 00:15：日历详情时间段统一为 06:00–12:00 / 12:00–18:00 / 18:00–20:45；行程点与活动映射改为按时间重叠判断并优先落入窗口，无空位则放到窗口后；AI 规划默认时间段同步调整并支持 20:45 输出；日历拖拽恢复可落到卡片上；AI 使用记录展示模型；修复新建活动报错 locationMap 未定义；仅 location_id 关联的活动与行程设计器同步，清空地点将删除同步活动；文档同步更新
+﻿# Update Log
+
+## 2026-02-08
+- Docs: consolidated planning docs into `docs/planning/`; archived/removed outdated docs; refreshed runbook/auth/permissions/api references.
+- ItineraryDesigner: further refactor/split into hooks (data loading, activity CRUD, group console DnD/actions, group calendar resize). `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx` reduced to ~640 lines. Frontend build verified.
+
+## 2026-02-07
+- Planning export: must-visit validation based on `groups.manual_must_visit_location_ids`; export modal supports fixing missing must-visit points and saving back to group fields.
+- ItineraryDesigner: initial refactor splitting UI blocks (header, group selector, activity modal, calendar detail modal) and moving planning IO/drag/conflicts into dedicated modules; `index.jsx` reduced to ~1024 lines.
+- GroupManagementV2: upgraded itinerary detail view (modern timeline/magazine style) and extracted subcomponents.
+
+## Legacy notes (older, may be incomplete)
+- 2026-01-27: calendar detail time slot/mapping adjustments; drag-drop and activity creation bug fixes.
+- 2026-01-26: itinerary designer cards: departure marker.

@@ -1,6 +1,3 @@
-export const getRequestErrorMessage = (error, fallbackText = '操作失败') => (
-  error?.response?.data?.conflicts?.[0]?.message
-    || error?.response?.data?.error
-    || fallbackText
-);
+// Legacy re-export: keep import paths stable for ItineraryDesigner code.
+export { getRequestErrorMessage } from '../../../domain/error';
 

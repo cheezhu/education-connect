@@ -523,54 +523,47 @@ const ProfileView = ({
     (locations || []).map((location) => [Number(location.id), location])
   );
   const manualMustVisitIds = normalizeManualMustVisitLocationIds(draft.manual_must_visit_location_ids);
-  const mode = normalizeMustVisitMode(
-    draft.must_visit_mode,
-    manualMustVisitIds.length > 0 ? 'manual' : 'plan'
-  );
   const activePlan = (itineraryPlans || []).find(
     (plan) => Number(plan.id) === Number(draft.itinerary_plan_id)
   ) || null;
   const planMustVisitIds = extractPlanLocationIds(activePlan?.items || []);
-  const selectedMustVisitIds = (mode === 'plan' && manualMustVisitIds.length === 0)
-    ? planMustVisitIds
-    : manualMustVisitIds;
+  const selectedMustVisitIds = manualMustVisitIds;
   const resolvedMustVisit = selectedMustVisitIds.map((locationId, index) => {
-    const fromPlan = mode === 'plan' && manualMustVisitIds.length === 0;
     const location = locationMap.get(locationId);
     return {
       location_id: locationId,
       location_name: location?.name || `#${locationId}`,
       sort_order: index,
-      source: fromPlan ? 'plan' : 'manual'
+      source: 'manual'
     };
   });
-  const mustVisitConfigured = resolvedMustVisit.length > 0;
+  const mustVisitConfigured = manualMustVisitIds.length > 0;
 
   const handleMustVisitPlanChange = (value) => {
     setDraft((prev) => {
       if (!prev) return prev;
       const planId = value ? Number(value) : null;
-      const nextPlan = (itineraryPlans || []).find((plan) => Number(plan.id) === planId);
-      const nextIds = extractPlanLocationIds(nextPlan?.items || []);
       return {
         ...prev,
-        must_visit_mode: nextIds.length > 0 ? 'manual' : 'plan',
-        itinerary_plan_id: Number.isFinite(planId) ? planId : null,
-        manual_must_visit_location_ids: nextIds
+        itinerary_plan_id: Number.isFinite(planId) ? planId : null
       };
     });
   };
 
   const handleApplyCurrentPlan = () => {
+    if (manualMustVisitIds.length > 0) {
+      const confirmed = window.confirm('将使用方案地点替换当前必去点，是否继续？');
+      if (!confirmed) return;
+    }
     setDraft((prev) => {
       if (!prev) return prev;
       const planId = Number(prev.itinerary_plan_id);
       if (!Number.isFinite(planId)) return prev;
       const plan = (itineraryPlans || []).find((item) => Number(item.id) === planId);
       const nextIds = extractPlanLocationIds(plan?.items || []);
+      if (!nextIds.length) return prev;
       return {
         ...prev,
-        must_visit_mode: nextIds.length > 0 ? 'manual' : 'plan',
         manual_must_visit_location_ids: nextIds
       };
     });
@@ -583,15 +576,7 @@ const ProfileView = ({
     }
     setDraft((prev) => {
       if (!prev) return prev;
-      const previousMode = normalizeMustVisitMode(prev.must_visit_mode, 'plan');
-      const currentManualIds = normalizeManualMustVisitLocationIds(prev.manual_must_visit_location_ids);
-      let currentIds = currentManualIds;
-      if (previousMode === 'plan' && currentManualIds.length === 0) {
-        const previousPlan = (itineraryPlans || []).find(
-          (plan) => Number(plan.id) === Number(prev.itinerary_plan_id)
-        );
-        currentIds = extractPlanLocationIds(previousPlan?.items || []);
-      }
+      const currentIds = normalizeManualMustVisitLocationIds(prev.manual_must_visit_location_ids);
       const nextSet = new Set(currentIds);
       if (nextSet.has(normalizedLocationId)) {
         nextSet.delete(normalizedLocationId);
@@ -600,8 +585,6 @@ const ProfileView = ({
       }
       return {
         ...prev,
-        must_visit_mode: 'manual',
-        itinerary_plan_id: prev.itinerary_plan_id ?? null,
         manual_must_visit_location_ids: Array.from(nextSet)
       };
     });
@@ -612,8 +595,6 @@ const ProfileView = ({
       if (!prev) return prev;
       return {
         ...prev,
-        must_visit_mode: 'manual',
-        itinerary_plan_id: prev.itinerary_plan_id ?? null,
         manual_must_visit_location_ids: []
       };
     });
@@ -684,7 +665,7 @@ const ProfileView = ({
                   </button>
                 </div>
                 <span className="must-visit-tip">
-                  选择方案后会自动填充下方多选，可继续手动微调。
+                  方案仅用于快捷点选；点击“套用当前方案”才会把方案地点填充到必去点，之后可继续手动微调。
                 </span>
               </div>
             </div>
@@ -776,7 +757,7 @@ const ProfileView = ({
                     </div>
                     <div className="staff-info">
                     <div className="staff-name">{module.label}</div>
-                    <div className="staff-role">按每日卡片填写完成度统计</div>
+                    <div className="staff-role">按食行卡片填写完成度统计</div>
                   </div>
                   <div className="task-bar">
                     <div className="task-fill" style={{ width: `${module.ratio}%`, background: module.color }}></div>
@@ -791,7 +772,7 @@ const ProfileView = ({
 
           <div className="day-block">
             <div className="day-header">
-              <div className="day-title">每日卡片预览</div>
+              <div className="day-title">食行卡片预览</div>
               <button
                 type="button"
                 className="day-action"
@@ -802,7 +783,7 @@ const ProfileView = ({
             </div>
 
             {previewDays.length === 0 && (
-              <div className="empty-state">暂无每日卡片数据</div>
+              <div className="empty-state">暂无食行卡片数据</div>
             )}
 
             {previewDays.map((day, index) => {
@@ -849,7 +830,7 @@ const ProfileView = ({
               ];
               const visibleMeals = mealEntries.filter((meal) => !meal.disabled);
               return (
-                <div className="daily-card" key={`${day.date}-${index}`}>
+                <div className="shixing-card" key={`${day.date}-${index}`}>
                   <div className="card-row">
                     <div className="card-label">日期</div>
                     <div className="card-content">

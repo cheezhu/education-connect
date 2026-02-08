@@ -31,13 +31,19 @@ const TabBar = ({
         className={`tab-item ${activeTab === 'logistics' ? 'active' : ''}`}
         onClick={() => onTabChange('logistics')}
       >
-        每日卡片
+        食行卡片
       </div>
       <div
         className={`tab-item ${activeTab === 'schedule' ? 'active' : ''}`}
         onClick={() => onTabChange('schedule')}
       >
         日历详情
+      </div>
+      <div
+        className={`tab-item ${activeTab === 'itinerary' ? 'active' : ''}`}
+        onClick={() => onTabChange('itinerary')}
+      >
+        行程详情
       </div>
       <div
         className={`tab-item ${activeTab === 'members' ? 'active' : ''}`}

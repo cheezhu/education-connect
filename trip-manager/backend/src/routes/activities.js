@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const requireEditLock = require('../middleware/editLock');
 
+const { timeSlotWindows, toMinutes, toSqlTimeString } = require('../../../shared/domain/time.cjs');
+
 const mapActivityRow = (row) => ({
   id: row.id,
   groupId: row.group_id,
@@ -14,15 +16,6 @@ const mapActivityRow = (row) => ({
   isPlanItem: Boolean(row.is_plan_item)
 });
 
-const toMinutes = (timeValue) => {
-  if (!timeValue) return null;
-  const [hourStr, minuteStr] = timeValue.split(':');
-  const hour = Number(hourStr);
-  const minute = Number(minuteStr);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
-  return hour * 60 + minute;
-};
-
 const toTimeString = (totalMinutes) => {
   if (!Number.isFinite(totalMinutes)) return '09:00';
   const hour = Math.floor(totalMinutes / 60);
@@ -31,13 +24,8 @@ const toTimeString = (totalMinutes) => {
 };
 
 const getDefaultTimeRange = (timeSlot) => {
-  if (timeSlot === 'AFTERNOON') {
-    return { startTime: '12:00', endTime: '18:00' };
-  }
-  if (timeSlot === 'EVENING') {
-    return { startTime: '18:00', endTime: '20:45' };
-  }
-  return { startTime: '06:00', endTime: '12:00' };
+  const window = timeSlotWindows[timeSlot] || timeSlotWindows.MORNING;
+  return { startTime: window.start, endTime: window.end };
 };
 
 const getSchedulePlacement = (db, groupId, date, timeSlot, excludeScheduleId) => {
@@ -434,12 +422,11 @@ router.delete('/:id', requireEditLock, (req, res) => {
 
 // 辅助函数：获取时间段
 function getTimeFromSlot(slot) {
-  const times = {
-    'MORNING': { start: '06:00:00', end: '12:00:00' },
-    'AFTERNOON': { start: '12:00:00', end: '18:00:00' },
-    'EVENING': { start: '18:00:00', end: '20:45:00' }
+  const window = timeSlotWindows[slot] || timeSlotWindows.MORNING;
+  return {
+    start: toSqlTimeString(window.start),
+    end: toSqlTimeString(window.end)
   };
-  return times[slot];
 }
 
 // 辅助函数：检查冲突

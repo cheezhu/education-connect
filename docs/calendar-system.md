@@ -1,6 +1,6 @@
-# 日历系统完整设计文档
+﻿# 日历系统完整设计文档
 
-> 适用范围：行程设计器、日历详情、每日卡片 三大模块的数据同步与映射规则
+> 适用范围：行程设计器、日历详情、食行卡片 三大模块的数据同步与映射规则
 > 状态：与代码对齐
 > 日期：2026-02-01
 
@@ -13,8 +13,8 @@
 | 模块 | 说明 |
 |------|------|
 | **行程设计器** | ItineraryDesigner，按时间段（MORNING/AFTERNOON/EVENING）管理 |
-| **日历详情** | CalendarDaysView，精确到时间的日程管理 |
-| **每日卡片** | 团组管理中的三餐、接送机/站等固定内容 |
+| **日历详情** | CalendarDetail（CalendarDetailController），精确到时间的日程管理 |
+| **食行卡片** | 团组管理中的三餐、接送机/站等固定内容 |
 
 ---
 
@@ -49,7 +49,7 @@
   - `locationId`
   - `participantCount`
 
-### 2.3 每日卡片字段
+### 2.3 食行卡片字段
 
 #### 三餐（含隐藏时间字段）
 ```
@@ -80,12 +80,17 @@ dropoff.contact / dropoff.flight_no / dropoff.airline / dropoff.terminal
 ## 3. 时间窗口（统一口径）
 
 > 边界按 `[start, end)` 处理
+>
+> 事实来源：
+> - `trip-manager/shared/domain/time.(mjs|cjs)`（前后端共用）
+> - 前端转发：`trip-manager/frontend/src/domain/time.ts`
+> - 后端引用：`require('../../../shared/domain/time.cjs')`
 
 | timeSlot | 时间范围 |
 |----------|----------|
-| MORNING | 06:00–12:00 |
-| AFTERNOON | 12:00–18:00 |
-| EVENING | 18:00–20:45 |
+| MORNING | 06:00-12:00 |
+| AFTERNOON | 12:00-18:00 |
+| EVENING | 18:00-20:45 |
 
 **timeSlot 取值规则**（schedule → activity）：
 - 计算 schedule 的时间段与三个窗口的**重叠分钟数**
@@ -107,7 +112,7 @@ resource_id = plan-<planId>-loc-<locationId>
 - 来源：行程方案（itinerary plan items）
 - 同步：双向同步到行程设计器
 
-### 4.2 每日卡片（daily:*）
+### 4.2 食行卡片（daily:*）
 
 ```
 daily:<date>:meal:breakfast
@@ -117,8 +122,8 @@ daily:<date>:pickup
 daily:<date>:dropoff
 ```
 
-- 来源：每日卡片的三餐、接送机/站
-- 同步：每日卡片 ↔ 日历详情
+- 来源：食行卡片的三餐、接送机/站
+- 同步：食行卡片 ↔ 日历详情
 
 ### 4.3 自定义模板（custom:*）
 
@@ -134,9 +139,9 @@ hash = hash(type + '|' + title + '|' + durationMinutes)
 
 ## 5. 同步规则
 
-### 5.1 每日卡片 ↔ 日历详情
+### 5.1 食行卡片 ↔ 日历详情
 
-#### 5.1.1 每日卡片 → 日历
+#### 5.1.1 食行卡片 → 日历
 
 **三餐映射**：
 - 有填写且非"不安排" → 自动生成日历活动
@@ -173,7 +178,7 @@ resource_id = daily:<date>:pickup|dropoff
 is_from_resource = 1
 ```
 
-#### 5.1.2 日历 → 每日卡片（回写）
+#### 5.1.2 日历 → 食行卡片（回写）
 
 当日历活动的 `resource_id` 以 `daily:` 开头时，回写数据：
 
@@ -198,7 +203,7 @@ dropoff.time / dropoff.end_time
 
 #### 5.1.4 删除与回收
 
-- 日历中删除活动，但每日卡片仍有内容 → 回到资源库（每日卡片栏目）
+- 日历中删除活动，但食行卡片仍有内容 → 回到资源库（食行卡片栏目）
 - 不安排 → 删除/不生成对应活动
 
 ---
@@ -283,9 +288,11 @@ description/resource_id/is_from_resource 保留已有值
 
 ---
 
-## 6. CalendarDaysView 组件技术实现
+## 6. Calendar Detail 组件技术实现
 
-**组件路径**：`trip-manager/frontend/src/pages/GroupEditV2/CalendarDaysView.jsx`
+**组件路径**：
+- Controller：`trip-manager/frontend/src/features/calendar-detail/CalendarDetailController.jsx`
+- Workspace：`trip-manager/frontend/src/features/calendar-detail/CalendarDetailWorkspace/index.jsx`
 
 ### 6.1 核心功能
 
@@ -383,7 +390,7 @@ const activityTypes = {
 
 | 功能 | 文件路径 |
 |------|----------|
-| 日历详情组件 | `trip-manager/frontend/src/pages/GroupEditV2/CalendarDaysView.jsx` |
+| 日历详情组件 | `trip-manager/frontend/src/features/calendar-detail/CalendarDetailController.jsx` |
 | 行程设计器 | `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx` |
 | 后端 schedule 路由 | `trip-manager/backend/src/routes/schedules.js` |
 | 后端 activity 路由 | `trip-manager/backend/src/routes/activities.js` |
@@ -393,7 +400,7 @@ const activityTypes = {
 
 ## 8. 示例
 
-### 示例 A：早餐从每日卡片同步到日历
+### 示例 A：早餐从食行卡片同步到日历
 
 ```
 日卡填写：早餐="校内餐厅"，地址="XX路12号"
@@ -411,10 +418,10 @@ const activityTypes = {
 
 ```
 pickup.time=09:00，pickup.end_time=空
-结果：不生成日历活动，资源库"每日卡片"中显示接站卡片
+结果：不生成日历活动，资源库"食行卡片"中显示接站卡片
 ```
 
-### 示例 C：日历拖动午餐回写每日卡片
+### 示例 C：日历拖动午餐回写食行卡片
 
 ```
 午餐被拖到 13:00-14:00
@@ -443,17 +450,17 @@ pickup.time=09:00，pickup.end_time=空
 
 ### Q1：为什么餐饮活动没有同步到行程设计器？
 
-A：只有 `resourceId` 以 `plan-` 开头的 schedule 才会映射到行程设计器。餐饮使用 `daily:*` 前缀，属于每日卡片模块，不进入行程设计器。
+A：只有 `resourceId` 以 `plan-` 开头的 schedule 才会映射到行程设计器。餐饮使用 `daily:*` 前缀，属于食行卡片模块，不进入行程设计器。
 
 ### Q2：拖拽活动时间后被默认时间覆盖？
 
-A：检查隐藏时间字段是否正确回写。每日卡片模块会回写 `meals.*_time` 字段，日历详情应该读取这些字段而非使用默认值。
+A：检查隐藏时间字段是否正确回写。食行卡片模块会回写 `meals.*_time` 字段，日历详情应该读取这些字段而非使用默认值。
 
 ### Q3：如何区分三类资源？
 
 A：看 `resourceId` 前缀：
 - `plan-*` → 行程方案点
-- `daily:*` → 每日卡片
+- `daily:*` → 食行卡片
 - `custom:*` → 自定义模板
 
 ### Q4：schedule 和 activity 是什么关系？

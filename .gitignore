@@ -72,3 +72,4 @@ temp/
 trip-manager/backend/db/trip.db
 trip-manager/backend/nul
 trip-manager/frontend/nul
+.obsidian/workspace.json

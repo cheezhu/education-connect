@@ -55,7 +55,7 @@ function PlanningImportModal({
 }) {
   return (
     <Modal
-      title="导入排程结果(JSON/CSV)"
+      title="导入排程结果(JSON)"
       open={open}
       onCancel={onClose}
       wrapClassName="itinerary-modal-wrap"
@@ -95,7 +95,7 @@ function PlanningImportModal({
       destroyOnClose
     >
       <Upload.Dragger
-        accept=".json,.csv,application/json,text/csv"
+        accept=".json,application/json"
         multiple={false}
         fileList={planningImportFileList}
         beforeUpload={handlePlanningImportFile}
@@ -104,8 +104,8 @@ function PlanningImportModal({
         <p className="ant-upload-drag-icon">
           <InboxOutlined />
         </p>
-        <p className="ant-upload-text">点击或拖拽上传 planning_result.json / CSV 模板</p>
-        <p className="ant-upload-hint">支持 JSON（标准格式）和 CSV（人工可读格式）</p>
+        <p className="ant-upload-text">点击或拖拽上传 planning_result.json</p>
+        <p className="ant-upload-hint">仅支持 JSON（标准格式）</p>
       </Upload.Dragger>
 
       {planningImportPayload ? (
@@ -324,4 +324,3 @@ function PlanningImportModal({
 }
 
 export default PlanningImportModal;
-

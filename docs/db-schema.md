@@ -1,4 +1,4 @@
-﻿﻿﻿# 数据库结构（SQLite）
+﻿# 数据库结构（SQLite）
 
 数据库文件：`trip-manager/backend/db/trip.db`
 初始化脚本：`trip-manager/backend/db/init.sql`
@@ -20,6 +20,8 @@
 - start_date, end_date, duration
 - color
 - itinerary_plan_id (可空)
+- must_visit_mode: plan/manual（历史字段，前端已不依赖）
+- manual_must_visit_location_ids: TEXT(JSON array string, 默认 '[]')（跨团组排程的“必去点”来源）
 - status
 - contact_person, contact_phone
 - emergency_contact, emergency_phone

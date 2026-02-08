@@ -232,14 +232,6 @@ router.post('/export', (req, res) => {
     allLocations.map(location => [Number(location.id), location])
   );
 
-  const planItemQuery = req.db.prepare(`
-    SELECT p.location_id, p.sort_order, l.name AS location_name
-    FROM itinerary_plan_items p
-    LEFT JOIN locations l ON l.id = p.location_id
-    WHERE p.plan_id = ?
-    ORDER BY p.sort_order, p.id
-  `);
-
   const mustVisitByGroup = {};
   const exportValidationErrors = [];
 
@@ -248,31 +240,14 @@ router.post('/export', (req, res) => {
     const groupKey = String(groupId);
     const groupName = group.name || `#${groupId}`;
     const manualIds = normalizeLocationIdList(group.manual_must_visit_location_ids);
-    const mode = normalizeMustVisitMode(
-      group.must_visit_mode,
-      manualIds.length > 0 ? 'manual' : 'plan'
-    );
-
-    let rawItems = [];
-    if (mode === 'plan') {
-      if (!group.itinerary_plan_id) {
-        exportValidationErrors.push(`${groupName} 未绑定行程方案`);
-      } else {
-        rawItems = planItemQuery.all(group.itinerary_plan_id);
-        if (!rawItems || rawItems.length === 0) {
-          exportValidationErrors.push(`${groupName} 的必去行程点为空`);
-        }
-      }
-    } else {
-      if (manualIds.length === 0) {
-        exportValidationErrors.push(`${groupName} 的手动必去行程点为空`);
-      } else {
-        rawItems = manualIds.map((locationId, index) => ({
-          location_id: locationId,
-          sort_order: index
-        }));
-      }
+    if (manualIds.length === 0) {
+      exportValidationErrors.push(`${groupName} 未勾选必去行程点`);
     }
+
+    const rawItems = manualIds.map((locationId, index) => ({
+      location_id: locationId,
+      sort_order: index
+    }));
 
     const normalizedMustVisit = [];
     rawItems.forEach((item, index) => {
@@ -297,7 +272,7 @@ router.post('/export', (req, res) => {
         location_id: locationId,
         location_name: location.name || '',
         sort_order: sortOrder,
-        source: mode
+        source: 'manual'
       });
     });
 

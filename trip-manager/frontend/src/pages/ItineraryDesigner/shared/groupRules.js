@@ -54,23 +54,8 @@ export const isDateWithinGroupRange = (group, dateString) => {
   return !target.isBefore(group.start_date, 'day') && !target.isAfter(group.end_date, 'day');
 };
 
-export const isGroupMissingMustVisitConfig = (group, itineraryPlanById) => {
+export const isGroupMissingMustVisitConfig = (group) => {
   if (!group) return false;
   const manualIds = normalizeManualMustVisitLocationIds(group.manual_must_visit_location_ids);
-  const normalizedMode = String(
-    group.must_visit_mode || (manualIds.length > 0 ? 'manual' : 'plan')
-  ).trim().toLowerCase();
-
-  if (normalizedMode === 'manual') {
-    return manualIds.length === 0;
-  }
-
-  const planId = Number(group.itinerary_plan_id);
-  if (!Number.isFinite(planId) || planId <= 0) {
-    return true;
-  }
-
-  const plan = itineraryPlanById?.get ? itineraryPlanById.get(planId) : null;
-  return !plan || !Array.isArray(plan.items) || plan.items.length === 0;
+  return manualIds.length === 0;
 };
-

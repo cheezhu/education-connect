@@ -1,7 +1,7 @@
 ﻿# 行程设计器（ItineraryDesigner）详解
 
 ## 功能定位
-多团组 7 日时间轴排期中心：批量查看、编辑、拖拽、冲突检查、AI 自动排期。
+多团组时间轴排期中心：用于“行程点”的跨团队宏观资源调配（导出 -> 外部大模型/求解器 -> 导入 -> 人工微调），并提供可视化网格编辑与冲突提示。
 
 ## 数据加载
 - GET `/groups`
@@ -11,8 +11,13 @@
   - `/config/itinerary-week-start`
   - `/config/itinerary-time-slots`
   - `/config/itinerary-daily-focus`
-  - `/config/itinerary-group-row-align`
+  - `/config/itinerary-group-calendar-height`
 - 本地缓存：localStorage
+  - `itinerary_week_start`
+  - `itinerary_time_slots`
+  - `itinerary_daily_focus`
+  - `itinerary_show_unscheduled`（仅前端本地开关，暂无后端配置）
+  - `itinerary_group_calendar_height`
 
 ## 网格结构
 - 7 天视图（以 weekStartDate 为起点）
@@ -23,7 +28,11 @@
 - 选择团组：筛选显示
 - 拖拽活动：调整日期与时段
 - 点击单元格：打开编辑弹窗，支持添加活动
-- 导出：当前周 + 选中团组的活动导出为 CSV
+- 导出（跨团组排程）：
+  - 导出排程输入(JSON)：用于外部大模型/求解器（`ec-planning-input@2`）
+  - 导出人工模板(CSV)：给非技术同学人工填写/交接
+- 导入（跨团组排程）：
+  - 导入排程结果(JSON/CSV)：写回 activities / schedules（可选覆盖范围）
 
 ## 冲突检查（前端）
 - 同团组同时间段冲突
@@ -31,14 +40,35 @@
 - 地点不可用日期
 - 团组类型限制
 
-> 注意：前端冲突检查字段与后端并非完全一致（见 `docs/issues-known.md`）。
+> 注意：前端冲突检查字段与后端并非完全一致（见 `docs/code-review-issues.md`）。
 
-## AI 多团组生成
-- 打开弹窗，选择团组与日期范围
-- 预览 / 生成：调用 `/ai/plan/global`
-- 生成后写入 itinerary plans + schedules + activities
+## 必去行程点（Must-Visit，导出强依赖）
 
-## 团组行对齐 / 紧凑模式
+这是“行程设计器导出排程输入”里最关键的一份约束：**每个被导出的团组必须至少勾选 1 个必去行程点**，否则导出会被拦截。
+
+### 数据来源（以团组字段为准）
+- 团组字段：`groups.manual_must_visit_location_ids`
+  - 形态：地点 ID 数组（例如 `[1, 5, 9]`）
+  - 语义：本次跨团组资源调配时，大模型/求解器必须优先安排（每个地点通常只安排 1 次）
+- 团组字段：`groups.itinerary_plan_id`
+  - 语义：推荐方案/快捷点选（不等同于“必去”）
+
+### 配置入口（推荐）
+- 团组管理（GroupManagementV2）-> 团组详情（Profile）-> “必去行程点配置”
+  - 手动多选必去点：直接点击卡片即可多选
+  - 方案仅是“快捷点选”：选择方案后，点击“套用当前方案”才会把方案地点写入必去点，之后可继续手动微调
+
+### 导出时补齐（减少“点进团组再勾选”的成本）
+行程设计器导出弹窗内会显示“必去点补齐”面板：
+- 自动列出当前选择范围内“缺少必去点”的团组
+- 支持为每个团组直接选择必去点，或“一键从方案填充”
+- 导出时会自动把补齐的必去点写回团组字段，再执行导出
+
+## （规划/未落地）AI 多团组生成
+
+当前行程设计器没有接入“后端直调大模型生成排程”的接口；只保留跨团组排程的导出/导入工作流。
+
+## 团组行对齐 / 紧凑模式（规划/未启用）
 ### 背景与问题
 当同一时段有多个团组时，为了方便跨天对比，系统会把同名团组固定在同一行。这会导致某些日期出现“空行”，降低密度。
 
@@ -48,7 +78,7 @@
 - 对齐模式下的空行弱化显示
 
 ### 方案说明
-#### 1) 对齐模式（默认开启）
+#### 1) 对齐模式
 - 行顺序基于整个时间段的团组集合
 - 某天没有该团组时显示为空行
 - 空行以淡色细线占位，减少视觉噪音
@@ -58,35 +88,45 @@
 - 同名团组跨天不再严格固定在同一行
 - 适合希望提高密度、减少空行的场景
 
-### 使用方式
-行程设计器顶部工具栏提供开关：
-- **对齐团组行**（提示：同名团组跨天固定在同一行，可能出现空行）
-  - 开启：对齐模式
-  - 关闭：紧凑模式
-
-开关状态会全局保存并在前端做本地缓存：
-- system_config key：`itinerary_group_row_align`
-- localStorage key：`itinerary_group_row_align`
+### 当前实现状态（重要）
+- `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx` 内 `alignGroupRows` 目前写死为 `false`，等同于“仅紧凑模式”
+- UI 暂无“对齐团组行”开关，也没有对应的后端 `/config/*` 项
+- `TimelineGrid` 组件已具备对齐/紧凑两种渲染路径，后续只需要把开关与配置接上即可
 
 ### 相关文件
 - `trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`
-  - 新增状态 `alignGroupRows`
-  - 新增开关“对齐团组行”
-  - 渲染逻辑支持对齐/紧凑两种生成方式
+  - 当前固定 `alignGroupRows=false`
+- `trip-manager/frontend/src/pages/ItineraryDesigner/timeline/TimelineGrid.jsx`
+  - 已实现对齐/紧凑两种渲染逻辑
 - `trip-manager/frontend/src/pages/ItineraryDesigner/ItineraryDesigner.css`
   - 对齐模式空行样式弱化
-- `trip-manager/backend/src/routes/systemConfig.js`
-  - 配置读取/保存接口
 
 ### 代码结构（2026-02 重构后）
-- 页面入口：`trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`
+- 页面入口：`trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`（约 640 行）
+- 数据加载/选择范围（hook）：`trip-manager/frontend/src/pages/ItineraryDesigner/hooks/useItineraryDesignerData.js`
 - 样式：`trip-manager/frontend/src/pages/ItineraryDesigner/ItineraryDesigner.css`
+- 顶部工具栏：`trip-manager/frontend/src/pages/ItineraryDesigner/components/ItineraryDesignerHeader.jsx`
+- 左侧团组选择抽屉：`trip-manager/frontend/src/pages/ItineraryDesigner/components/GroupSelectorDrawer.jsx`
 - 时间轴网格：`trip-manager/frontend/src/pages/ItineraryDesigner/timeline/TimelineGrid.jsx`
+- 活动卡片（UI）：`trip-manager/frontend/src/pages/ItineraryDesigner/timeline/ActivityCard.jsx`
+- 时间轴拖拽（hook）：`trip-manager/frontend/src/pages/ItineraryDesigner/timeline/useTimelineDnD.js`
+- 活动新增/编辑/删除（hook）：`trip-manager/frontend/src/pages/ItineraryDesigner/hooks/useActivityCrud.js`
 - 底部调控台抽屉：`trip-manager/frontend/src/pages/ItineraryDesigner/console/GroupConsoleDrawer.jsx`
+- 底部调控台数据拼装（hook）：`trip-manager/frontend/src/pages/ItineraryDesigner/console/useGroupConsoleModel.js`
+- 底部调控台拖拽/清空/移除（hook）：`trip-manager/frontend/src/pages/ItineraryDesigner/console/useGroupConsoleDnD.js`
+- 底部调控台高度拖拽（hook）：`trip-manager/frontend/src/pages/ItineraryDesigner/hooks/useGroupCalendarResize.js`
+- 编辑行程弹窗：`trip-manager/frontend/src/pages/ItineraryDesigner/components/ActivityEditModal.jsx`
 - 导入/导出弹窗：`trip-manager/frontend/src/pages/ItineraryDesigner/planning/PlanningImportModal.jsx`、`trip-manager/frontend/src/pages/ItineraryDesigner/planning/PlanningExportModal.jsx`
 - 导入/导出解析（CSV/JSON）：`trip-manager/frontend/src/pages/ItineraryDesigner/planning/planningIO.js`
+- 导入/导出状态与业务逻辑（hooks）：`trip-manager/frontend/src/pages/ItineraryDesigner/planning/usePlanningExport.js`、`trip-manager/frontend/src/pages/ItineraryDesigner/planning/usePlanningImport.js`
+- 配置读取/本地缓存（hook）：`trip-manager/frontend/src/pages/ItineraryDesigner/hooks/useItineraryDesignerConfig.js`
+- 团组日历详情（打开/加载/防抖保存）（hook）：`trip-manager/frontend/src/pages/ItineraryDesigner/hooks/useGroupCalendarDetail.js`
+- 团组日历详情弹窗（UI）：`trip-manager/frontend/src/pages/ItineraryDesigner/components/GroupCalendarDetailModal.jsx`
 - 冲突 UI 与文案：`trip-manager/frontend/src/pages/ItineraryDesigner/conflicts/`
+- 时间轴冲突计算（hook）：`trip-manager/frontend/src/pages/ItineraryDesigner/conflicts/useTimelineSlotConflictMap.js`
+- 活动冲突检查（helper，用于新增/编辑提示）：`trip-manager/frontend/src/pages/ItineraryDesigner/conflicts/checkConflicts.js`
 - 公共工具（日期/时段/解析/规则/错误提示）：`trip-manager/frontend/src/pages/ItineraryDesigner/shared/`
+- 地点可用性规则：`trip-manager/frontend/src/pages/ItineraryDesigner/shared/locationAvailability.js`
 
 ### 可选后续优化
 - 支持系统级默认值配置
@@ -95,7 +135,7 @@
 
 ## AI 调用方式
 
-本项目 AI 相关能力分为三条路径：跨团组排程（导出/导入）、行程设计器内置多团组生成（后端直调）、日历详情（单团组 AI 行程）。三者目的、入口与数据流不同，避免混用。
+当前已落地的“自动化/AI 工作流”只有一条：跨团组排程（导出/导入）。日历详情 Copilot 与其他 AI 入口目前为 UI 预留，后端尚未接入真实 `/api/ai/*` 接口（见 `docs/itinerary-designer-upgrade-review-2026-02-06.md`）。
 
 ---
 
@@ -127,70 +167,23 @@
 
 ---
 
-### 2) 行程设计器内置多团组生成（后端直调）
+### （规划/未落地）日历详情 AI Copilot（单团组）
 
-**定位**  
-直接由后端生成排程结果，适合快速生成“可用版本”的排程。
+当前仅有前端静态演示 UI（可输入指令，但不会调用后端 AI API）：
+- 组件：`trip-manager/frontend/src/features/calendar-detail/CalendarDetailWorkspace/components/CalendarDetailCopilot.jsx`
+- 逻辑挂载：`trip-manager/frontend/src/features/calendar-detail/CalendarDetailWorkspace/index.jsx`
 
-**入口**  
-行程设计器右上角 **AI 多团组生成**
-
-**API**  
-`POST /api/ai/plan/global`
-
-**特点**  
-- 后端生成并写入 `activities` + `schedules`
-- 可配置是否使用外部 AI（如 `AI_api_key`）
-- 无需导出/导入中间文件
-
-**适用场景**  
-希望快速产出一版行程、接受后端自动排程策略的场景。
-
----
-
-### 3) 日历详情（单团组 AI 行程）
-
-**定位**  
-针对单个团组、基于其行程方案生成/补全详细日程。
-
-**入口**  
-团组管理 → 日历详情（GroupEditV2）中的 AI 行程相关按钮。
-
-**API**  
-- `GET /api/ai/rules`：读取 AI 规则
-- `PUT /api/ai/rules`：保存 AI 规则（需编辑锁）
-- `POST /api/ai/plan/itinerary`：为单团组生成/补全行程
-- `GET /api/ai/history`：查看 AI 使用记录
-
-**特性**  
-- 输入：`groupId` + 选定/绑定的 `itinerary_plan_id`
-- 输出：`scheduleList`（写入/覆盖到日历）+ `conflicts`（未能安排项）
-- 支持冲突提示弹窗与历史记录查看
-- 可配置是否调用外部 AI（`AI_api_key`；同时支持 `AI_PROVIDER`/`AI_MODEL`）
-- 规则与历史存储在 `system_config`（`ai_schedule_rules` / `ai_itinerary_history`）
-
-**适用场景**  
-单团组行程细化、补全空档、快速生成日历详情。
-
----
-
-### 核心区别对比
-
-| 维度 | 跨团组排程（导出/导入） | 行程设计器内置多团组生成 | 日历详情（单团组 AI） |
-| --- | --- | --- | --- |
-| 入口 | 导出 JSON → 外部生成 → 导入 JSON | 行程设计器按钮直调 | 团组日历详情内按钮直调 |
-| 适用范围 | 多团组跨天排程 | 多团组快速生成 | 单团组日历补全 |
-| 数据写入 | activities + schedules | activities + schedules | schedules（并反映到日历） |
-| 行程方案 | **不创建/不修改** | **创建/绑定**（默认流程） | **依赖既有方案** |
-| 外部 AI | 外部处理 | 可选 | 可选 |
+后端现状（截至 2026-02-07）：
+- 已有 AI 基础配置读写（provider/model/apiKey/timeout）：`trip-manager/backend/src/routes/systemConfig.js` + `trip-manager/backend/src/utils/aiConfig.js`
+- 暂无 `/api/ai/*` 的聊天/排程接口（需要单独实现）
 
 ---
 
 ### 相关文件/模块
 - 前端（行程设计器）：`trip-manager/frontend/src/pages/ItineraryDesigner/index.jsx`
-- 前端（日历详情）：`trip-manager/frontend/src/pages/GroupEditV2/CalendarDaysView.jsx`
+- 前端（日历详情）：`trip-manager/frontend/src/features/calendar-detail/CalendarDetailController.jsx`
 - 后端（导出/导入）：`trip-manager/backend/src/routes/planning.js`
-- 后端（AI 规则/排程/历史）：`trip-manager/backend/src/routes/aiPlanner.js`
+- 后端（AI 配置）：`trip-manager/backend/src/routes/systemConfig.js`、`trip-manager/backend/src/utils/aiConfig.js`
 
 ---
 

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿# 示例请求与响应（示意）
+﻿# 示例请求与响应（示意）
 
 > 以下示例基于当前后端结构，用于帮助模型理解字段语义，非严格校验样例。
 
@@ -96,7 +96,9 @@
 }
 ```
 
-## AI 多团组排期（POST /api/ai/plan/global）
+## （规划/未落地）AI 多团组排期（POST /api/ai/plan/global）
+
+说明：当前后端尚未提供该接口；这里保留为未来规划的 payload 示例。
 ```json
 {
   "groupIds": [1, 2, 3],
@@ -124,3 +126,6 @@
   "includePlanItemsByGroup": true
 }
 ```
+
+说明：
+- 导出会强校验每个团组必须配置 `manual_must_visit_location_ids`（必去行程点），并写入到导出包的 `data.requiredLocationsByGroup`。

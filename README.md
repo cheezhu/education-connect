@@ -1,81 +1,60 @@
-# Education Connect（研学行程管理系统）
+﻿# Education Connect（研学行程管理系统）
 
-Education Connect 面向研学团组的行程排期与日历管理，覆盖团组管理、资源配置、日历详情、行程设计器、统计报表，并提供 AI 辅助排程能力。
+Education Connect 用于研学团组的行程与资源管理，覆盖：
+- 团组管理（团组信息 / 食行卡片 / 日历详情 / 人员信息）
+- 地点管理
+- 行程设计器（跨团组排程与模板）
+- 跨团组排程（planning 导入/导出 + 求解器）
 
-## 快速开始
+## 快速开始（推荐）
 
-**前置**：Node.js 16+、npm（或 yarn）
+1. 安装 Node.js（会自带 `npm`，用于安装依赖与运行脚本）。
+2. 在项目根目录运行：`.\start-dev.ps1`
+3. 浏览器打开：http://localhost:5173
 
-1) 初始化数据库（首次或需要重置默认数据时）
-```bash
+默认账号（首次初始化 DB 后）：
+- `admin` / `admin123`（管理员）
+- `viewer1` / `admin123`（只读）
+
+## 初始化数据库（需要重建数据时）
+
+注意：会重建 `trip-manager/backend/db/trip.db`（会覆盖本地数据）。
+
+```powershell
 cd trip-manager/backend
 npm install
 npm run init-db
 ```
-> 该命令会重建 `trip-manager/backend/db/trip.db`。
 
-2) 启动后端
-```bash
+## 分别启动（不用脚本时）
+
+后端：
+
+```powershell
 cd trip-manager/backend
-npm run start
+npm install
+npm run dev
 ```
 
-3) 启动前端（新终端）
-```bash
+前端：
+
+```powershell
 cd trip-manager/frontend
 npm install
 npm run dev
 ```
 
-4) 访问系统
-- 前端：http://localhost:5173
-- 后端：http://localhost:3001
-- 默认账号：`admin` / `admin123`（由 `init-db` 写入）
+## 常用命令
 
-> 也可使用根目录脚本：`start-dev.ps1`（前后端分窗口启动，输出错误）。
+- 一键自检（建议合并/上线前跑一次）：`.\trip-manager\scripts\verify.ps1`
 
-## AI 配置（后端）
-后端支持以下环境变量：
-- `AI_api_key`
-- `AI_PROVIDER`（`openai` 或 `gemini`，未设置默认 `openai`）
-- `AI_MODEL`
-- `AI_TIMEOUT_MS`
+## 配置
 
-未配置 `AI_api_key` 时，AI 排程退化为规则引擎（不调用外部 AI）。
+- 认证：HTTP Basic Auth（users 表 + bcrypt）
+- AI 配置（可选；当前未挂载 `/api/ai/*` 路由）
+- AI 环境变量：`AI_API_KEY`（推荐）/ `AI_api_key`（兼容旧名）、`AI_PROVIDER`、`AI_MODEL`、`AI_TIMEOUT_MS`
+- AI 系统配置（system_config）：`ai_api_key` / `ai_provider` / `ai_model` / `ai_timeout_ms`
 
-PowerShell 示例：
-```bash
-$env:AI_api_key="YOUR_API_KEY"
-$env:AI_PROVIDER="gemini"
-$env:AI_MODEL="gemini-1.5-pro-latest"
-```
+## 文档
 
-也可在 `trip-manager/backend/.env` 中配置（参考 `trip-manager/backend/.env.example`），修改后重启后端生效。
-
-## 数据与 API
-- 数据库：`trip-manager/backend/db/trip.db`
-- 表结构：`trip-manager/backend/db/init.sql`
-- API 路由：`trip-manager/backend/src/routes/`
-- 前端代理：`trip-manager/frontend/vite.config.js` 将 `/api` 代理到 `http://localhost:3001`
-
-## 目录结构
-```
-education-connect/
-├─ trip-manager/    # 主应用（前端 + 后端）
-├─ docs/            # 文档中心
-├─ .claude/         # Claude 指令与配置（可选）
-└─ start-dev.ps1    # 开发启动脚本
-```
-
-## 文档索引
-- 文档中心入口：`docs/README.md`
-- 项目概览：`docs/overview/project-overview.md`
-- 运行说明：`docs/runbook.md`
-- 系统架构：`docs/architecture/overview.md`
-- API 参考：`docs/api/api-reference.md`
-- 数据库结构：`docs/database/database-schema.md`
-- 日历详情索引：`docs/calendar/README.md`
-- AI 调用方式（行程设计器/日历详情）：`docs/itinerary/ai-workflows/README.md`
-- 前端页面说明：`docs/frontend/frontend-ui.md`
-- 策略与规划：`docs/strategy/README.md`
-- 历史与遗留文档：`docs/history/README.md`
+- 文档入口：`docs/README.md`

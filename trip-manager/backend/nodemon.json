@@ -1,0 +1,13 @@
+{
+  "watch": [
+    "server.js",
+    "src",
+    "../shared"
+  ],
+  "ext": "js,json,cjs",
+  "ignore": [
+    "db/*",
+    "node_modules/*"
+  ]
+}
+

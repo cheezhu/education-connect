@@ -4,57 +4,8 @@ const requireEditLock = require('../middleware/editLock');
 const { getScheduleRevision, bumpScheduleRevision } = require('../utils/scheduleRevision');
 const { requireRole } = require('../middleware/permission');
 
-const toMinutes = (timeValue) => {
-  if (!timeValue) return null;
-  const [hourStr, minuteStr] = timeValue.split(':');
-  const hour = Number(hourStr);
-  const minute = Number(minuteStr);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
-  return hour * 60 + minute;
-};
-
-const SLOT_WINDOWS = {
-  MORNING: { start: '06:00', end: '12:00' },
-  AFTERNOON: { start: '12:00', end: '18:00' },
-  EVENING: { start: '18:00', end: '20:45' }
-};
-
-const getTimeSlotFromStart = (startTime) => {
-  const minutes = toMinutes(startTime);
-  if (minutes === null) return 'MORNING';
-  if (minutes < 12 * 60) return 'MORNING';
-  if (minutes < 18 * 60) return 'AFTERNOON';
-  return 'EVENING';
-};
-
-const getTimeSlotFromRange = (startTime, endTime) => {
-  const startMinutes = toMinutes(startTime);
-  const endMinutes = toMinutes(endTime);
-  if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) {
-    return getTimeSlotFromStart(startTime);
-  }
-
-  let bestSlot = null;
-  let bestOverlap = -1;
-  Object.entries(SLOT_WINDOWS).forEach(([slotKey, window]) => {
-    const windowStart = toMinutes(window.start);
-    const windowEnd = toMinutes(window.end);
-    if (!Number.isFinite(windowStart) || !Number.isFinite(windowEnd)) return;
-    const overlap = Math.max(
-      0,
-      Math.min(endMinutes, windowEnd) - Math.max(startMinutes, windowStart)
-    );
-    if (overlap > bestOverlap) {
-      bestOverlap = overlap;
-      bestSlot = slotKey;
-    }
-  });
-
-  if (bestSlot) {
-    return bestSlot;
-  }
-  return getTimeSlotFromStart(startTime);
-};
+const { resolveTimeSlotByOverlap, timeSlotWindows } = require('../../../shared/domain/time.cjs');
+const { isPlanResourceId } = require('../../../shared/domain/resourceId.cjs');
 
 const syncSchedulesToActivities = (db, groupId) => {
   const syncableSchedules = db.prepare(`
@@ -93,8 +44,8 @@ const syncSchedulesToActivities = (db, groupId) => {
   `);
 
   syncableSchedules.forEach((schedule) => {
-    const timeSlot = getTimeSlotFromRange(schedule.start_time, schedule.end_time);
-    const isPlanItem = typeof schedule.resource_id === 'string' && schedule.resource_id.startsWith('plan-');
+    const timeSlot = resolveTimeSlotByOverlap(schedule.start_time, schedule.end_time);
+    const isPlanItem = isPlanResourceId(schedule.resource_id);
     const existing = findActivityBySchedule.get(schedule.id);
     if (existing) {
       updateActivity.run(
@@ -161,7 +112,7 @@ const normalizeScheduleId = (value) => {
 router.get('/groups/:groupId/schedules', (req, res) => {
   const groupId = Number(req.params.groupId);
   if (!Number.isFinite(groupId)) {
-    return res.status(400).json({ error: '鏃犳晥鍥㈢粍ID' });
+    return res.status(400).json({ error: '无效团组ID' });
   }
 
   const rows = req.db.prepare(`
@@ -217,7 +168,7 @@ router.get('/groups/:groupId/schedules/designer-source', requireRole(['admin']),
   `).all(groupId);
 
   const scheduleList = rows.map((row) => {
-    const slotWindow = SLOT_WINDOWS[row.time_slot] || SLOT_WINDOWS.MORNING;
+    const slotWindow = timeSlotWindows[row.time_slot] || timeSlotWindows.MORNING;
     const title = (row.schedule_title && String(row.schedule_title).trim())
       ? row.schedule_title
       : (row.location_name || '行程点');
@@ -263,7 +214,7 @@ router.get('/schedules', (req, res) => {
 router.post('/groups/:groupId/schedules/batch', requireEditLock, (req, res) => {
   const groupId = Number(req.params.groupId);
   if (!Number.isFinite(groupId)) {
-    return res.status(400).json({ error: '鏃犳晥鍥㈢粍ID' });
+    return res.status(400).json({ error: '无效团组ID' });
   }
 
   const currentRevision = getScheduleRevision(req.db, groupId);
@@ -333,8 +284,8 @@ router.post('/groups/:groupId/schedules/batch', requireEditLock, (req, res) => {
     res.setHeader('x-schedule-revision', nextRevision);
     res.json(rows.map(mapScheduleRow));
   } catch (error) {
-    console.error('鎵归噺淇濆瓨鏃ョ▼澶辫触:', error);
-    res.status(500).json({ error: '鎵归噺淇濆瓨鏃ョ▼澶辫触' });
+    console.error('批量保存日程失败:', error);
+    res.status(500).json({ error: '批量保存日程失败' });
   }
 });
 
@@ -380,7 +331,7 @@ router.post(
         return {
           scheduleId: normalizeScheduleId(item?.id),
           date,
-          timeSlot: getTimeSlotFromRange(startTime, endTime),
+          timeSlot: resolveTimeSlotByOverlap(startTime, endTime),
           locationId
         };
       })
