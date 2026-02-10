@@ -82,6 +82,80 @@ def normalize_input(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(rules, dict):
         rules = {}
     cluster_day_penalty = _as_int(rules.get("clusterDayPenalty", 40), 40)
+
+    # Quality rules (optional): balancing thresholds and weights.
+    balance_t1 = rules.get("balanceThreshold1", rules.get("balance_threshold_1", 0.7))
+    balance_t2 = rules.get("balanceThreshold2", rules.get("balance_threshold_2", 0.9))
+    try:
+        balance_t1 = float(balance_t1)
+    except (TypeError, ValueError):
+        balance_t1 = 0.7
+    try:
+        balance_t2 = float(balance_t2)
+    except (TypeError, ValueError):
+        balance_t2 = 0.9
+    if balance_t1 <= 0 or balance_t1 >= 1:
+        balance_t1 = 0.7
+    if balance_t2 <= 0 or balance_t2 >= 1 or balance_t2 <= balance_t1:
+        balance_t2 = min(0.95, max(balance_t1 + 0.05, 0.9))
+
+    quality_weights = {
+        "repeat": _as_int(rules.get("weightRepeat", rules.get("w_repeat", 1000)), 1000),
+        "balance_t1": _as_int(rules.get("weightBalanceT1", rules.get("w_balance_t1", 1)), 1),
+        "balance_t2": _as_int(rules.get("weightBalanceT2", rules.get("w_balance_t2", 3)), 3),
+        "missing": _as_int(rules.get("weightMissing", rules.get("w_missing", 5)), 5),
+        "consolidate": _as_int(rules.get("weightConsolidate", rules.get("w_consolidate", 30)), 30),
+        "wrong_slot": _as_int(rules.get("weightWrongSlot", rules.get("w_wrong_slot", 20)), 20),
+    }
+    for k in list(quality_weights.keys()):
+        if quality_weights[k] < 0:
+            quality_weights[k] = 0
+
+    # Location preferences (optional): consolidation + target slot (soft/hard).
+    raw_prefs = rules.get("locationPreferences", rules.get("location_preferences", {}))
+    if not isinstance(raw_prefs, dict):
+        raw_prefs = {}
+
+    location_prefs: Dict[int, Dict[str, Any]] = {}
+
+    def _as_slot(value: Any) -> str:
+        slot = str(value or "").upper().strip()
+        return slot
+
+    for loc_key, pref in raw_prefs.items():
+        try:
+            loc_id = int(loc_key)
+        except (TypeError, ValueError):
+            continue
+        if loc_id <= 0 or not isinstance(pref, dict):
+            continue
+
+        consolidate_mode = str(pref.get("consolidateMode", pref.get("consolidate_mode", "NONE"))).upper().strip()
+        if consolidate_mode not in {"NONE", "BY_DAY", "BY_WINDOW"}:
+            consolidate_mode = "NONE"
+
+        target_slot = _as_slot(pref.get("targetSlot", pref.get("preferredSlot", pref.get("preferred_slot"))))
+        if target_slot not in {"MORNING", "AFTERNOON"}:
+            target_slot = ""
+
+        target_slot_mode = str(pref.get("targetSlotMode", pref.get("target_slot_mode", "SOFT"))).upper().strip()
+        if target_slot_mode not in {"SOFT", "HARD"}:
+            target_slot_mode = "SOFT"
+
+        consolidate_weight = _as_int(pref.get("consolidateWeight", pref.get("consolidate_weight", quality_weights["consolidate"])) , quality_weights["consolidate"])
+        wrong_slot_penalty = _as_int(pref.get("wrongSlotPenalty", pref.get("wrong_slot_penalty", quality_weights["wrong_slot"])), quality_weights["wrong_slot"])
+        if consolidate_weight < 0:
+            consolidate_weight = 0
+        if wrong_slot_penalty < 0:
+            wrong_slot_penalty = 0
+
+        location_prefs[loc_id] = {
+            "consolidate_mode": consolidate_mode,
+            "target_slot": target_slot,
+            "target_slot_mode": target_slot_mode,
+            "consolidate_weight": int(consolidate_weight),
+            "wrong_slot_penalty": int(wrong_slot_penalty),
+        }
     if cluster_day_penalty <= 0:
         cluster_day_penalty = 40
     slot_windows = normalize_slot_windows(rules.get("slotWindows"), DEFAULT_SLOT_WINDOWS)
@@ -242,6 +316,12 @@ def normalize_input(payload: Dict[str, Any]) -> Dict[str, Any]:
         "slot_keys": slot_keys,
         "slot_windows": slot_windows,
         "cluster_day_penalty": cluster_day_penalty,
+        "quality": {
+            "balance_threshold_1": float(balance_t1),
+            "balance_threshold_2": float(balance_t2),
+            "weights": quality_weights,
+            "location_prefs": location_prefs,
+        },
         "groups": groups,
         "locations": locations,
         "groups_by_id": {row["id"]: row for row in groups},

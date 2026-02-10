@@ -58,6 +58,12 @@ input json
 - location capacity
 - required location coverage per group
 
+## Quality / Business Rules (optional)
+
+For additional business-specific rules and quality objectives (e.g. day/slot fill policies, avoid same-day MORNING/AFTERNOON duplicates, repeat-penalty, load-balancing), see:
+
+- `docs/planning/solver-quality-rules.md`
+
 ## CLI Example
 
 ```bash

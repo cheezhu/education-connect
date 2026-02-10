@@ -33,18 +33,30 @@ def build_task_space(normalized: Dict[str, Any]) -> Dict[str, Any]:
             tasks_by_group[group["id"]] = []
             continue
         group_tasks: List[Dict[str, Any]] = []
+        group_start = str(group["start_date"])
+        group_end = str(group["end_date"])
+        is_single_day = group_start == group_end
+
         for date in iter_dates(overlap["start_date"], overlap["end_date"]):
             for slot in slot_keys:
                 key = make_group_slot_key(group["id"], date, slot)
-                candidates: List[int] = []
-                for location in locations:
-                    if is_location_available(
-                        location=location,
-                        group=group,
-                        date=date,
-                        slot_window=slot_windows[slot],
-                    ):
-                        candidates.append(int(location["id"]))
+
+                # Business rule: no visit points on the first day MORNING.
+                if date == group_start and slot == "MORNING":
+                    candidates = []
+                # Business rule: for multi-day groups only, no visit points on the last day AFTERNOON.
+                elif (not is_single_day) and date == group_end and slot == "AFTERNOON":
+                    candidates = []
+                else:
+                    candidates = []
+                    for location in locations:
+                        if is_location_available(
+                            location=location,
+                            group=group,
+                            date=date,
+                            slot_window=slot_windows[slot],
+                        ):
+                            candidates.append(int(location["id"]))
                 task = {
                     "key": key,
                     "group_id": int(group["id"]),

@@ -12,11 +12,26 @@ def _solve_greedy_feasible(normalized: Dict[str, Any], task_space: Dict[str, Any
     required_by_group = normalized["required_by_group"]
     slot_map: Dict[str, Dict[str, Any]] = {}
     usage_map: Dict[str, int] = {}
+    used_locations_by_group: Dict[int, set] = {}
     diagnostics = {
         "kept_existing": 0,
         "added_required": 0,
         "unplaced_required": [],
     }
+
+    def violates_same_day_rule(group_id: int, date: str, slot: str, location_id: int) -> bool:
+        slot = str(slot).upper()
+        if slot not in {"MORNING", "AFTERNOON"}:
+            return False
+        other_slot = "AFTERNOON" if slot == "MORNING" else "MORNING"
+        other_key = make_group_slot_key(group_id, date, other_slot)
+        other = slot_map.get(other_key)
+        if not other:
+            return False
+        return int(other.get("location_id")) == int(location_id)
+
+    def violates_no_repeat_rule(group_id: int, location_id: int) -> bool:
+        return int(location_id) in used_locations_by_group.get(int(group_id), set())
 
     # keep existing assignments if still valid and conflict-free
     for row in normalized["existing_assignments"]:
@@ -39,9 +54,14 @@ def _solve_greedy_feasible(normalized: Dict[str, Any], task_space: Dict[str, Any
             participants=int(row["participant_count"]),
         ):
             continue
+        if violates_same_day_rule(row["group_id"], row["date"], row["time_slot"], row["location_id"]):
+            continue
+        if violates_no_repeat_rule(row["group_id"], row["location_id"]):
+            continue
         slot_map[task_key] = dict(row)
         usage_key = make_usage_key(row["date"], row["time_slot"], row["location_id"])
         usage_map[usage_key] = int(usage_map.get(usage_key, 0)) + int(row["participant_count"])
+        used_locations_by_group.setdefault(int(row["group_id"]), set()).add(int(row["location_id"]))
         diagnostics["kept_existing"] += 1
 
     def has_required(group_id: int, location_id: int) -> bool:
@@ -80,6 +100,10 @@ def _solve_greedy_feasible(normalized: Dict[str, Any], task_space: Dict[str, Any
                     participants=int(group["participant_count"]),
                 ):
                     continue
+                if violates_same_day_rule(group_id, task["date"], task["time_slot"], location_id):
+                    continue
+                if violates_no_repeat_rule(group_id, location_id):
+                    continue
                 assignment = {
                     "group_id": group_id,
                     "location_id": location_id,
@@ -90,6 +114,7 @@ def _solve_greedy_feasible(normalized: Dict[str, Any], task_space: Dict[str, Any
                 slot_map[task_key] = assignment
                 usage_key = make_usage_key(task["date"], task["time_slot"], location_id)
                 usage_map[usage_key] = int(usage_map.get(usage_key, 0)) + int(group["participant_count"])
+                used_locations_by_group.setdefault(int(group_id), set()).add(int(location_id))
                 diagnostics["added_required"] += 1
                 placed = True
                 break
@@ -148,4 +173,3 @@ def solve_feasible(
     fallback = _solve_greedy_feasible(normalized, task_space)
     fallback["diagnostics"]["phase1_time_sec"] = phase1_sec
     return fallback
-

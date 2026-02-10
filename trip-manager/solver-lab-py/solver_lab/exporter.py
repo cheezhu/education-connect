@@ -60,7 +60,37 @@ def build_report_payload(
     optimized: Dict[str, Any],
     audit: Dict[str, Any],
     elapsed_ms: int,
+    candidates: List[Dict[str, Any]] | None = None,
 ) -> Dict[str, Any]:
+    groups_by_id = normalized.get("groups_by_id", {})
+    locations_by_id = normalized.get("locations_by_id", {})
+
+    must_missing = audit.get("must_visit_missing", []) or []
+    # Group missing required locations by group.
+    must_missing_by_group = {}
+    for row in must_missing:
+        gid = int(row.get("group_id"))
+        lid = int(row.get("location_id"))
+        g = groups_by_id.get(gid) or {}
+        l = locations_by_id.get(lid) or {}
+        must_missing_by_group.setdefault(str(gid), []).append({
+            "locationId": lid,
+            "locationName": str(l.get("name", "")),
+        })
+        # also store group name for convenience (duplicated, tiny)
+        must_missing_by_group[str(gid)] = sorted(must_missing_by_group[str(gid)], key=lambda x: x["locationId"])
+
+    must_missing_groups = []
+    for gid_text, locs in must_missing_by_group.items():
+        gid = int(gid_text)
+        g = groups_by_id.get(gid) or {}
+        must_missing_groups.append({
+            "groupId": gid,
+            "groupName": str(g.get("name", "")),
+            "missing": locs,
+        })
+    must_missing_groups.sort(key=lambda x: x["groupId"])
+
     return {
         "summary": {
             "groups": len(normalized["groups"]),
@@ -82,10 +112,11 @@ def build_report_payload(
         "optimize": {
             "engine": optimized.get("engine"),
             "diagnostics": optimized.get("diagnostics", {}),
+            **({"candidates": candidates} if candidates else {}),
         },
         "audit": {
             "hardViolations": audit.get("hard_violations", []),
-            "mustVisitMissing": audit.get("must_visit_missing", []),
+            "mustVisitMissing": must_missing,
+            "mustVisitMissingGroups": must_missing_groups,
         },
     }
-
