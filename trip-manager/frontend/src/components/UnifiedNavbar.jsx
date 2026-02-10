@@ -6,6 +6,7 @@ import {
   BellOutlined,
   CompassOutlined,
   EnvironmentOutlined,
+  ExperimentOutlined,
   ExportOutlined,
   LogoutOutlined,
   SearchOutlined,
@@ -36,6 +37,7 @@ const UnifiedNavbar = () => {
 
   const navItems = [
     { path: '/designer', icon: <CompassOutlined />, label: '行程设计器', permission: 'designer' },
+    { path: '/solver-preview', icon: <ExperimentOutlined />, label: 'Solver 预览台', permission: 'designer' },
     { path: '/groups', icon: <TeamOutlined />, label: '团组管理', permission: 'groups' },
     { path: '/locations', icon: <EnvironmentOutlined />, label: '资源管理', permission: 'locations' },
     { path: '/statistics', icon: <BarChartOutlined />, label: '统计报表', permission: 'statistics' },

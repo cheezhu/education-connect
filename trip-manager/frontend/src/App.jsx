@@ -5,6 +5,7 @@ import GroupManagementV2 from './pages/GroupManagementV2';
 import LocationManagement from './pages/LocationManagement';
 import Statistics from './pages/Statistics';
 import ItineraryDesigner from './pages/ItineraryDesigner';
+import SolverPreview from './pages/SolverPreview';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import UserManagement from './pages/UserManagement';
@@ -55,8 +56,9 @@ function ProtectedRoute({ permission, action = 'read', children }) {
 function AppLayout() {
   const location = useLocation();
   const isDesigner = location.pathname.startsWith('/designer');
+  const isSolverPreview = location.pathname.startsWith('/solver-preview');
   const isGroupManager = location.pathname === '/groups' || location.pathname === '/groups/v2';
-  const isFullBleed = isDesigner || isGroupManager;
+  const isFullBleed = isDesigner || isSolverPreview || isGroupManager;
   const isLogin = location.pathname.startsWith('/login');
   const { canAccess } = useAuth();
 
@@ -96,6 +98,14 @@ function AppLayout() {
               element={(
                 <ProtectedRoute permission="designer">
                   <ItineraryDesigner />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="/solver-preview"
+              element={(
+                <ProtectedRoute permission="designer">
+                  <SolverPreview />
                 </ProtectedRoute>
               )}
             />
