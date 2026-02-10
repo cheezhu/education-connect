@@ -4,6 +4,17 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Local/editor configs
+.obsidian/
+.claude/
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Local solver run artifacts
+trip-manager/solver-lab-py/runs/
+
 # Build outputs
 dist/
 build/
