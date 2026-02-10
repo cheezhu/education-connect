@@ -1,0 +1,106 @@
+{
+  "schema": "ec-planning-input@2",
+  "meta": {
+    "snapshotId": "fixture-quality-rules-001",
+    "exportedAt": "2026-02-09T01:25:00.000Z"
+  },
+  "scope": {
+    "startDate": "2026-07-01",
+    "endDate": "2026-07-04",
+    "groupIds": [201, 202]
+  },
+  "rules": {
+    "timeSlots": ["MORNING", "AFTERNOON"],
+    "slotWindows": {
+      "MORNING": {"start": 6, "end": 12},
+      "AFTERNOON": {"start": 12, "end": 18},
+      "EVENING": {"start": 18, "end": 20.75}
+    },
+    "balanceThreshold1": 0.7,
+    "balanceThreshold2": 0.9,
+    "weightRepeat": 1000,
+    "weightBalanceT1": 2,
+    "weightBalanceT2": 6,
+    "weightMissing": 5
+  },
+  "data": {
+    "groups": [
+      {
+        "id": 201,
+        "name": "Single Day Primary",
+        "type": "primary",
+        "studentCount": 40,
+        "teacherCount": 4,
+        "participantCount": 44,
+        "startDate": "2026-07-02",
+        "endDate": "2026-07-02"
+      },
+      {
+        "id": 202,
+        "name": "Multi Day Secondary",
+        "type": "secondary",
+        "studentCount": 36,
+        "teacherCount": 4,
+        "participantCount": 40,
+        "startDate": "2026-07-01",
+        "endDate": "2026-07-04"
+      }
+    ],
+    "locations": [
+      {
+        "id": 21,
+        "name": "Museum A",
+        "targetGroups": "all",
+        "isActive": true,
+        "capacity": 120,
+        "blockedWeekdays": "",
+        "closedDates": [],
+        "openHours": null
+      },
+      {
+        "id": 22,
+        "name": "Museum B",
+        "targetGroups": "all",
+        "isActive": true,
+        "capacity": 120,
+        "blockedWeekdays": "",
+        "closedDates": [],
+        "openHours": null
+      },
+      {
+        "id": 23,
+        "name": "University C (Secondary Only)",
+        "targetGroups": "secondary",
+        "isActive": true,
+        "capacity": 90,
+        "blockedWeekdays": "",
+        "closedDates": [],
+        "openHours": null
+      },
+      {
+        "id": 24,
+        "name": "Science Lab D",
+        "targetGroups": "all",
+        "isActive": true,
+        "capacity": 80,
+        "blockedWeekdays": "",
+        "closedDates": ["2026-07-03"],
+        "openHours": null
+      }
+    ],
+    "requiredLocationsByGroup": {
+      "201": {"locationIds": [21]},
+      "202": {"locationIds": [21, 23]}
+    },
+    "existingAssignments": [
+      {
+        "groupId": 999,
+        "locationId": 21,
+        "date": "2026-07-02",
+        "timeSlot": "MORNING",
+        "participantCount": 70
+      }
+    ],
+    "existingSchedules": []
+  }
+}

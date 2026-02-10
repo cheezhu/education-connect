@@ -1,0 +1,25 @@
+services:
+  backend:
+    build:
+      context: ./trip-manager
+      dockerfile: backend/Dockerfile
+    environment:
+      - TZ=Asia/Hong_Kong
+    volumes:
+      - backend_db:/app/backend/db
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./trip-manager
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      - backend
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  backend_db:

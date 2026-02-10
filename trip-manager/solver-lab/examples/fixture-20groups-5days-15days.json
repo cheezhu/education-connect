@@ -1,0 +1,498 @@
+{
+  "schema": "ec-planning-input@2",
+  "meta": {
+    "snapshotId": "fixture-20groups-5days-in-15days-001",
+    "exportedAt": "2026-02-09T01:28:00.000Z"
+  },
+  "scope": {
+    "startDate": "2026-07-01",
+    "endDate": "2026-07-15",
+    "groupIds": [
+      1001,
+      1002,
+      1003,
+      1004,
+      1005,
+      1006,
+      1007,
+      1008,
+      1009,
+      1010,
+      1011,
+      1012,
+      1013,
+      1014,
+      1015,
+      1016,
+      1017,
+      1018,
+      1019,
+      1020
+    ]
+  },
+  "rules": {
+    "timeSlots": [
+      "MORNING",
+      "AFTERNOON"
+    ],
+    "slotWindows": {
+      "MORNING": {
+        "start": 6,
+        "end": 12
+      },
+      "AFTERNOON": {
+        "start": 12,
+        "end": 18
+      },
+      "EVENING": {
+        "start": 18,
+        "end": 20.75
+      }
+    },
+    "balanceThreshold1": 0.7,
+    "balanceThreshold2": 0.9,
+    "weightRepeat": 1000,
+    "weightBalanceT1": 2,
+    "weightBalanceT2": 6,
+    "weightMissing": 1,
+    "locationPreferences": {
+      "8": {
+        "consolidateMode": "BY_DAY",
+        "targetSlot": "MORNING",
+        "targetSlotMode": "SOFT",
+        "consolidateWeight": 80,
+        "wrongSlotPenalty": 30
+      }
+    }
+  },
+  "data": {
+    "groups": [
+      {
+        "id": 1001,
+        "name": "荃湾民生实验小学",
+        "type": "primary",
+        "studentCount": 42,
+        "teacherCount": 2,
+        "participantCount": 44,
+        "startDate": "2026-07-02",
+        "endDate": "2026-07-06"
+      },
+      {
+        "id": 1002,
+        "name": "元朗圣保罗实验小学",
+        "type": "primary",
+        "studentCount": 41,
+        "teacherCount": 3,
+        "participantCount": 44,
+        "startDate": "2026-07-08",
+        "endDate": "2026-07-12"
+      },
+      {
+        "id": 1003,
+        "name": "大埔民生小学",
+        "type": "primary",
+        "studentCount": 37,
+        "teacherCount": 7,
+        "participantCount": 44,
+        "startDate": "2026-07-02",
+        "endDate": "2026-07-06"
+      },
+      {
+        "id": 1004,
+        "name": "屯门协恩中心小学",
+        "type": "primary",
+        "studentCount": 38,
+        "teacherCount": 6,
+        "participantCount": 44,
+        "startDate": "2026-07-04",
+        "endDate": "2026-07-08"
+      },
+      {
+        "id": 1005,
+        "name": "筲箕湾玛利诺实验小学",
+        "type": "primary",
+        "studentCount": 40,
+        "teacherCount": 4,
+        "participantCount": 44,
+        "startDate": "2026-07-05",
+        "endDate": "2026-07-09"
+      },
+      {
+        "id": 1006,
+        "name": "上水玛利诺官立小学",
+        "type": "primary",
+        "studentCount": 36,
+        "teacherCount": 8,
+        "participantCount": 44,
+        "startDate": "2026-07-09",
+        "endDate": "2026-07-13"
+      },
+      {
+        "id": 1007,
+        "name": "西湾河真光官立小学",
+        "type": "primary",
+        "studentCount": 36,
+        "teacherCount": 8,
+        "participantCount": 44,
+        "startDate": "2026-07-03",
+        "endDate": "2026-07-07"
+      },
+      {
+        "id": 1008,
+        "name": "西湾河英华官立小学",
+        "type": "primary",
+        "studentCount": 42,
+        "teacherCount": 2,
+        "participantCount": 44,
+        "startDate": "2026-07-11",
+        "endDate": "2026-07-15"
+      },
+      {
+        "id": 1009,
+        "name": "元朗圣保罗中心小学",
+        "type": "primary",
+        "studentCount": 37,
+        "teacherCount": 7,
+        "participantCount": 44,
+        "startDate": "2026-07-07",
+        "endDate": "2026-07-11"
+      },
+      {
+        "id": 1010,
+        "name": "屯门中华基督教小学",
+        "type": "primary",
+        "studentCount": 41,
+        "teacherCount": 3,
+        "participantCount": 44,
+        "startDate": "2026-07-01",
+        "endDate": "2026-07-05"
+      },
+      {
+        "id": 1011,
+        "name": "元朗圣保罗书院",
+        "type": "secondary",
+        "studentCount": 37,
+        "teacherCount": 7,
+        "participantCount": 44,
+        "startDate": "2026-07-06",
+        "endDate": "2026-07-10"
+      },
+      {
+        "id": 1012,
+        "name": "观塘官立官立中学",
+        "type": "secondary",
+        "studentCount": 36,
+        "teacherCount": 8,
+        "participantCount": 44,
+        "startDate": "2026-07-01",
+        "endDate": "2026-07-05"
+      },
+      {
+        "id": 1013,
+        "name": "上水真光实验中学",
+        "type": "secondary",
+        "studentCount": 39,
+        "teacherCount": 5,
+        "participantCount": 44,
+        "startDate": "2026-07-11",
+        "endDate": "2026-07-15"
+      },
+      {
+        "id": 1014,
+        "name": "屯门真光官立中学",
+        "type": "secondary",
+        "studentCount": 40,
+        "teacherCount": 4,
+        "participantCount": 44,
+        "startDate": "2026-07-09",
+        "endDate": "2026-07-13"
+      },
+      {
+        "id": 1015,
+        "name": "筲箕湾官立官立中学",
+        "type": "secondary",
+        "studentCount": 41,
+        "teacherCount": 3,
+        "participantCount": 44,
+        "startDate": "2026-07-08",
+        "endDate": "2026-07-12"
+      },
+      {
+        "id": 1016,
+        "name": "上水玛利诺书院",
+        "type": "secondary",
+        "studentCount": 40,
+        "teacherCount": 4,
+        "participantCount": 44,
+        "startDate": "2026-07-01",
+        "endDate": "2026-07-05"
+      },
+      {
+        "id": 1017,
+        "name": "观塘玛利诺官立中学",
+        "type": "secondary",
+        "studentCount": 39,
+        "teacherCount": 5,
+        "participantCount": 44,
+        "startDate": "2026-07-05",
+        "endDate": "2026-07-09"
+      },
+      {
+        "id": 1018,
+        "name": "筲箕湾圣保罗中学",
+        "type": "secondary",
+        "studentCount": 36,
+        "teacherCount": 8,
+        "participantCount": 44,
+        "startDate": "2026-07-03",
+        "endDate": "2026-07-07"
+      },
+      {
+        "id": 1019,
+        "name": "元朗圣保罗书院",
+        "type": "secondary",
+        "studentCount": 41,
+        "teacherCount": 3,
+        "participantCount": 44,
+        "startDate": "2026-07-05",
+        "endDate": "2026-07-09"
+      },
+      {
+        "id": 1020,
+        "name": "屯门官立官立中学",
+        "type": "secondary",
+        "studentCount": 36,
+        "teacherCount": 8,
+        "participantCount": 44,
+        "startDate": "2026-07-09",
+        "endDate": "2026-07-13"
+      }
+    ],
+    "locations": [
+      {
+        "id": 1,
+        "name": "香港科学馆",
+        "targetGroups": "all",
+        "isActive": true,
+        "capacity": 200,
+        "blockedWeekdays": "4",
+        "closedDates": [],
+        "openHours": null
+      },
+      {
+        "id": 2,
+        "name": "香港警队博物馆",
+        "targetGroups": "primary",
+        "isActive": true,
+        "capacity": 100,
+        "blockedWeekdays": "",
+        "closedDates": [],
+        "openHours": null
+      },
+      {
+        "id": 3,
+        "name": "诺亚方舟",
+        "targetGroups": "all",
+        "isActive": true,
+        "capacity": 150,
+        "blockedWeekdays": "3",
+        "closedDates": [],
+        "openHours": null
+      },
+      {
+        "id": 4,
+        "name": "香港海洋公园",
+        "targetGroups": "all",
+        "isActive": true,
+        "capacity": 500,
+        "blockedWeekdays": "",
+        "closedDates": [],
+        "openHours": null
+      },
+      {
+        "id": 5,
+        "name": "西九文化区",
+        "targetGroups": "all",
+        "isActive": true,
+        "capacity": 300,
+        "blockedWeekdays": "",
+        "closedDates": [],
+        "openHours": null
+      },
+      {
+        "id": 6,
+        "name": "香港太空馆",
+        "targetGroups": "all",
+        "isActive": true,
+        "capacity": 100,
+        "blockedWeekdays": "",
+        "closedDates": [],
+        "openHours": null
+      },
+      {
+        "id": 7,
+        "name": "香港大学",
+        "targetGroups": "all",
+        "isActive": true,
+        "capacity": 150,
+        "blockedWeekdays": "",
+        "closedDates": [],
+        "openHours": null
+      },
+      {
+        "id": 8,
+        "name": "驻港部队展览中心",
+        "targetGroups": "secondary",
+        "isActive": true,
+        "capacity": 100,
+        "blockedWeekdays": "",
+        "closedDates": [],
+        "openHours": null
+      }
+    ],
+    "requiredLocationsByGroup": {
+      "1001": {
+        "locationIds": [
+          4,
+          5,
+          1
+        ]
+      },
+      "1002": {
+        "locationIds": [
+          3,
+          4,
+          6
+        ]
+      },
+      "1003": {
+        "locationIds": [
+          5,
+          4,
+          2
+        ]
+      },
+      "1004": {
+        "locationIds": [
+          7,
+          3,
+          1
+        ]
+      },
+      "1005": {
+        "locationIds": [
+          2,
+          5,
+          1
+        ]
+      },
+      "1006": {
+        "locationIds": [
+          7,
+          3,
+          2
+        ]
+      },
+      "1007": {
+        "locationIds": [
+          3,
+          6,
+          5
+        ]
+      },
+      "1008": {
+        "locationIds": [
+          6,
+          3,
+          1
+        ]
+      },
+      "1009": {
+        "locationIds": [
+          3,
+          1,
+          6
+        ]
+      },
+      "1010": {
+        "locationIds": [
+          6,
+          2,
+          5
+        ]
+      },
+      "1011": {
+        "locationIds": [
+          6,
+          7,
+          5
+        ]
+      },
+      "1012": {
+        "locationIds": [
+          8,
+          7,
+          5
+        ]
+      },
+      "1013": {
+        "locationIds": [
+          7,
+          8,
+          1
+        ]
+      },
+      "1014": {
+        "locationIds": [
+          4,
+          7,
+          1
+        ]
+      },
+      "1015": {
+        "locationIds": [
+          8,
+          3,
+          5
+        ]
+      },
+      "1016": {
+        "locationIds": [
+          1,
+          7,
+          4
+        ]
+      },
+      "1017": {
+        "locationIds": [
+          3,
+          8,
+          7
+        ]
+      },
+      "1018": {
+        "locationIds": [
+          3,
+          1,
+          7
+        ]
+      },
+      "1019": {
+        "locationIds": [
+          5,
+          8,
+          7
+        ]
+      },
+      "1020": {
+        "locationIds": [
+          8,
+          5,
+          6
+        ]
+      }
+    },
+    "existingAssignments": [],
+    "existingSchedules": []
+  }
+}
