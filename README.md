@@ -48,6 +48,18 @@ npm run dev
 
 - 一键自检（建议合并/上线前跑一次）：`.\trip-manager\scripts\verify.ps1`
 
+## 在 backend 容器里验证求解器（CP-SAT + LNS）
+
+```bash
+docker compose build backend
+docker compose run --rm -v ./trip-manager/solver-lab/examples:/data:ro backend bash -lc '/opt/solver-venv/bin/python /app/solver-lab-py/cli.py --in /data/sample-input.json --out /tmp/o.json --report /tmp/r.json --seed 42 --time 30 --workers 8 && python3 - <<PY\nimport json\nrep=json.load(open(\"/tmp/r.json\"))\nprint(rep.get(\"optimize\",{}).get(\"engine\"))\nprint(rep.get(\"optimize\",{}).get(\"diagnostics\",{}).get(\"cp_sat_used\"))\nprint(rep.get(\"optimize\",{}).get(\"diagnostics\",{}).get(\"lns_iterations\"))\nPY'
+```
+
+期望输出：
+- `engine` 含 `+lns`
+- `cp_sat_used` 为 `True`
+- `lns_iterations` > 0
+
 ## 配置
 
 - 认证：HTTP Basic Auth（users 表 + bcrypt）
