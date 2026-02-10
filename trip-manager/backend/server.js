@@ -281,6 +281,63 @@ if (!locationColumns.includes('cluster_prefer_same_day')) {
   db.exec('UPDATE locations SET cluster_prefer_same_day = 0 WHERE cluster_prefer_same_day IS NULL');
 }
 
+// Solver preview runs (async job history)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS solver_preview_runs (
+    id TEXT PRIMARY KEY,
+    status TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME,
+    finished_at DATETIME,
+    created_by TEXT,
+    request_json TEXT NOT NULL,
+    input_json TEXT,
+    candidates_json TEXT,
+    report_json TEXT,
+    error TEXT,
+    log_tail TEXT
+  );
+`);
+
+const solverPreviewRunColumns = db.prepare("PRAGMA table_info(solver_preview_runs)").all().map(col => col.name);
+if (!solverPreviewRunColumns.includes('status')) {
+  db.exec('ALTER TABLE solver_preview_runs ADD COLUMN status TEXT');
+}
+if (!solverPreviewRunColumns.includes('created_at')) {
+  db.exec('ALTER TABLE solver_preview_runs ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP');
+  db.exec('UPDATE solver_preview_runs SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL');
+}
+if (!solverPreviewRunColumns.includes('started_at')) {
+  db.exec('ALTER TABLE solver_preview_runs ADD COLUMN started_at DATETIME');
+}
+if (!solverPreviewRunColumns.includes('finished_at')) {
+  db.exec('ALTER TABLE solver_preview_runs ADD COLUMN finished_at DATETIME');
+}
+if (!solverPreviewRunColumns.includes('created_by')) {
+  db.exec('ALTER TABLE solver_preview_runs ADD COLUMN created_by TEXT');
+}
+if (!solverPreviewRunColumns.includes('request_json')) {
+  // NOTE: For backwards-compatible migrations we avoid NOT NULL here.
+  db.exec('ALTER TABLE solver_preview_runs ADD COLUMN request_json TEXT');
+  db.exec("UPDATE solver_preview_runs SET request_json = '{}' WHERE request_json IS NULL OR TRIM(request_json) = ''");
+}
+if (!solverPreviewRunColumns.includes('input_json')) {
+  db.exec('ALTER TABLE solver_preview_runs ADD COLUMN input_json TEXT');
+}
+if (!solverPreviewRunColumns.includes('candidates_json')) {
+  db.exec('ALTER TABLE solver_preview_runs ADD COLUMN candidates_json TEXT');
+}
+if (!solverPreviewRunColumns.includes('report_json')) {
+  db.exec('ALTER TABLE solver_preview_runs ADD COLUMN report_json TEXT');
+}
+if (!solverPreviewRunColumns.includes('error')) {
+  db.exec('ALTER TABLE solver_preview_runs ADD COLUMN error TEXT');
+}
+if (!solverPreviewRunColumns.includes('log_tail')) {
+  db.exec('ALTER TABLE solver_preview_runs ADD COLUMN log_tail TEXT');
+}
+db.exec('CREATE INDEX IF NOT EXISTS idx_solver_preview_runs_created_at ON solver_preview_runs(created_at)');
+
 const ensureUserRoleConstraint = () => {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'").get();
   if (row && row.sql && row.sql.includes("'editor'")) {
@@ -353,6 +410,7 @@ const writeEditorRoles = ['admin', 'editor'];
 
 app.use('/api/lock', requireRole(['admin']), require('./src/routes/lock'));
 app.use('/api/activities', requireRole(['admin']), require('./src/routes/activities'));
+app.use('/api/planning/solver-runs', requireRole(['admin']), require('./src/routes/solverPreviewRuns'));
 app.use('/api/planning', requireRole(['admin']), require('./src/routes/planning'));
 app.use('/api/config', requireRole(['admin']), require('./src/routes/systemConfig'));
 

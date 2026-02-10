@@ -1,7 +1,8 @@
 const express = require('express');
 const requireEditLock = require('../middleware/editLock');
-const { DEFAULT_TIME_SLOTS, getAiRules } = require('../utils/aiConfig');
+const { DEFAULT_TIME_SLOTS } = require('../utils/aiConfig');
 const { bumpScheduleRevision } = require('../utils/scheduleRevision');
+const { buildPlanningInputPayload, PlanningInputBuildError } = require('../utils/buildPlanningInputPayload');
 
 const router = express.Router();
 
@@ -172,225 +173,20 @@ const normalizeLocationIdList = (value) => {
 const getReasonLabel = (reason) => CONFLICT_REASON_LABELS[reason] || reason || '未知冲突';
 
 router.post('/export', (req, res) => {
-  const {
-    groupIds,
-    startDate,
-    endDate,
-    includeExistingActivities = true,
-    includeExistingSchedules = true,
-    includePlanItemsByGroup = true
-  } = req.body || {};
+  try {
+    const { payload, filename } = buildPlanningInputPayload(req.db, req.body || {});
+    const body = JSON.stringify(payload, null, 2);
 
-  if (!Array.isArray(groupIds) || groupIds.length === 0) {
-    return res.status(400).json({ error: '缺少团组ID' });
-  }
-
-  if (!isValidDate(startDate) || !isValidDate(endDate)) {
-    return res.status(400).json({ error: '日期范围无效' });
-  }
-
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
-    return res.status(400).json({ error: '日期范围无效' });
-  }
-
-  const uniqueGroupIds = Array.from(new Set(groupIds.map(id => Number(id)).filter(Number.isFinite)));
-  if (uniqueGroupIds.length === 0) {
-    return res.status(400).json({ error: '团组ID无效' });
-  }
-
-  const placeholders = uniqueGroupIds.map(() => '?').join(', ');
-  const groups = req.db.prepare(`
-    SELECT id, name, type, student_count, teacher_count, start_date, end_date,
-      itinerary_plan_id, must_visit_mode, manual_must_visit_location_ids
-    FROM groups
-    WHERE id IN (${placeholders})
-  `).all(...uniqueGroupIds);
-
-  if (!groups || groups.length === 0) {
-    return res.status(400).json({ error: '团组不存在' });
-  }
-
-  const filteredGroups = groups.filter(group => (
-    group.start_date <= endDate && group.end_date >= startDate
-  ));
-
-  if (filteredGroups.length === 0) {
-    return res.status(400).json({ error: '日期范围内无团组' });
-  }
-
-  const filteredGroupIds = filteredGroups.map(group => group.id);
-  const filteredPlaceholders = filteredGroupIds.map(() => '?').join(', ');
-
-  const allLocations = req.db.prepare(`
-    SELECT id, name, address, capacity, cluster_prefer_same_day, blocked_weekdays, open_hours, closed_dates, target_groups, is_active
-    FROM locations
-  `).all();
-  const activeLocations = allLocations.filter(location => Boolean(location.is_active));
-  const locationMap = new Map(
-    allLocations.map(location => [Number(location.id), location])
-  );
-
-  const mustVisitByGroup = {};
-  const exportValidationErrors = [];
-
-  filteredGroups.forEach(group => {
-    const groupId = Number(group.id);
-    const groupKey = String(groupId);
-    const groupName = group.name || `#${groupId}`;
-    const manualIds = normalizeLocationIdList(group.manual_must_visit_location_ids);
-    if (manualIds.length === 0) {
-      exportValidationErrors.push(`${groupName} 未勾选必去行程点`);
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename=\"${filename}\"`);
+    res.send(body);
+  } catch (error) {
+    if (error instanceof PlanningInputBuildError) {
+      return res.status(error.status).json(error.body);
     }
-
-    const rawItems = manualIds.map((locationId, index) => ({
-      location_id: locationId,
-      sort_order: index
-    }));
-
-    const normalizedMustVisit = [];
-    rawItems.forEach((item, index) => {
-      const locationId = Number(item.location_id);
-      const sortOrder = Number.isFinite(Number(item.sort_order))
-        ? Number(item.sort_order)
-        : index;
-      if (!Number.isFinite(locationId) || locationId <= 0) {
-        exportValidationErrors.push(`${groupName} 存在无效必去地点ID：${item.location_id}`);
-        return;
-      }
-      const location = locationMap.get(locationId);
-      if (!location) {
-        exportValidationErrors.push(`${groupName} 的必去地点不存在：#${locationId}`);
-        return;
-      }
-      if (!location.is_active) {
-        exportValidationErrors.push(`${groupName} 的必去地点已停用：${location.name || `#${locationId}`}`);
-        return;
-      }
-      normalizedMustVisit.push({
-        location_id: locationId,
-        location_name: location.name || '',
-        sort_order: sortOrder,
-        source: 'manual'
-      });
-    });
-
-    mustVisitByGroup[groupKey] = normalizedMustVisit;
-  });
-
-  if (exportValidationErrors.length > 0) {
-    return res.status(409).json({
-      error: '导出前校验失败，请先修复必去行程点配置',
-      code: 'EXPORT_VALIDATION_FAILED',
-      details: exportValidationErrors.slice(0, 50)
-    });
+    console.error('Planning export failed:', error);
+    return res.status(500).json({ error: '导出失败' });
   }
-
-  const activities = includeExistingActivities
-    ? req.db.prepare(`
-        SELECT group_id, location_id, activity_date, time_slot, participant_count
-        FROM activities
-        WHERE activity_date BETWEEN ? AND ?
-      `).all(startDate, endDate)
-    : [];
-
-  const schedules = includeExistingSchedules
-    ? req.db.prepare(`
-        SELECT group_id, activity_date, start_time, end_time, is_from_resource, location_id
-        FROM schedules
-        WHERE group_id IN (${filteredPlaceholders})
-          AND activity_date BETWEEN ? AND ?
-      `).all(...filteredGroupIds, startDate, endDate)
-    : [];
-
-  const snapshotId = buildSnapshotId();
-  const exportedAt = new Date().toISOString();
-  const rules = getAiRules(req.db);
-
-  const groupExportRows = filteredGroups.map((group) => ({
-    id: group.id,
-    name: group.name,
-    type: group.type,
-    studentCount: group.student_count,
-    teacherCount: group.teacher_count,
-    participantCount: (group.student_count || 0) + (group.teacher_count || 0),
-    startDate: group.start_date,
-    endDate: group.end_date,
-    itineraryPlanId: group.itinerary_plan_id || null
-  }));
-
-  const locationExportRows = activeLocations.map((location) => ({
-    id: location.id,
-    name: location.name,
-    address: location.address,
-    capacity: location.capacity,
-    clusterPreferSameDay: Boolean(location.cluster_prefer_same_day),
-    blockedWeekdays: location.blocked_weekdays ?? '',
-    closedDates: parseArraySafe(location.closed_dates),
-    openHours: parseObjectSafe(location.open_hours),
-    targetGroups: location.target_groups,
-    isActive: Boolean(location.is_active)
-  }));
-
-  const requiredLocationsByGroup = includePlanItemsByGroup
-    ? filteredGroups.reduce((result, group) => {
-      const groupId = Number(group.id);
-      const groupKey = String(groupId);
-      const rows = Array.isArray(mustVisitByGroup[groupKey]) ? mustVisitByGroup[groupKey] : [];
-      result[groupKey] = {
-        locationIds: rows
-          .map(item => Number(item.location_id))
-          .filter(id => Number.isFinite(id) && id > 0)
-      };
-      return result;
-    }, {})
-    : {};
-
-  const existingAssignments = activities.map((row) => ({
-    groupId: row.group_id,
-    locationId: row.location_id,
-    date: row.activity_date,
-    timeSlot: row.time_slot,
-    participantCount: row.participant_count
-  }));
-
-  const existingSchedules = schedules.map((row) => ({
-    groupId: row.group_id,
-    date: row.activity_date,
-    startTime: row.start_time,
-    endTime: row.end_time,
-    isFromResource: Boolean(row.is_from_resource),
-    locationId: row.location_id ?? null
-  }));
-
-  const payload = {
-    schema: 'ec-planning-input@2',
-    meta: {
-      snapshotId,
-      exportedAt
-    },
-    scope: {
-      startDate,
-      endDate,
-      groupIds: filteredGroupIds
-    },
-    rules,
-    data: {
-      groups: groupExportRows,
-      locations: locationExportRows,
-      requiredLocationsByGroup,
-      existingAssignments,
-      existingSchedules
-    }
-  };
-
-  const filename = buildFilename(snapshotId);
-  const body = JSON.stringify(payload, null, 2);
-
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Content-Disposition', `attachment; filename=\"${filename}\"`);
-  res.send(body);
 });
 
 router.post('/import', requireEditLock, (req, res) => {
