@@ -94,7 +94,7 @@
 - `docs/planning/export-planning-input.md`
 - `docs/planning/import-planning-result.md`
 - `docs/planning/prompt-planning-result.md`
-- `docs/planning/solver-workflow.md`
+- `trip-manager/solver-lab-py/docs/solver-workflow.md`
 
 ## 统计 /statistics
 - GET `/statistics`：统计概览 + 各类使用统计
@@ -122,4 +122,3 @@
 ## AI 排期 /ai（规划/未落地）
 
 当前后端未挂载 `/api/ai/*` 路由；前端 Copilot 为静态 UI 预留入口。相关背景见：`docs/itinerary-designer-upgrade-review-2026-02-06.md`。
-

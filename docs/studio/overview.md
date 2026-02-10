@@ -34,4 +34,4 @@
 
 - 架构：`docs/studio/architecture.md`
 - API：`docs/studio/api.md`
-- 求解器质量规则：`docs/planning/solver-quality-rules.md`
+- 求解器质量规则：`trip-manager/solver-lab-py/docs/solver-quality-rules.md`

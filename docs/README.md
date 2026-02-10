@@ -14,6 +14,6 @@
 - API：`docs/api/api-reference.md`、`docs/api/sample-payloads.md`
 - 配置/认证/编辑锁：`docs/config-auth.md`
 - 账号与权限：`docs/account-admin.md`
-- 跨团组排程（导出/导入/Prompt/求解器）：`docs/planning/export-planning-input.md`、`docs/planning/import-planning-result.md`、`docs/planning/prompt-planning-result.md`、`docs/planning/solver-workflow.md`、`docs/planning/solver-quality-rules.md`
+- 跨团组排程（导出/导入/Prompt/求解器）：`docs/planning/export-planning-input.md`、`docs/planning/import-planning-result.md`、`docs/planning/prompt-planning-result.md`、`trip-manager/solver-lab-py/docs/solver-workflow.md`、`trip-manager/solver-lab-py/docs/solver-quality-rules.md`
 - Studio（独立行程调度台）：`docs/studio/overview.md`、`docs/studio/architecture.md`、`docs/studio/api.md`
 - 日历详情组件索引：`docs/trip-manager-calendar-eventchip-map.md`

@@ -9,6 +9,11 @@ Standalone Python scheduler module for `ec-planning-input@2`.
 - Provide long-running optimization path (CP-SAT + LNS).
 - Stay decoupled from current backend/frontend routes.
 
+## Docs
+
+- Solver workflow and quality rules live in `docs/`.
+- Example input fixtures live in `examples/fixtures/`.
+
 ## Run
 
 From `trip-manager` root:
@@ -27,4 +32,3 @@ python solver-lab-py/cli.py ^
 
 - If `ortools` is not installed, solver auto-falls back to greedy baseline.
 - Output remains `ec-planning-result@1`, so existing import flow can reuse it.
-
