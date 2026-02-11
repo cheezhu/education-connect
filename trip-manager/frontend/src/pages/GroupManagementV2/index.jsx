@@ -5,7 +5,6 @@ import dayjs from 'dayjs';
 import api from '../../services/api';
 import {
   buildShixingResourceId,
-  parseShixingResourceId,
   isCustomResourceId,
   isPlanResourceId,
   isShixingResourceId,
@@ -36,77 +35,11 @@ const MEAL_LABELS = {
   dinner: '晚餐'
 };
 
-const collectShixingResourceIds = (schedules = []) => {
-  const set = new Set();
-  schedules.forEach((schedule) => {
-    const resourceId = getResourceId(schedule);
-    if (isShixingResourceId(resourceId)) {
-      set.add(resourceId);
-    }
-  });
-  return set;
-};
-
-const clearShixingResourceFields = (logistics = [], removedIds = []) => {
-  if (!Array.isArray(logistics) || removedIds.length === 0) return logistics;
-  const parsed = removedIds.map(parseShixingResourceId).filter(Boolean);
-  if (parsed.length === 0) return logistics;
-  const byDate = new Map();
-  parsed.forEach((item) => {
-    if (!byDate.has(item.date)) byDate.set(item.date, []);
-    byDate.get(item.date).push(item);
-  });
-
-  return logistics.map((row) => {
-    const changes = byDate.get(row.date);
-    if (!changes) return row;
-    const meals = { ...(row.meals || {}) };
-    const pickup = { ...(row.pickup || {}) };
-    const dropoff = { ...(row.dropoff || {}) };
-
-    changes.forEach((item) => {
-      if (item.category === 'meal' && item.key) {
-        meals[item.key] = '';
-        meals[`${item.key}_place`] = '';
-        meals[`${item.key}_time`] = '';
-        meals[`${item.key}_end`] = '';
-        meals[`${item.key}_detached`] = false;
-        meals[`${item.key}_disabled`] = false;
-        return;
-      }
-      if (item.category === 'pickup') {
-        pickup.time = '';
-        pickup.end_time = '';
-        pickup.location = '';
-        pickup.contact = '';
-        pickup.flight_no = '';
-        pickup.airline = '';
-        pickup.terminal = '';
-        pickup.detached = false;
-        pickup.disabled = false;
-        return;
-      }
-      if (item.category === 'dropoff') {
-        dropoff.time = '';
-        dropoff.end_time = '';
-        dropoff.location = '';
-        dropoff.contact = '';
-        dropoff.flight_no = '';
-        dropoff.airline = '';
-        dropoff.terminal = '';
-        dropoff.detached = false;
-        dropoff.disabled = false;
-      }
-    });
-
-    return {
-      ...row,
-      meals,
-      pickup,
-      dropoff
-    };
-  });
-};
+const getRequestErrorMessage = (error, fallback) => (
+  error?.response?.data?.message
+  || error?.response?.data?.error
+  || fallback
+);
 
 const calcDurationMinutes = (startTime, endTime) => {
   const start = toMinutes(startTime);
@@ -164,6 +97,7 @@ const buildCustomResource = (schedule) => {
     duration: durationHours,
     description: schedule?.description || '',
     locationName: schedule?.location || title,
+    color: schedule?.color || '',
     isUnique: false
   };
 };
@@ -181,9 +115,8 @@ const mergeCustomResources = (existing = [], schedules = []) => {
     if (resourceId && (isShixingResourceId(resourceId) || isPlanResourceId(resourceId))) return;
 
     const resource = buildCustomResource(schedule);
-    if (!map.has(resource.id)) {
-      map.set(resource.id, resource);
-    }
+    const existing = map.get(resource.id);
+    map.set(resource.id, existing ? { ...existing, ...resource } : resource);
   });
 
   return Array.from(map.values());
@@ -328,7 +261,7 @@ const mergeSchedulesWithLogistics = (schedules = [], logistics = [], groupId) =>
         groupId,
         date,
         type: 'meal',
-        title: MEAL_LABELS[key],
+        title: description || MEAL_LABELS[key],
         location,
         description,
         resourceId,
@@ -588,6 +521,28 @@ const GroupManagementV2 = () => {
       );
     }
 
+    const toTs = (value) => {
+      if (!value) return null;
+      const parsed = dayjs(value);
+      if (!parsed.isValid()) return null;
+      return parsed.valueOf();
+    };
+
+    filtered.sort((a, b) => {
+      // Default order: start_date desc (latest first).
+      const aStart = toTs(a.start_date);
+      const bStart = toTs(b.start_date);
+      if (aStart !== null && bStart !== null && aStart !== bStart) return bStart - aStart;
+      if (aStart === null && bStart !== null) return 1;
+      if (aStart !== null && bStart === null) return -1;
+
+      // Tie-breakers: created_at desc, then id desc.
+      const aCreated = toTs(a.created_at);
+      const bCreated = toTs(b.created_at);
+      if (aCreated !== null && bCreated !== null && aCreated !== bCreated) return bCreated - aCreated;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
+
     setFilteredGroups(filtered);
   }, [filters, groups]);
 
@@ -672,17 +627,12 @@ const GroupManagementV2 = () => {
           )));
         }
       } catch (error) {
-        message.error('保存食行卡片失败');
+        message.error(getRequestErrorMessage(error, '保存食行卡片失败'));
       }
     }, 400);
   }, [activeGroupId]);
 
   const applyScheduleSync = useCallback((schedules) => {
-    const previousSchedules = scheduleSnapshotRef.current || [];
-    const prevShixing = collectShixingResourceIds(previousSchedules);
-    const nextShixing = collectShixingResourceIds(schedules);
-    const removedShixingIds = Array.from(prevShixing).filter(id => !nextShixing.has(id));
-
     setGroupSchedules(schedules);
     scheduleSignatureRef.current = buildScheduleSignature(schedules);
     scheduleSnapshotRef.current = schedules;
@@ -690,10 +640,7 @@ const GroupManagementV2 = () => {
     let nextLogisticsSnapshot = null;
     setGroups(prev => prev.map(group => {
       if (group.id !== activeGroupId) return group;
-      let nextLogistics = syncLogisticsFromSchedules(group.logistics || [], schedules);
-      if (removedShixingIds.length) {
-        nextLogistics = clearShixingResourceFields(nextLogistics, removedShixingIds);
-      }
+      const nextLogistics = syncLogisticsFromSchedules(group.logistics || [], schedules);
       nextLogisticsSnapshot = nextLogistics;
       const nextCustomResources = mergeCustomResources(group.customResources || [], schedules);
       return {
@@ -733,7 +680,7 @@ const GroupManagementV2 = () => {
           }));
         }
       } catch (error) {
-        message.error('保存失败');
+        message.error(getRequestErrorMessage(error, '保存失败'));
       }
     }, 0);
   }, []);
@@ -771,7 +718,7 @@ const GroupManagementV2 = () => {
           fetchSchedules(groupId);
           return;
         }
-        message.error('保存日程失败');
+        message.error(getRequestErrorMessage(error, '保存日程失败'));
       }
     }, 400);
   }, [activeGroupId, applyScheduleSync, fetchSchedules]);
@@ -809,7 +756,7 @@ const GroupManagementV2 = () => {
       message.success('团组已删除');
       fetchGroups();
     } catch (error) {
-      message.error('删除失败');
+      message.error(getRequestErrorMessage(error, '删除失败'));
     }
   };
 

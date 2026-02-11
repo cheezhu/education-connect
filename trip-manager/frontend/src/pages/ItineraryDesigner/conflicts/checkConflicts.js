@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import { getGroupTypeLabel } from '../../../domain/group';
 
 export default function checkConflicts({
   activityId,
@@ -70,13 +71,13 @@ export default function checkConflicts({
   // 4) Group type match
   const group = (groups || []).find((item) => item.id === groupId);
   const targetGroups = location.target_groups || 'all';
-  if (group && targetGroups !== 'all' && targetGroups !== group.type) {
+  if (group && group.type !== 'vip' && targetGroups !== 'all' && targetGroups !== group.type) {
+    const typeLabel = getGroupTypeLabel(group.type) || String(group.type || '');
     conflicts.push({
       type: 'groupType',
-      message: `${location.name}不适用于${group.type === 'primary' ? '小学' : '中学'}团组`
+      message: `${location.name}不适用于${typeLabel}团组`
     });
   }
 
   return conflicts;
 }
-

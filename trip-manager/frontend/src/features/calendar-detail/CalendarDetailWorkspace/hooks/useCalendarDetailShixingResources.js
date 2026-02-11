@@ -56,7 +56,7 @@ const useCalendarDetailShixingResources = ({ groupData, activities }) => useMemo
       resources.push({
         id: resourceId,
         type: 'meal',
-        title: defaults.label || key,
+        title: meals[key] || defaults.label || key,
         duration,
         description: meals[key] || '',
         locationName: meals[`${key}_place`] || defaults.label || '',

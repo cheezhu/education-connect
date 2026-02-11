@@ -465,6 +465,7 @@ const CalendarDetailWorkspace = ({
       anchorRect,
       activity: null,
       initialValues: {
+        date,
         startTime,
         endTime,
         type: 'visit',
@@ -622,6 +623,10 @@ const CalendarDetailWorkspace = ({
       const startRow = constrainedIndex + 2;
       const endRow = Math.min(startRow + durationSlots, timeSlots.length + 1);
       const endTime = gridRowToTime(endRow);
+      const isMealResource = draggedResource.type === 'meal';
+      const resourceTitle = isMealResource
+        ? (draggedResource.description || draggedResource.title || '用餐安排')
+        : draggedResource.title;
       const newActivity = {
         id: null,
         clientId: buildClientId(),
@@ -630,12 +635,12 @@ const CalendarDetailWorkspace = ({
         startTime: adjustedStartTime,
         endTime,
         type: draggedResource.type,
-        title: draggedResource.title,
+        title: resourceTitle,
         location: draggedResource.locationName || draggedResource.title || '',
         locationId: draggedResource.locationId || null,
         locationColor: draggedResource.locationColor || null,
         description: draggedResource.description,
-        color: resolveActivityColor({
+        color: draggedResource.color || resolveActivityColor({
           type: draggedResource.type,
           locationId: draggedResource.locationId,
           locationColor: draggedResource.locationColor
@@ -652,7 +657,7 @@ const CalendarDetailWorkspace = ({
       setDraggedResource(null);
       setIsDragging(false);
 
-      message.success(`已添加活动：${draggedResource.title}`, 1);
+      message.success(`已添加活动：${resourceTitle || draggedResource.title}`, 1);
       return;
     }
 
@@ -847,6 +852,8 @@ const CalendarDetailWorkspace = ({
 
     let resolvedTitle = payload.title || baseActivity?.title || '';
     let resolvedLocation = payload.location || baseActivity?.location || '';
+    let resolvedDescription = payload.description ?? baseActivity?.description ?? '';
+    let resolvedColor = payload.color || baseActivity?.color || '';
     let resolvedLocationId = baseActivity?.locationId ?? null;
     let resolvedLocationColor = baseActivity?.locationColor ?? null;
     let resolvedResourceId = baseActivity?.resourceId ?? baseActivity?.resource_id ?? null;
@@ -893,6 +900,15 @@ const CalendarDetailWorkspace = ({
       }
     }
 
+    const computedColor = resolveActivityColor({
+      type: payload.type || baseActivity?.type || 'visit',
+      locationId: resolvedLocationId,
+      locationColor: resolvedLocationColor
+    });
+    if (!resolvedColor) {
+      resolvedColor = computedColor;
+    }
+
     const activityData = {
       ...baseActivity,
       id: baseActivity?.id ?? null,
@@ -904,13 +920,10 @@ const CalendarDetailWorkspace = ({
       type: payload.type || baseActivity?.type || 'visit',
       title: resolvedTitle,
       location: resolvedLocation,
+      description: resolvedDescription,
       locationId: resolvedLocationId,
       locationColor: resolvedLocationColor,
-      color: resolveActivityColor({
-        type: payload.type || baseActivity?.type || 'visit',
-        locationId: resolvedLocationId,
-        locationColor: resolvedLocationColor
-      }),
+      color: resolvedColor,
       resourceId: resolvedResourceId,
       planItemId: resolvedPlanItemId,
       isFromResource

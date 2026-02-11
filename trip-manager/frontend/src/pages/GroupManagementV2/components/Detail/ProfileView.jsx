@@ -106,7 +106,8 @@ const buildBaseProperties = (group, hasMembers) => {
   const totalCount = (group.student_count || 0) + (group.teacher_count || 0);
   const typeOptions = [
     { value: 'primary', label: '小学' },
-    { value: 'secondary', label: '中学' }
+    { value: 'secondary', label: '中学' },
+    { value: 'vip', label: 'VIP' }
   ];
 
   return [
@@ -343,6 +344,7 @@ const ProfileView = ({
   itineraryPlans = [],
   locations = [],
   onUpdate,
+  onDelete,
   hasMembers,
   onNavigateTab
 }) => {
@@ -433,6 +435,14 @@ const ProfileView = ({
 
   const handleStatusChange = (value) => {
     setDraft((prev) => ({ ...prev, status: value || null }));
+  };
+
+  const handleDeleteGroup = () => {
+    if (!group?.id || !onDelete) return;
+    const name = draft?.name || group?.name || `#${group.id}`;
+    const confirmed = window.confirm(`确定删除团组「${name}」？此操作不可撤销。`);
+    if (!confirmed) return;
+    onDelete();
   };
 
   const handlePropertyUpdate = (id, updates) => {
@@ -603,6 +613,25 @@ const ProfileView = ({
   return (
     <div className="profile-layout profile-doc">
       <div className="profile-center doc-container">
+        <div className="doc-actions">
+          <div className="breadcrumb">
+            <span>团组</span>
+            <span className="breadcrumb-sep">/</span>
+            <span>{draft.name || '未命名团组'}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span className="doc-status">自动保存</span>
+            <button
+              type="button"
+              className="btn-delete"
+              onClick={handleDeleteGroup}
+              disabled={!group?.id || !onDelete}
+            >
+              删除团组
+            </button>
+          </div>
+        </div>
+
         <div className="doc-content">
           <div>
             <div className="doc-icon">🗂️</div>

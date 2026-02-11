@@ -314,6 +314,68 @@ const ensureUserRoleConstraint = () => {
 
 ensureUserRoleConstraint();
 
+const ensureGroupTypeConstraint = () => {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'groups'").get();
+  if (!row?.sql) return;
+  if (row.sql.includes("'vip'")) return;
+
+  // SQLite does not support altering CHECK constraints in-place. Rebuild the table while preserving
+  // all existing columns/constraints from the current schema, and only extend the type CHECK list.
+  const tableSql = String(row.sql);
+  const checkRegex = /CHECK\s*\(\s*type\s+IN\s*\(\s*([^)]+?)\s*\)\s*\)/i;
+
+  let createSql = tableSql.replace(
+    /CREATE TABLE\s+(?:IF NOT EXISTS\s+)?("?groups"?)/i,
+    'CREATE TABLE groups_new'
+  );
+  createSql = createSql.replace(checkRegex, (match, listRaw) => {
+    const listText = String(listRaw || '');
+    if (listText.toLowerCase().includes("'vip'")) return match;
+    const trimmed = listText.trim().replace(/,\s*$/, '');
+    return `CHECK(type IN (${trimmed}, 'vip'))`;
+  });
+
+  if (!createSql.includes("'vip'")) {
+    console.error('[db] Failed to rewrite groups.type CHECK constraint, skipping migration.');
+    return;
+  }
+
+  const createStmt = `${createSql.trim().replace(/;\s*$/, '')};`;
+
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.exec('BEGIN TRANSACTION;');
+    db.exec('DROP TABLE IF EXISTS groups_new;');
+    db.exec(createStmt);
+    db.exec('INSERT INTO groups_new SELECT * FROM groups;');
+    db.exec('DROP TABLE groups;');
+    db.exec('ALTER TABLE groups_new RENAME TO groups;');
+    db.exec('COMMIT;');
+  } catch (error) {
+    try {
+      db.exec('ROLLBACK;');
+    } catch (rollbackError) {
+      // ignore rollback errors
+    }
+    console.error('[db] Failed to migrate groups.type CHECK constraint:', error);
+    return;
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+
+  const maxId = db.prepare('SELECT MAX(id) as maxId FROM groups').get();
+  if (maxId && Number.isFinite(maxId.maxId)) {
+    db.prepare('UPDATE sqlite_sequence SET seq = ? WHERE name = ?')
+      .run(maxId.maxId, 'groups');
+  }
+
+  // Recreate indexes that were defined on the old table.
+  db.exec('CREATE INDEX IF NOT EXISTS idx_groups_date_range ON groups(start_date, end_date)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_groups_itinerary_plan ON groups(itinerary_plan_id)');
+};
+
+ensureGroupTypeConstraint();
+
 // 中间件
 app.use(cors());
 app.use(express.json());
@@ -369,7 +431,8 @@ app.use('/api', requireAccess({ read: readAllRoles, write: writeEditorRoles }), 
 // 错误处理
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ 
+  const status = Number(err?.status || err?.statusCode || 500);
+  res.status(Number.isFinite(status) ? status : 500).json({ 
     error: '服务器错误',
     message: process.env.NODE_ENV === 'development' ? err.message : undefined
   });

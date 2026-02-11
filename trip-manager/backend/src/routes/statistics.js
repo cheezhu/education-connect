@@ -1,6 +1,13 @@
 const express = require('express');
 const router = express.Router();
 
+const getGroupTypeLabel = (type) => {
+  if (type === 'primary') return '小学';
+  if (type === 'secondary') return '中学';
+  if (type === 'vip') return 'VIP';
+  return type ? String(type) : '';
+};
+
 // 获取统计数据
 router.get('/', (req, res) => {
   try {
@@ -100,7 +107,7 @@ router.get('/export', (req, res) => {
       // 生成CSV格式
       const csvHeader = '日期,时段,团组,类型,地点,参与人数,地点容量\n';
       const csvData = activities.map(a => 
-        `${a.activity_date},${a.time_slot},${a.group_name},${a.group_type === 'primary' ? '小学' : '中学'},${a.location_name},${a.participant_count},${a.location_capacity}`
+        `${a.activity_date},${a.time_slot},${a.group_name},${getGroupTypeLabel(a.group_type)},${a.location_name},${a.participant_count},${a.location_capacity}`
       ).join('\n');
       
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');

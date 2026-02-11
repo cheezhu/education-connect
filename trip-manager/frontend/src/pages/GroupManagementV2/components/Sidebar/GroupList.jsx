@@ -1,6 +1,7 @@
 ﻿import React, { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import SidebarFooter from './SidebarFooter';
+import { getGroupTypeLabel } from '../../../../domain/group';
 
 const GroupList = ({
   groups,
@@ -30,7 +31,8 @@ const GroupList = ({
   const renderMeta = (group) => {
     const start = group.start_date ? dayjs(group.start_date).format('YYYY-MM-DD') : '未设置日期';
     const total = (group.student_count || 0) + (group.teacher_count || 0);
-    return `${start} • ${total}人`;
+    const typeLabel = getGroupTypeLabel(group.type) || '未设置类型';
+    return `${typeLabel} • ${start} • ${total}人`;
   };
 
   return (

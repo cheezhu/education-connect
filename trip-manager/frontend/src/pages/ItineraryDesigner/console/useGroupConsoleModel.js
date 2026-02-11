@@ -1,5 +1,6 @@
 import dayjs from 'dayjs';
 import { useMemo } from 'react';
+import { getGroupTypeLabel } from '../../../domain/group';
 
 import { normalizeManualMustVisitLocationIds } from '../shared/groupRules';
 
@@ -135,11 +136,7 @@ export default function useGroupConsoleModel({
       })
     }));
 
-    const groupConsoleTypeLabel = group?.type === 'primary'
-      ? '小学'
-      : group?.type === 'secondary'
-        ? '中学'
-        : '团组';
+    const groupConsoleTypeLabel = getGroupTypeLabel(group?.type) || '团组';
 
     return {
       groupCalendarSlotKeys: GROUP_CONSOLE_SLOT_KEYS,
@@ -158,4 +155,3 @@ export default function useGroupConsoleModel({
     };
   }, [groupId, groups, activities, locations, fallbackDates, formatDateString, getTimeSlotLabel]);
 }
-

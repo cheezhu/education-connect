@@ -212,6 +212,16 @@ const normalizeHkoForecast = (payload) => {
   };
 };
 
+const HOTEL_OPTIONS = ['专家公寓A楼', '维也纳酒店', '锦江之星', '希尔顿花园'];
+const VEHICLE_OPTIONS = ['王师傅', '李师傅', '陈师傅'];
+const GUIDE_OPTIONS = ['张导', '李导', '赵导'];
+const SECURITY_OPTIONS = ['赵安保', '陈安保'];
+const MEAL_OPTIONS = ['酒店自带', '基地团餐', '自理', '特色餐', '路餐'];
+
+const rowsEqual = (left = [], right = []) => (
+  JSON.stringify(left) === JSON.stringify(right)
+);
+
 const LogisticsView = ({ group, schedules = [], onUpdate }) => {
   const [rows, setRows] = useState([]);
   const [hkoWeather, setHkoWeather] = useState({ status: 'idle', data: null, error: '' });
@@ -222,10 +232,22 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
     error: ''
   });
   const saveTimeoutRef = useRef(null);
+  const isComposingRef = useRef(false);
+  const isEditingRef = useRef(false);
+  const pendingHydrateRef = useRef(null);
+  const pendingSaveRef = useRef(null);
 
   const dateRange = useMemo(() => (
     buildDateRange(group?.start_date, group?.end_date)
   ), [group?.start_date, group?.end_date]);
+
+  useEffect(() => {
+    isComposingRef.current = false;
+    isEditingRef.current = false;
+    pendingHydrateRef.current = null;
+    pendingSaveRef.current = null;
+    clearTimeout(saveTimeoutRef.current);
+  }, [group?.id]);
 
   useEffect(() => {
     if (!group) {
@@ -237,7 +259,23 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
       const match = existing.find((item) => item.date === date) || {};
       return normalizeLogisticsRow(date, match);
     });
-    setRows(nextRows);
+    setRows((prev) => {
+      if (isComposingRef.current || isEditingRef.current) {
+        pendingHydrateRef.current = nextRows;
+        return prev;
+      }
+      if (pendingSaveRef.current) {
+        if (rowsEqual(nextRows, pendingSaveRef.current)) {
+          pendingSaveRef.current = null;
+          pendingHydrateRef.current = null;
+          return prev;
+        }
+        pendingHydrateRef.current = nextRows;
+        return prev;
+      }
+      pendingHydrateRef.current = null;
+      return rowsEqual(prev, nextRows) ? prev : nextRows;
+    });
   }, [group?.id, group?.logistics, dateRange]);
 
   useEffect(() => {
@@ -331,11 +369,64 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
 
   const queueSave = useCallback((nextRows) => {
     if (!group) return;
+    pendingSaveRef.current = nextRows;
+    if (isComposingRef.current) {
+      return;
+    }
     clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
       onUpdate?.({ ...group, logistics: nextRows });
     }, 300);
   }, [group, onUpdate]);
+
+  const handleCompositionStart = useCallback(() => {
+    isComposingRef.current = true;
+    clearTimeout(saveTimeoutRef.current);
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    isComposingRef.current = false;
+
+    const pendingSaveRows = pendingSaveRef.current;
+    if (pendingSaveRows) {
+      // During IME, server/parent may push an older snapshot. Keep local typed value first.
+      pendingHydrateRef.current = null;
+      queueSave(pendingSaveRows);
+      return;
+    }
+
+    const pendingHydrateRows = pendingHydrateRef.current;
+    if (pendingHydrateRows) {
+      setRows((prev) => (rowsEqual(prev, pendingHydrateRows) ? prev : pendingHydrateRows));
+      pendingHydrateRef.current = null;
+    }
+  }, [queueSave]);
+
+  const handleMatrixFocusCapture = useCallback(() => {
+    isEditingRef.current = true;
+  }, []);
+
+  const handleMatrixBlurCapture = useCallback((event) => {
+    const current = event.currentTarget;
+    const nextTarget = event.relatedTarget;
+    if (nextTarget && current.contains(nextTarget)) {
+      return;
+    }
+
+    isEditingRef.current = false;
+
+    const pendingSaveRows = pendingSaveRef.current;
+    if (pendingSaveRows) {
+      queueSave(pendingSaveRows);
+      return;
+    }
+
+    const pendingHydrateRows = pendingHydrateRef.current;
+    if (pendingHydrateRows) {
+      setRows((prev) => (rowsEqual(prev, pendingHydrateRows) ? prev : pendingHydrateRows));
+      pendingHydrateRef.current = null;
+    }
+  }, [queueSave]);
 
   const handleUpdateDay = useCallback((date, updates) => {
     setRows((prev) => {
@@ -360,11 +451,10 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
     });
   }, [queueSave]);
 
-  const hotelOptions = ['专家公寓A楼', '维也纳酒店', '锦江之星', '希尔顿花园'];
-  const vehicleOptions = ['王师傅', '李师傅', '陈师傅'];
-  const guideOptions = ['张导', '李导', '赵导'];
-  const securityOptions = ['赵安保', '陈安保'];
-  const mealOptions = ['酒店自带', '基地团餐', '自理', '特色餐', '路餐'];
+  const weatherBundle = useMemo(() => ({
+    current: hkoWeather,
+    forecast: hkoForecast
+  }), [hkoWeather, hkoForecast]);
 
   if (!group) {
     return (
@@ -385,13 +475,17 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
             scheduleMap={scheduleMap}
             onUpdateDay={handleUpdateDay}
             onCopyPrevDay={handleCopyPrevDay}
-            hotelOptions={hotelOptions}
-            vehicleOptions={vehicleOptions}
-            guideOptions={guideOptions}
-            securityOptions={securityOptions}
-            mealOptions={mealOptions}
+            onFocusCapture={handleMatrixFocusCapture}
+            onBlurCapture={handleMatrixBlurCapture}
+            onCompositionStartCapture={handleCompositionStart}
+            onCompositionEndCapture={handleCompositionEnd}
+            hotelOptions={HOTEL_OPTIONS}
+            vehicleOptions={VEHICLE_OPTIONS}
+            guideOptions={GUIDE_OPTIONS}
+            securityOptions={SECURITY_OPTIONS}
+            mealOptions={MEAL_OPTIONS}
             groupSize={groupSize}
-            weatherData={{ current: hkoWeather, forecast: hkoForecast }}
+            weatherData={weatherBundle}
           />
         </div>
       </div>

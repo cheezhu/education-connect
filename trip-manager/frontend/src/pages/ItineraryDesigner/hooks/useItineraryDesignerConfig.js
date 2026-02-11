@@ -242,7 +242,6 @@ export default function useItineraryDesignerConfig({ api }) {
     loadTimeSlotConfig();
     loadDailyFocusConfig();
     loadGroupCalendarHeightConfig();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleTimeSlotToggle = (slots) => {
@@ -291,4 +290,3 @@ export default function useItineraryDesignerConfig({ api }) {
     handleWeekShift
   };
 }
-

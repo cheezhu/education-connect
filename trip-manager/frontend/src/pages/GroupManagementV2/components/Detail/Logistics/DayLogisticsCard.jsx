@@ -730,7 +730,7 @@ const DayLogisticsCard = ({
   );
 };
 
-export default DayLogisticsCard;
+export default React.memo(DayLogisticsCard);
 
 
 

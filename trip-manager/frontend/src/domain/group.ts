@@ -1,4 +1,4 @@
-export type GroupType = 'primary' | 'secondary' | string;
+export type GroupType = 'primary' | 'secondary' | 'vip' | string;
 
 export type MustVisitMode = 'plan' | 'manual' | string;
 
@@ -37,6 +37,15 @@ export const getGroupHeadcount = (group: Group | null | undefined): number => {
   return students + teachers;
 };
 
+export const getGroupTypeLabel = (type: GroupType | null | undefined): string => {
+  const normalized = String(type || '').trim().toLowerCase();
+  if (!normalized) return '';
+  if (normalized === 'primary') return '小学';
+  if (normalized === 'secondary') return '中学';
+  if (normalized === 'vip') return 'VIP';
+  return String(type);
+};
+
 export const isDateWithinGroupRange = (group: Group | null | undefined, dateStr: string): boolean => {
   if (!dateStr) return true;
   const start = String(group?.start_date || '').trim();
@@ -45,4 +54,3 @@ export const isDateWithinGroupRange = (group: Group | null | undefined, dateStr:
   // Dates are YYYY-MM-DD, lexicographic compare works.
   return dateStr >= start && dateStr <= end;
 };
-

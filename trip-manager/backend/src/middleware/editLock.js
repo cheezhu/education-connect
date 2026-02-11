@@ -1,46 +1,65 @@
-// 编辑锁中间件
+const LOCK_ID = 1;
+const LOCK_TTL_MS = 5 * 60 * 1000;
+const EDIT_ROLES = new Set(['admin', 'editor']);
+
 const requireEditLock = (req, res, next) => {
-  const lock = req.db.prepare('SELECT * FROM edit_lock WHERE id = 1').get();
-  
-  // 检查锁是否过期
-  const now = new Date();
-  let lockedBy = lock.locked_by;
-  if (lock.expires_at && new Date(lock.expires_at) < now) {
-    // 自动释放过期的锁
+  const username = req.user || req.auth?.user;
+  if (!username) {
+    return res.status(401).json({ error: '未登录或登录态失效' });
+  }
+
+  const user = req.db.prepare('SELECT role FROM users WHERE username = ?').get(username);
+  if (!user || !EDIT_ROLES.has(user.role)) {
+    return res.status(403).json({ error: '仅管理员或编辑者可执行保存操作' });
+  }
+
+  let lock = req.db.prepare('SELECT * FROM edit_lock WHERE id = ?').get(LOCK_ID);
+  if (!lock) {
     req.db.prepare(`
-      UPDATE edit_lock 
-      SET locked_by = NULL, locked_at = NULL, expires_at = NULL 
-      WHERE id = 1
-    `).run();
+      INSERT INTO edit_lock (id, locked_by, locked_at, expires_at, auto_release_at)
+      VALUES (?, NULL, NULL, NULL, NULL)
+    `).run(LOCK_ID);
+    lock = req.db.prepare('SELECT * FROM edit_lock WHERE id = ?').get(LOCK_ID);
+  }
+
+  const now = Date.now();
+  let lockedBy = lock?.locked_by ? String(lock.locked_by).trim() : null;
+  const expiresAtMs = lock?.expires_at ? Date.parse(lock.expires_at) : NaN;
+  const isExpired = lockedBy && Number.isFinite(expiresAtMs) && expiresAtMs <= now;
+
+  if (isExpired) {
+    req.db.prepare(`
+      UPDATE edit_lock
+      SET locked_by = NULL, locked_at = NULL, expires_at = NULL
+      WHERE id = ?
+    `).run(LOCK_ID);
     lockedBy = null;
+    lock = req.db.prepare('SELECT * FROM edit_lock WHERE id = ?').get(LOCK_ID);
   }
 
-  // 如果未持有锁，尝试为管理员自动获取
-  if (!lockedBy) {
-    const user = req.db.prepare('SELECT role FROM users WHERE username = ?').get(req.user);
-    if (user && (user.role === 'admin' || user.role === 'editor')) {
-      const newExpiry = new Date(Date.now() + 5 * 60 * 1000);
+  if (!lockedBy || lockedBy === username) {
+    const newExpiry = new Date(now + LOCK_TTL_MS).toISOString();
+    if (!lockedBy) {
       req.db.prepare(`
-        UPDATE edit_lock 
+        UPDATE edit_lock
         SET locked_by = ?, locked_at = CURRENT_TIMESTAMP, expires_at = ?
-        WHERE id = 1
-      `).run(req.user, newExpiry.toISOString());
-      return next();
+        WHERE id = ?
+      `).run(username, newExpiry, LOCK_ID);
+    } else {
+      req.db.prepare(`
+        UPDATE edit_lock
+        SET expires_at = ?
+        WHERE id = ? AND locked_by = ?
+      `).run(newExpiry, LOCK_ID, username);
     }
-
-    return res.status(403).json({
-      error: '需要编辑权限才能进行此操作'
-    });
+    return next();
   }
 
-  // 检查用户是否持有锁
-  if (lockedBy !== req.user) {
-    return res.status(403).json({
-      error: '需要编辑权限才能进行此操作'
-    });
-  }
-  
-  next();
+  return res.status(423).json({
+    error: `当前编辑锁由 ${lockedBy} 占用，请稍后再试`,
+    lockedBy,
+    expiresAt: lock?.expires_at || null
+  });
 };
 
 module.exports = requireEditLock;

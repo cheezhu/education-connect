@@ -15,7 +15,7 @@ CREATE TABLE users (
 CREATE TABLE groups (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name VARCHAR(200) NOT NULL,
-    type VARCHAR(20) CHECK(type IN ('primary', 'secondary')) NOT NULL,
+    type VARCHAR(20) CHECK(type IN ('primary', 'secondary', 'vip')) NOT NULL,
     student_count INTEGER DEFAULT 40,
     teacher_count INTEGER DEFAULT 4,
     start_date DATE NOT NULL,

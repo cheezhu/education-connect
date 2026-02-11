@@ -73,6 +73,7 @@
 
 - 若 `location.targetGroups` 缺失或为 `"all"`：任何团可用
 - 若为 `"primary"` 或 `"secondary"`：必须与 `group.type` 完全一致
+  - 注：若 `group.type = "vip"`，则视为匹配（等同 `"all"`）
 
 不一致则不能安排，reason=`GROUP_TYPE`。
 

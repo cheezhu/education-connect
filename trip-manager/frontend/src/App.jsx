@@ -94,7 +94,7 @@ function AppLayout() {
             <Route
               path="/designer"
               element={(
-                <ProtectedRoute permission="designer">
+                <ProtectedRoute permission="designer" action="write">
                   <ItineraryDesigner />
                 </ProtectedRoute>
               )}
@@ -110,7 +110,7 @@ function AppLayout() {
             <Route
               path="/settings"
               element={(
-                <ProtectedRoute permission="settings">
+                <ProtectedRoute permission="settings" action="write">
                   <Settings />
                 </ProtectedRoute>
               )}

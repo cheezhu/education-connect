@@ -7,6 +7,12 @@ import './LocationManagement.css';
 const { Option } = Select;
 const { TextArea, Search } = Input;
 
+const getRequestErrorMessage = (error, fallback) => (
+  error?.response?.data?.message
+  || error?.response?.data?.error
+  || fallback
+);
+
 function LocationManagement({ editMode }) {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -299,7 +305,7 @@ function LocationManagement({ editMode }) {
       loadLocations();
       loadPlans();
     } catch (error) {
-      message.error('保存失败');
+      message.error(getRequestErrorMessage(error, '保存失败'));
     }
   };
 
@@ -369,7 +375,7 @@ function LocationManagement({ editMode }) {
       planForm.resetFields();
       loadPlans();
     } catch (error) {
-      message.error('保存失败');
+      message.error(getRequestErrorMessage(error, '保存失败'));
     }
   };
 
@@ -428,7 +434,7 @@ function LocationManagement({ editMode }) {
       personForm.resetFields();
       loadPeople();
     } catch (error) {
-      message.error('保存失败');
+      message.error(getRequestErrorMessage(error, '保存失败'));
     }
   };
 
@@ -488,7 +494,7 @@ function LocationManagement({ editMode }) {
       hotelForm.resetFields();
       loadHotels();
     } catch (error) {
-      message.error('保存失败');
+      message.error(getRequestErrorMessage(error, '保存失败'));
     }
   };
 
@@ -545,7 +551,7 @@ function LocationManagement({ editMode }) {
       vehicleForm.resetFields();
       loadVehicles();
     } catch (error) {
-      message.error('保存失败');
+      message.error(getRequestErrorMessage(error, '保存失败'));
     }
   };
 

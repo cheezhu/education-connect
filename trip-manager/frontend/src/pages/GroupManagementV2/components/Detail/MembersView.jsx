@@ -4,6 +4,11 @@ import api from '../../../../services/api';
 import MemberRow from './MemberRow';
 
 const safeText = (value) => (value === undefined || value === null ? '' : String(value));
+const getRequestErrorMessage = (error, fallback) => (
+  error?.response?.data?.message
+  || error?.response?.data?.error
+  || fallback
+);
 
 const ROLE_ORDER = {
   TEACHER: 0,
@@ -111,7 +116,7 @@ const MembersView = ({ groupId }) => {
       await loadMembers();
     } catch (error) {
       if (error?.errorFields) return;
-      message.error('保存失败');
+      message.error(getRequestErrorMessage(error, '保存失败'));
     }
   };
 
@@ -270,4 +275,3 @@ const MembersView = ({ groupId }) => {
 };
 
 export default MembersView;
-

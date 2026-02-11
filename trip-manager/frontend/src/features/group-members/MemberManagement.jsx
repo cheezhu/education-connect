@@ -31,6 +31,11 @@ import api from '../../services/api';
 
 const { Option } = Select;
 const { Search } = Input;
+const getRequestErrorMessage = (error, fallback) => (
+  error?.response?.data?.message
+  || error?.response?.data?.error
+  || fallback
+);
 
 const MemberManagement = ({ groupId }) => {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
@@ -228,7 +233,7 @@ const MemberManagement = ({ groupId }) => {
       if (error?.errorFields) {
         return;
       }
-      message.error('保存失败');
+      message.error(getRequestErrorMessage(error, '保存失败'));
     }
   };
 
@@ -239,7 +244,7 @@ const MemberManagement = ({ groupId }) => {
       message.success('删除成功');
       await loadMembers();
     } catch (error) {
-      message.error('删除失败');
+      message.error(getRequestErrorMessage(error, '删除失败'));
     }
   };
 
@@ -255,7 +260,7 @@ const MemberManagement = ({ groupId }) => {
       message.success(`删除了 ${ids.length} 个成员`);
       await loadMembers();
     } catch (error) {
-      message.error('批量删除失败');
+      message.error(getRequestErrorMessage(error, '批量删除失败'));
     }
   };
 

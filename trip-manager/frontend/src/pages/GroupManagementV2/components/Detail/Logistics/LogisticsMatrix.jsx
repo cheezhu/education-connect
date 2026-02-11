@@ -2,6 +2,8 @@
 import dayjs from 'dayjs';
 import DayLogisticsCard from './DayLogisticsCard';
 
+const EMPTY_SCHEDULE_ITEMS = [];
+
 const TransferStrip = ({ type, day, onUpdateDay }) => {
   const isPickup = type === 'pickup';
   const transfer = isPickup ? (day.pickup || {}) : (day.dropoff || {});
@@ -134,6 +136,10 @@ const LogisticsMatrix = ({
   scheduleMap,
   onUpdateDay,
   onCopyPrevDay,
+  onFocusCapture,
+  onBlurCapture,
+  onCompositionStartCapture,
+  onCompositionEndCapture,
   hotelOptions,
   vehicleOptions,
   guideOptions,
@@ -147,7 +153,13 @@ const LogisticsMatrix = ({
   }
 
   return (
-    <div className="logistics-list">
+    <div
+      className="logistics-list"
+      onFocusCapture={onFocusCapture}
+      onBlurCapture={onBlurCapture}
+      onCompositionStartCapture={onCompositionStartCapture}
+      onCompositionEndCapture={onCompositionEndCapture}
+    >
       {rows.map((day, index) => (
         <React.Fragment key={day.date}>
           {index === 0 && (
@@ -156,7 +168,7 @@ const LogisticsMatrix = ({
           <DayLogisticsCard
             index={index}
             day={day}
-            scheduleItems={scheduleMap?.get(day.date) || []}
+            scheduleItems={scheduleMap?.get(day.date) || EMPTY_SCHEDULE_ITEMS}
             onUpdateDay={onUpdateDay}
             onCopyPrevDay={onCopyPrevDay}
             hotelOptions={hotelOptions}

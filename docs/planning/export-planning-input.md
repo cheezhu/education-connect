@@ -72,6 +72,9 @@
 
 其中：`participantCount = studentCount + teacherCount`（导出时计算）。
 
+说明：
+- `type` 当前支持：`primary` / `secondary` / `vip`
+
 ### 4.2 `data.locations`
 
 每个地点一条记录，包含：
@@ -80,6 +83,7 @@
 - `closedDates`：停用日期数组（`["YYYY-MM-DD"]`）
 - `openHours`：营业时间对象（从数据库 JSON 解析而来）
 - `targetGroups`：团组类型限制（`all/primary/secondary`）
+  - `vip` 团组在导入冲突校验中会忽略该限制（等同 `all`）
 - `isActive`：是否可用（导出时只会输出 active 地点）
 
 ### 4.3 `data.requiredLocationsByGroup`（必去点，硬约束）

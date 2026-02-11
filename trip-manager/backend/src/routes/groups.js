@@ -3,6 +3,7 @@ const router = express.Router();
 const requireEditLock = require('../middleware/editLock');
 const { bumpScheduleRevision } = require('../utils/scheduleRevision');
 const CANCELLED_STATUS = '已取消';
+const ALLOWED_GROUP_TYPES = new Set(['primary', 'secondary', 'vip']);
 
 // 获取所有团组
 router.get('/', (req, res) => {
@@ -171,6 +172,10 @@ const normalizeGroupPayload = (payload = {}) => {
   };
 };
 
+const isValidGroupType = (type) => (
+  typeof type === 'string' && ALLOWED_GROUP_TYPES.has(type.trim().toLowerCase())
+);
+
 // Batch create groups (requires edit lock)
 router.post('/batch', requireEditLock, (req, res) => {
   const { groups } = req.body;
@@ -197,6 +202,9 @@ router.post('/batch', requireEditLock, (req, res) => {
 
       if (!normalized.name || !normalized.type || !normalized.startDate || !normalized.endDate) {
         throw new Error(`第 ${index + 1} 行缺少必要字段`);
+      }
+      if (!isValidGroupType(normalized.type)) {
+        throw new Error(`第 ${index + 1} 行团组类型无效（仅支持 primary/secondary/vip）`);
       }
 
       const result = insertStmt.run(
@@ -293,6 +301,9 @@ router.post('/', requireEditLock, (req, res) => {
     return res.status(400).json({ 
       error: '缺少必需字段: name, type, start_date, end_date' 
     });
+  }
+  if (!isValidGroupType(type)) {
+    return res.status(400).json({ error: '团组类型无效（仅支持 primary/secondary/vip）' });
   }
 
   try {
@@ -447,6 +458,10 @@ router.put('/:id', requireEditLock, (req, res) => {
       }
     }
   });
+
+  if (normalizedBody.type !== undefined && !isValidGroupType(normalizedBody.type)) {
+    return res.status(400).json({ error: '团组类型无效（仅支持 primary/secondary/vip）' });
+  }
 
   if (updates.length === 0) {
     return res.status(400).json({ error: '没有要更新的字段' });

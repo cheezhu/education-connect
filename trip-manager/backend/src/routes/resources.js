@@ -23,8 +23,8 @@ router.get('/resources/people', (req, res) => {
     SELECT * FROM resource_people
     WHERE is_active = 1
       AND name IS NOT NULL
-      AND name <> ''
-      AND name <> '[object Object]'
+      AND TRIM(name) <> ''
+      AND TRIM(name) <> '[object Object]'
     ORDER BY role, name
   `).all();
   res.json(rows);
@@ -97,8 +97,8 @@ router.get('/resources/hotels', (req, res) => {
     SELECT * FROM resource_hotels
     WHERE is_active = 1
       AND name IS NOT NULL
-      AND name <> ''
-      AND name <> '[object Object]'
+      AND TRIM(name) <> ''
+      AND TRIM(name) <> '[object Object]'
     ORDER BY name
   `).all();
   res.json(rows);
@@ -185,8 +185,8 @@ router.get('/resources/vehicles', (req, res) => {
     SELECT * FROM resource_vehicles
     WHERE is_active = 1
       AND plate IS NOT NULL
-      AND plate <> ''
-      AND plate <> '[object Object]'
+      AND TRIM(plate) <> ''
+      AND TRIM(plate) <> '[object Object]'
     ORDER BY plate
   `).all();
   res.json(rows);
