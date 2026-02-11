@@ -117,6 +117,7 @@ const CalendarDetailController = ({
             onCustomResourcesChange={onCustomResourcesChange}
             loading={loading}
             resourceWidth={resourceWidth}
+            showResources={false}
           />
         ) : (
           <>

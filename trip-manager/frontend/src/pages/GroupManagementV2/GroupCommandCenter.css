@@ -10,6 +10,7 @@
   --selected: #e6f7ff;
   --color-danger: #ff4d4f;
   --trans-speed: 0.3s;
+  --ai-dock-width: clamp(360px, 33vw, 560px);
   height: 100%;
   width: 100%;
   overflow: hidden;
@@ -19,6 +20,12 @@
   font-size: 12px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   margin: 0;
+  position: relative;
+  transition: padding-right var(--trans-speed) ease;
+}
+
+.group-command-center.ai-docked {
+  padding-right: var(--ai-dock-width);
 }
 
 .group-command-center * {
@@ -3000,4 +3007,167 @@
   font-weight: 600;
   color: var(--text);
   margin-bottom: 8px;
+}
+
+.group-command-center .ai-dock-fab {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 40;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0f6ae4, #0a4db0);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 10px 16px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(15, 106, 228, 0.32);
+  transition: right var(--trans-speed) ease, transform 0.18s ease;
+}
+
+.group-command-center .ai-dock-fab:hover {
+  transform: translateY(-1px);
+}
+
+.group-command-center .ai-dock-fab.open {
+  right: calc(var(--ai-dock-width) + 16px);
+}
+
+.group-command-center .ai-dock-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--ai-dock-width);
+  background: #ffffff;
+  border-left: 1px solid #dfe6f2;
+  box-shadow: -8px 0 24px rgba(16, 30, 54, 0.08);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform var(--trans-speed) ease, opacity var(--trans-speed) ease;
+  z-index: 35;
+}
+
+.group-command-center .ai-dock-panel.open {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.group-command-center .ai-dock-header {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid #edf2f9;
+  background: linear-gradient(180deg, #fbfcff 0%, #f6f9ff 100%);
+}
+
+.group-command-center .ai-dock-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1d2a45;
+}
+
+.group-command-center .ai-dock-context {
+  margin-top: 4px;
+  color: #637389;
+  font-size: 12px;
+}
+
+.group-command-center .ai-dock-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #f7f9fd;
+}
+
+.group-command-center .ai-dock-msg {
+  max-width: 96%;
+  border-radius: 12px;
+  padding: 9px 11px;
+  border: 1px solid #e4e9f3;
+  background: #fff;
+}
+
+.group-command-center .ai-dock-msg.user {
+  align-self: flex-end;
+  border-color: #b7d5ff;
+  background: #e9f2ff;
+}
+
+.group-command-center .ai-dock-msg.assistant {
+  align-self: flex-start;
+}
+
+.group-command-center .ai-dock-msg pre {
+  margin: 0;
+  font-family: inherit;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #213045;
+}
+
+.group-command-center .ai-dock-input {
+  border-top: 1px solid #e6ecf5;
+  background: #fff;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.group-command-center .ai-dock-input textarea {
+  width: 100%;
+  min-height: 72px;
+  max-height: 180px;
+  resize: vertical;
+  border: 1px solid #d7deea;
+  border-radius: 8px;
+  padding: 8px 10px;
+  outline: none;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.group-command-center .ai-dock-input textarea:focus {
+  border-color: #0f6ae4;
+  box-shadow: 0 0 0 2px rgba(15, 106, 228, 0.12);
+}
+
+.group-command-center .ai-dock-input button {
+  justify-self: end;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  background: #0f6ae4;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.group-command-center .ai-dock-input button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+@media (max-width: 1024px) {
+  .group-command-center.ai-docked {
+    padding-right: 0;
+  }
+
+  .group-command-center .ai-dock-panel {
+    width: min(100vw, 560px);
+  }
+
+  .group-command-center .ai-dock-fab.open {
+    right: 16px;
+    bottom: 16px;
+  }
 }

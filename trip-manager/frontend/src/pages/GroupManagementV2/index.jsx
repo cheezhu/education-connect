@@ -21,6 +21,7 @@ import LogisticsView from './components/Detail/Logistics/LogisticsView';
 import ItineraryTextDetail from './components/Detail/ItineraryTextDetail';
 import BulkCreateModal from './components/Modals/BulkCreateModal';
 import MembersView from './components/Detail/MembersView';
+import AiDock from './components/AiDock';
 import GroupCommandCenterSkeleton from './components/GroupCommandCenterSkeleton';
 import './GroupCommandCenter.css';
 
@@ -34,6 +35,14 @@ const MEAL_LABELS = {
   breakfast: '早餐',
   lunch: '午餐',
   dinner: '晚餐'
+};
+
+const TAB_LABELS = {
+  profile: '团组信息',
+  logistics: '食行卡片',
+  schedule: '日历详情',
+  itinerary: '行程详情',
+  members: '人员信息'
 };
 
 const collectShixingResourceIds = (schedules = []) => {
@@ -446,6 +455,7 @@ const GroupManagementV2 = () => {
   const [itineraryPlans, setItineraryPlans] = useState([]);
   const [locations, setLocations] = useState([]);
   const [rightPanelWidth, setRightPanelWidth] = useState(260);
+  const [aiDockOpen, setAiDockOpen] = useState(false);
 
   const [filters, setFilters] = useState({
     searchText: '',
@@ -916,6 +926,8 @@ const GroupManagementV2 = () => {
     return <GroupCommandCenterSkeleton />;
   }
 
+  const activeTabLabel = TAB_LABELS[activeTab] || activeTab;
+
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'profile':
@@ -985,7 +997,7 @@ const GroupManagementV2 = () => {
   };
 
   return (
-    <div className="group-command-center">
+    <div className={`group-command-center ${aiDockOpen ? 'ai-docked' : ''}`}>
       <div className="layout">
         <div className="content-split">
           <GroupList
@@ -1041,6 +1053,13 @@ const GroupManagementV2 = () => {
         submitting={bulkSubmitting}
       />
 
+      <AiDock
+        open={aiDockOpen}
+        activeGroup={activeGroup}
+        activeTabLabel={activeTabLabel}
+        onToggle={() => setAiDockOpen(prev => !prev)}
+      />
+
       {loading && groups.length > 0 && (
         <div className="modal-overlay visible">
           <div className="modal-box" style={{ width: 240, height: 120, alignItems: 'center', justifyContent: 'center' }}>
@@ -1053,7 +1072,6 @@ const GroupManagementV2 = () => {
 };
 
 export default GroupManagementV2;
-
 
 
 
