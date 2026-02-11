@@ -739,6 +739,278 @@ const releaseAgentLock = (db) => {
   `).run(AGENT_LOCK_USER);
 };
 
+const normalizePhone = (value) => (
+  normalizeText(value).replace(/[\s\-()]/g, '')
+);
+
+const isLikelyPhone = (value) => /^\+?\d{6,20}$/.test(normalizePhone(value));
+
+const normalizeGender = (value) => {
+  const text = normalizeText(value);
+  if (!text) return null;
+  const lower = text.toLowerCase();
+  if (text === '男' || lower === 'm' || lower === 'male') return '男';
+  if (text === '女' || lower === 'f' || lower === 'female') return '女';
+  return text;
+};
+
+const normalizeAge = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return null;
+    const ageNum = Math.floor(value);
+    return ageNum > 0 && ageNum <= 120 ? ageNum : null;
+  }
+
+  const match = normalizeText(value).match(/(\d{1,3})/);
+  if (!match) return null;
+  const ageNum = Number(match[1]);
+  if (!Number.isFinite(ageNum)) return null;
+  return ageNum > 0 && ageNum <= 120 ? ageNum : null;
+};
+
+const normalizeOptionalText = (value) => {
+  const text = normalizeText(value);
+  return text ? text : null;
+};
+
+const normalizeMemberPayload = (member = {}) => {
+  const name = normalizeText(member.name);
+  if (!name) return null;
+
+  const phoneRaw = member.phone;
+  const parentPhoneRaw = member.parent_phone !== undefined
+    ? member.parent_phone
+    : member.parentPhone;
+
+  const phone = normalizePhone(phoneRaw);
+  const parentPhone = normalizePhone(parentPhoneRaw);
+
+  return {
+    name,
+    gender: normalizeGender(member.gender),
+    age: normalizeAge(member.age),
+    phone: phone || null,
+    parent_phone: parentPhone || null,
+    role: normalizeOptionalText(member.role),
+    room_number: normalizeOptionalText(member.room_number !== undefined ? member.room_number : member.roomNumber),
+    special_needs: normalizeOptionalText(
+      member.special_needs !== undefined ? member.special_needs : member.specialNeeds
+    ),
+    emergency_contact: normalizeOptionalText(
+      member.emergency_contact !== undefined ? member.emergency_contact : member.emergencyContact
+    )
+  };
+};
+
+const parseLabeledMemberLine = (line) => {
+  const pairs = Array.from(
+    line.matchAll(/([A-Za-z\u4e00-\u9fa5_]+)\s*[:：]\s*([^,，;；]+)/g)
+  );
+  if (pairs.length === 0) return null;
+
+  const draft = {};
+  pairs.forEach((match) => {
+    const key = normalizeText(match[1]).toLowerCase();
+    const value = normalizeText(match[2]);
+    if (!value) return;
+
+    if (key.includes('姓名') || key === 'name') {
+      draft.name = value;
+      return;
+    }
+    if (key.includes('性别') || key === 'gender') {
+      draft.gender = value;
+      return;
+    }
+    if (key.includes('年龄') || key === 'age') {
+      draft.age = value;
+      return;
+    }
+    if (key.includes('家长') || key.includes('parent')) {
+      draft.parent_phone = value;
+      return;
+    }
+    if (key.includes('手机') || key.includes('电话') || key === 'phone' || key.includes('mobile')) {
+      draft.phone = value;
+      return;
+    }
+    if (key.includes('角色') || key === 'role') {
+      draft.role = value;
+      return;
+    }
+    if (key.includes('房间') || key.includes('房号') || key.includes('room')) {
+      draft.room_number = value;
+      return;
+    }
+    if (key.includes('特殊') || key.includes('need') || key.includes('special')) {
+      draft.special_needs = value;
+      return;
+    }
+    if (key.includes('紧急') || key.includes('emergency')) {
+      draft.emergency_contact = value;
+    }
+  });
+
+  return normalizeMemberPayload(draft);
+};
+
+const parseMemberLine = (line) => {
+  const trimmed = normalizeText(line)
+    .replace(/^[\-\*\u2022\d\.\)\(、\s]+/, '')
+    .trim();
+  if (!trimmed) return null;
+
+  const labeled = parseLabeledMemberLine(trimmed);
+  if (labeled) return labeled;
+
+  const parts = trimmed
+    .split(/[,\uFF0C、\t ]+/)
+    .map((token) => normalizeText(token))
+    .filter(Boolean);
+
+  if (parts.length === 0) return null;
+
+  const draft = { name: parts[0] };
+  parts.slice(1).forEach((token) => {
+    if (!draft.gender) {
+      const gender = normalizeGender(token);
+      if (gender === '男' || gender === '女') {
+        draft.gender = gender;
+        return;
+      }
+    }
+
+    if (draft.age === undefined) {
+      const age = normalizeAge(token);
+      if (age !== null) {
+        draft.age = age;
+        return;
+      }
+    }
+
+    if (isLikelyPhone(token)) {
+      if (!draft.phone) {
+        draft.phone = token;
+      } else if (!draft.parent_phone) {
+        draft.parent_phone = token;
+      }
+    }
+  });
+
+  return normalizeMemberPayload(draft);
+};
+
+const parseMembersInput = (payload = {}) => {
+  if (Array.isArray(payload.members) && payload.members.length > 0) {
+    return payload.members
+      .map((member) => normalizeMemberPayload(member))
+      .filter(Boolean);
+  }
+
+  const text = normalizeText(payload.text);
+  if (!text) return [];
+
+  return text
+    .split(/\r?\n|[;；]+/)
+    .map((line) => parseMemberLine(line))
+    .filter(Boolean);
+};
+
+const upsertGroupMembers = (db, groupId, mode, members) => {
+  const selectByPhoneStmt = db.prepare(`
+    SELECT id
+    FROM group_members
+    WHERE group_id = ? AND phone = ?
+    ORDER BY id DESC
+    LIMIT 1
+  `);
+
+  const insertStmt = db.prepare(`
+    INSERT INTO group_members (
+      group_id, name, gender, age, phone, parent_phone, role,
+      room_number, special_needs, emergency_contact, created_at, updated_at
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    )
+  `);
+
+  const updateStmt = db.prepare(`
+    UPDATE group_members
+    SET
+      name = ?,
+      gender = COALESCE(?, gender),
+      age = COALESCE(?, age),
+      phone = ?,
+      parent_phone = COALESCE(?, parent_phone),
+      role = COALESCE(?, role),
+      room_number = COALESCE(?, room_number),
+      special_needs = COALESCE(?, special_needs),
+      emergency_contact = COALESCE(?, emergency_contact),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+
+  const deleteAllStmt = db.prepare('DELETE FROM group_members WHERE group_id = ?');
+  const countStmt = db.prepare('SELECT COUNT(1) AS count FROM group_members WHERE group_id = ?');
+
+  const transaction = db.transaction(() => {
+    if (mode === 'cover') {
+      deleteAllStmt.run(groupId);
+    }
+
+    let inserted = 0;
+    let updated = 0;
+
+    members.forEach((member) => {
+      if (member.phone) {
+        const existing = selectByPhoneStmt.get(groupId, member.phone);
+        if (existing) {
+          updateStmt.run(
+            member.name,
+            member.gender,
+            member.age,
+            member.phone,
+            member.parent_phone,
+            member.role,
+            member.room_number,
+            member.special_needs,
+            member.emergency_contact,
+            existing.id
+          );
+          updated += 1;
+          return;
+        }
+      }
+
+      insertStmt.run(
+        groupId,
+        member.name,
+        member.gender,
+        member.age,
+        member.phone,
+        member.parent_phone,
+        member.role,
+        member.room_number,
+        member.special_needs,
+        member.emergency_contact
+      );
+      inserted += 1;
+    });
+
+    const totalRow = countStmt.get(groupId);
+    return {
+      mode,
+      inserted,
+      updated,
+      total: Number(totalRow?.count || 0)
+    };
+  });
+
+  return transaction();
+};
+
 const applyCoverUpdate = (db, groupId, date, parsed) => {
   const ensureDayStmt = db.prepare(`
     INSERT INTO group_logistics_days (group_id, activity_date, created_at, updated_at)
@@ -991,6 +1263,57 @@ router.post('/inject-one-shot', (req, res) => {
     console.error('Agent inject-one-shot failed:', error);
     return res.status(500).json({
       error: 'agent_inject_failed',
+      message: error.message
+    });
+  } finally {
+    releaseAgentLock(req.db);
+  }
+});
+
+router.post('/members/upsert', (req, res) => {
+  const modeRaw = normalizeText(req.body?.mode).toLowerCase();
+  const mode = modeRaw || 'append';
+  if (mode !== 'append' && mode !== 'cover') {
+    return res.status(400).json({ error: 'mode 必须是 append 或 cover' });
+  }
+
+  const groupResult = resolveGroup(req.db, req.body || {});
+  if (groupResult.error) {
+    return res.status(groupResult.error.status).json(groupResult.error.body);
+  }
+
+  const { group } = groupResult;
+  const members = parseMembersInput(req.body || {});
+  if (members.length === 0) {
+    return res.status(400).json({
+      error: '未解析到有效成员，请提供 members 数组或可解析 text'
+    });
+  }
+
+  const lockResult = acquireAgentLock(req.db);
+  if (!lockResult.ok) {
+    return res.status(409).json({
+      error: 'edit_lock_conflict',
+      message: `当前由 ${lockResult.lockedBy} 持有编辑锁`,
+      lockedBy: lockResult.lockedBy,
+      expiresAt: lockResult.expiresAt
+    });
+  }
+
+  try {
+    const result = upsertGroupMembers(req.db, group.id, mode, members);
+    return res.json({
+      applied: true,
+      groupId: group.id,
+      mode: result.mode,
+      inserted: result.inserted,
+      updated: result.updated,
+      total: result.total
+    });
+  } catch (error) {
+    console.error('Agent members upsert failed:', error);
+    return res.status(500).json({
+      error: 'agent_members_upsert_failed',
       message: error.message
     });
   } finally {
