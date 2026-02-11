@@ -158,17 +158,7 @@ function buildResponsesPayload(inputBody) {
   return {
     model: 'openclaw',
     user: `web:${groupId}`,
-    input: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'input_text',
-            text: composedPrompt
-          }
-        ]
-      }
-    ]
+    input: composedPrompt
   };
 }
 
