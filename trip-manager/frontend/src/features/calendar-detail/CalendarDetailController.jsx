@@ -16,6 +16,7 @@ const CalendarDetailController = ({
   groupData,
   schedules,
   onUpdate,
+  onLogisticsUpdate,
   onPlanChange,
   onCustomResourcesChange,
   loading = false,
@@ -119,6 +120,7 @@ const CalendarDetailController = ({
             groupData={groupData}
             schedules={localSchedules}
             onUpdate={handleScheduleUpdate}
+            onLogisticsUpdate={onLogisticsUpdate}
             onPlanChange={onPlanChange}
             onCustomResourcesChange={onCustomResourcesChange}
             loading={loading}

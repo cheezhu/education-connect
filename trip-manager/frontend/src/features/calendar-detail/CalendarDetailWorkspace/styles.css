@@ -489,6 +489,61 @@
   line-height: 1.1;
 }
 
+.meal-editor-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.meal-editor-row {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px;
+  background: #f9fafb;
+}
+
+.meal-editor-row.is-disabled {
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+}
+
+.meal-editor-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.meal-editor-toggle {
+  border: 1px solid #bbf7d0;
+  background: #ecfdf3;
+  color: #15803d;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.meal-editor-toggle.is-off {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.meal-editor-fields,
+.meal-editor-time {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.meal-editor-time {
+  margin-top: 6px;
+}
+
 .pop-footer {
   padding: 12px 20px;
   border-top: 1px solid var(--border);

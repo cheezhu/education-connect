@@ -161,11 +161,25 @@ const syncLogisticsFromSchedules = (logistics = [], schedules = []) => {
       const resourceId = buildShixingResourceId(row.date, 'meal', key);
       const schedule = scheduleMap.get(resourceId);
       if (schedule) {
+        const scheduleDescription = schedule.description || '';
+        const scheduleTitle = schedule.title || '';
         meals[`${key}_time`] = schedule.startTime || schedule.start_time || '';
         meals[`${key}_end`] = schedule.endTime || schedule.end_time || '';
+        meals[key] = scheduleDescription || scheduleTitle || meals[key] || '';
+        meals[`${key}_place`] = schedule.location || meals[`${key}_place`] || '';
+        meals[`${key}_disabled`] = false;
+        meals[`${key}_detached`] = false;
+      } else if (meals[`${key}_disabled`]) {
+        meals[`${key}_time`] = '';
+        meals[`${key}_end`] = '';
         meals[`${key}_detached`] = false;
       } else if (isMealFilled(meals, key)) {
-        meals[`${key}_detached`] = true;
+        // One-to-one mapping mode: deleting meal event on calendar clears meal card fields.
+        meals[key] = '';
+        meals[`${key}_place`] = '';
+        meals[`${key}_time`] = '';
+        meals[`${key}_end`] = '';
+        meals[`${key}_detached`] = false;
       } else {
         meals[`${key}_detached`] = false;
       }
@@ -270,10 +284,6 @@ const mergeSchedulesWithLogistics = (schedules = [], logistics = [], groupId) =>
 
       if (existing) {
         upsertSchedule(resourceId, basePayload);
-        return;
-      }
-
-      if (meals[`${key}_detached`]) {
         return;
       }
 
@@ -894,6 +904,13 @@ const GroupManagementV2 = () => {
             group={activeGroup}
             schedules={groupSchedules}
             onSchedulesUpdate={handleScheduleUpdate}
+            onLogisticsUpdate={(nextLogistics) => {
+              if (!activeGroupId || !Array.isArray(nextLogistics)) return;
+              setGroups(prev => prev.map(group => (
+                group.id === activeGroupId ? { ...group, logistics: nextLogistics } : group
+              )));
+              queueLogisticsSave(activeGroupId, nextLogistics);
+            }}
             onCustomResourcesChange={(nextCustomResources) => {
               if (!activeGroupId) return;
               setGroups(prev => prev.map(group => (

@@ -21,7 +21,14 @@ import { buildClientId } from './utils/clientId';
 import { hashString } from './utils/hash';
 import { isDailyActivity, parseDailyDate } from './utils/calendarDetailResourceId';
 import { calcDurationHours, calcDurationMinutes } from './utils/time';
-import { getResourceId, isCustomResourceId, isPlanResourceId, isShixingResourceId } from '../../../domain/resourceId';
+import {
+  buildShixingResourceId,
+  getResourceId,
+  isCustomResourceId,
+  isPlanResourceId,
+  isShixingResourceId,
+  parseShixingResourceId
+} from '../../../domain/resourceId';
 import { resolveSourceMeta, resolveSourceMetaByKind } from '../../../domain/resourceSource';
 
 const START_HOUR = 6;
@@ -35,11 +42,23 @@ const SLOTS_PER_HOUR = Math.max(1, Math.round(60 / SLOT_MINUTES));
 const DEFAULT_PLAN_DURATION = 2;
 const MAX_FULL_DAYS = 9;
 const DEFAULT_WINDOW_DAYS = 7;
+const SHIXING_MEAL_KEYS = ['breakfast', 'lunch', 'dinner'];
+const SHIXING_MEAL_LABELS = {
+  breakfast: '早餐',
+  lunch: '午餐',
+  dinner: '晚餐'
+};
+const SHIXING_MEAL_DEFAULTS = {
+  breakfast: { start: '07:30', end: '08:30' },
+  lunch: { start: '12:00', end: '13:00' },
+  dinner: { start: '18:00', end: '19:00' }
+};
 
 const CalendarDetailWorkspace = ({
   groupData,
   schedules = [],
   onUpdate,
+  onLogisticsUpdate,
   onPlanChange,
   onPushedToDesigner,
   onCustomResourcesChange,
@@ -449,6 +468,38 @@ const CalendarDetailWorkspace = ({
 
     return groups;
   }, []);
+
+  const buildShixingMealDrafts = useCallback((targetDate) => {
+    const drafts = {};
+    const logisticsRows = Array.isArray(groupData?.logistics) ? groupData.logistics : [];
+    const logisticsRow = logisticsRows.find((row) => row?.date === targetDate) || null;
+    const meals = logisticsRow?.meals || {};
+
+    const activityByMealKey = new Map();
+    (activities || []).forEach((activity) => {
+      const parsed = parseShixingResourceId(getResourceId(activity));
+      if (!parsed || parsed.category !== 'meal' || !parsed.key) return;
+      if (parsed.date !== targetDate) return;
+      activityByMealKey.set(parsed.key, activity);
+    });
+
+    SHIXING_MEAL_KEYS.forEach((key) => {
+      const matchedActivity = activityByMealKey.get(key);
+      const defaults = SHIXING_MEAL_DEFAULTS[key] || {};
+      const title = matchedActivity?.title || '';
+      const description = matchedActivity?.description || '';
+      drafts[key] = {
+        disabled: matchedActivity ? false : Boolean(meals[`${key}_disabled`]),
+        plan: description || title || meals[key] || '',
+        place: matchedActivity?.location || meals[`${key}_place`] || '',
+        startTime: matchedActivity?.startTime || meals[`${key}_time`] || defaults.start || '',
+        endTime: matchedActivity?.endTime || meals[`${key}_end`] || defaults.end || ''
+      };
+    });
+
+    return drafts;
+  }, [activities, groupData?.logistics]);
+
   const handleSlotClick = (date, time, anchorRect) => {
     if (isDragging || isResizing) return;
 
@@ -470,7 +521,8 @@ const CalendarDetailWorkspace = ({
         endTime,
         type: 'visit',
         title: '',
-        location: ''
+        location: '',
+        mealDrafts: buildShixingMealDrafts(date)
       }
     });
   };
@@ -485,7 +537,10 @@ const CalendarDetailWorkspace = ({
       mode: 'edit',
       anchorRect,
       activity,
-      initialValues: null
+      initialValues: {
+        date: activity.date,
+        mealDrafts: buildShixingMealDrafts(activity.date)
+      }
     });
   };
 
@@ -834,6 +889,41 @@ const CalendarDetailWorkspace = ({
     return { startTime: normalizedStart, endTime: normalizedEnd };
   };
 
+  const applyMealDraftsToLogistics = useCallback((targetDate, mealDrafts) => {
+    if (!targetDate || !mealDrafts || typeof mealDrafts !== 'object') return;
+    const logisticsRows = Array.isArray(groupData?.logistics) ? groupData.logistics : [];
+    const existingIndex = logisticsRows.findIndex((row) => row?.date === targetDate);
+    const baseRow = existingIndex >= 0 ? logisticsRows[existingIndex] : { date: targetDate };
+    const nextMeals = { ...(baseRow.meals || {}) };
+
+    SHIXING_MEAL_KEYS.forEach((key) => {
+      const row = mealDrafts[key] || {};
+      const defaults = SHIXING_MEAL_DEFAULTS[key] || {};
+      const disabled = Boolean(row.disabled);
+      const plan = (row.plan || '').trim();
+      const place = (row.place || '').trim();
+      nextMeals[key] = disabled ? '' : plan;
+      nextMeals[`${key}_place`] = disabled ? '' : place;
+      nextMeals[`${key}_disabled`] = disabled;
+      nextMeals[`${key}_time`] = disabled ? '' : (row.startTime || defaults.start || '');
+      nextMeals[`${key}_end`] = disabled ? '' : (row.endTime || defaults.end || '');
+      nextMeals[`${key}_detached`] = false;
+    });
+
+    const nextRow = {
+      ...baseRow,
+      date: targetDate,
+      meals: nextMeals
+    };
+    const nextLogistics = [...logisticsRows];
+    if (existingIndex >= 0) {
+      nextLogistics[existingIndex] = nextRow;
+    } else {
+      nextLogistics.push(nextRow);
+    }
+    onLogisticsUpdate?.(nextLogistics);
+  }, [groupData?.logistics, onLogisticsUpdate]);
+
   const handleSaveFromPopover = (baseActivity, payload) => {
     if (!payload) return false;
 
@@ -848,6 +938,81 @@ const CalendarDetailWorkspace = ({
     if (timeToGridRow(endTime) <= timeToGridRow(startTime)) {
       message.error('结束时间需晚于开始时间');
       return false;
+    }
+
+    if (payload.sourceCategory === 'shixing' && payload.shixingMeals) {
+      const effectiveDate = payload.date || targetDate;
+      if (!effectiveDate) {
+        message.error('请选择日期');
+        return false;
+      }
+
+      const mealResourceIds = SHIXING_MEAL_KEYS.map((key) => (
+        buildShixingResourceId(effectiveDate, 'meal', key)
+      ));
+      const existingMealsByResource = new Map(
+        (activities || [])
+          .filter((activity) => mealResourceIds.includes(getResourceId(activity)))
+          .map((activity) => [getResourceId(activity), activity])
+      );
+      const baseActivityIdentity = getActivityIdentity(baseActivity);
+      const baseActivities = (activities || []).filter((activity) => {
+        const identity = getActivityIdentity(activity);
+        if (baseActivityIdentity && identity === baseActivityIdentity) return false;
+        return !mealResourceIds.includes(getResourceId(activity));
+      });
+
+      const createdMeals = [];
+      for (const key of SHIXING_MEAL_KEYS) {
+        const draft = payload.shixingMeals[key] || {};
+        const isDisabled = Boolean(draft.disabled);
+        const plan = (draft.plan || '').trim();
+        const place = (draft.place || '').trim();
+        if (isDisabled || (!plan && !place)) {
+          continue;
+        }
+        const defaults = SHIXING_MEAL_DEFAULTS[key] || {};
+        const rowStart = draft.startTime || defaults.start;
+        const rowEnd = draft.endTime || defaults.end;
+        if (!rowStart || !rowEnd || timeToGridRow(rowEnd) <= timeToGridRow(rowStart)) {
+          message.error(`${SHIXING_MEAL_LABELS[key]}时间范围无效`);
+          return false;
+        }
+        const resourceId = buildShixingResourceId(effectiveDate, 'meal', key);
+        const existingMeal = existingMealsByResource.get(resourceId);
+        createdMeals.push({
+          ...existingMeal,
+          id: existingMeal?.id ?? null,
+          clientId: existingMeal?.clientId ?? buildClientId(),
+          groupId: groupData.id,
+          date: effectiveDate,
+          startTime: rowStart,
+          endTime: rowEnd,
+          type: 'meal',
+          title: plan || SHIXING_MEAL_LABELS[key],
+          location: place,
+          description: plan,
+          locationId: null,
+          locationColor: null,
+          color: payload.color || activityTypes.meal?.color || '#52c41a',
+          resourceId,
+          planItemId: null,
+          isFromResource: true
+        });
+      }
+
+      const updatedActivities = [...baseActivities, ...createdMeals];
+      setActivities(updatedActivities);
+      setSaveStatus('saving');
+      onUpdate?.(updatedActivities);
+      applyMealDraftsToLogistics(effectiveDate, payload.shixingMeals);
+
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        setSaveStatus('saved');
+        message.success('三餐已同步到日历和每日卡片', 1);
+      }, 500);
+      return true;
     }
 
     let resolvedTitle = payload.title || baseActivity?.title || '';

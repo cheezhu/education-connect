@@ -3,6 +3,7 @@
 import {
   getResourceId,
   isPlanResourceId,
+  parseShixingResourceId,
   resolveResourceKind
 } from '../../../../domain/resourceId';
 import { resolveSourceMetaByKind } from '../../../../domain/resourceSource';
@@ -24,6 +25,33 @@ const COLOR_SWATCHES = [
   '#8c8c8c'
 ];
 const LEGACY_MEAL_TITLES = new Set(['早餐', '午餐', '晚餐', '早饭', '午饭', '晚饭']);
+const SHIXING_MEAL_KEYS = ['breakfast', 'lunch', 'dinner'];
+const SHIXING_MEAL_LABELS = {
+  breakfast: '早餐',
+  lunch: '午餐',
+  dinner: '晚餐'
+};
+const SHIXING_MEAL_DEFAULTS = {
+  breakfast: { start: '07:30', end: '08:30' },
+  lunch: { start: '12:00', end: '13:00' },
+  dinner: { start: '18:00', end: '19:00' }
+};
+
+const buildMealState = (drafts = {}) => {
+  const result = {};
+  SHIXING_MEAL_KEYS.forEach((key) => {
+    const defaults = SHIXING_MEAL_DEFAULTS[key] || {};
+    const draft = drafts[key] || {};
+    result[key] = {
+      disabled: Boolean(draft.disabled),
+      plan: draft.plan || '',
+      place: draft.place || '',
+      startTime: draft.startTime || defaults.start || '',
+      endTime: draft.endTime || defaults.end || ''
+    };
+  });
+  return result;
+};
 
 const resolveMode = (mode) => (mode === 'edit' ? 'edit' : 'create');
 const formatDateText = (value) => {
@@ -58,6 +86,7 @@ const CalendarDetailEventEditorPopover = ({
     color: COLOR_SWATCHES[0],
     planItemId: ''
   });
+  const [mealState, setMealState] = useState(() => buildMealState());
   const [sourceCategory, setSourceCategory] = useState('custom');
 
   const isEditMode = resolveMode(mode) === 'edit';
@@ -89,6 +118,20 @@ const CalendarDetailEventEditorPopover = ({
       color: activity.color || COLOR_SWATCHES[0],
       planItemId: derivedPlanId || ''
     });
+    const nextMeals = buildMealState(initialValues?.mealDrafts || {});
+    const parsedShixing = parseShixingResourceId(resourceId);
+    if (parsedShixing?.category === 'meal' && parsedShixing.key && nextMeals[parsedShixing.key]) {
+      const key = parsedShixing.key;
+      nextMeals[key] = {
+        ...nextMeals[key],
+        disabled: false,
+        plan: rawDescription || normalizedTitle || nextMeals[key].plan || '',
+        place: activity.location || nextMeals[key].place || '',
+        startTime: activity.startTime || nextMeals[key].startTime || '',
+        endTime: activity.endTime || nextMeals[key].endTime || ''
+      };
+    }
+    setMealState(nextMeals);
     if (resourceKind === 'shixing') {
       setSourceCategory('shixing');
     } else if (derivedPlanId || resourceKind === 'plan') {
@@ -96,7 +139,7 @@ const CalendarDetailEventEditorPopover = ({
     } else {
       setSourceCategory('custom');
     }
-  }, [activity, isOpen, resourceId, resourceKind]);
+  }, [activity, initialValues?.mealDrafts, isOpen, resourceId, resourceKind]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -112,7 +155,10 @@ const CalendarDetailEventEditorPopover = ({
         color: initialValues?.color || COLOR_SWATCHES[0],
         planItemId: initialValues?.planItemId || ''
       });
-      if (initialValues?.planItemId) {
+      setMealState(buildMealState(initialValues?.mealDrafts || {}));
+      if (initialValues?.sourceCategory === 'shixing') {
+        setSourceCategory('shixing');
+      } else if (initialValues?.planItemId) {
         setSourceCategory('plan');
       } else {
         setSourceCategory('custom');
@@ -129,10 +175,12 @@ const CalendarDetailEventEditorPopover = ({
   const sourceMeta = useMemo(() => {
     if (isShixing || sourceCategory === 'shixing') {
       const base = resolveSourceMetaByKind('shixing');
+      const parsed = parseShixingResourceId(resourceId);
+      const detail = parsed ? formatShixingResourceDetail(resourceId) : '三餐';
       return {
         kind: base.kind,
         label: base.title,
-        detail: formatShixingResourceDetail(resourceId)
+        detail
       };
     }
     const kind = sourceCategory === 'plan' ? 'plan' : 'custom';
@@ -164,9 +212,8 @@ const CalendarDetailEventEditorPopover = ({
 
   const handleSourceToggle = (category) => {
     if (category === 'shixing') {
-      if (isShixing) {
-        setSourceCategory('shixing');
-      }
+      setSourceCategory('shixing');
+      updateField('planItemId', '');
       return;
     }
     if (isShixing) return;
@@ -212,9 +259,45 @@ const CalendarDetailEventEditorPopover = ({
     setFormState((prev) => ({ ...prev, [key]: value }));
   };
 
+  const updateMealField = (mealKey, field, value) => {
+    setMealState((prev) => ({
+      ...prev,
+      [mealKey]: {
+        ...prev[mealKey],
+        [field]: value
+      }
+    }));
+  };
+
+  const toggleMealDisabled = (mealKey) => {
+    setMealState((prev) => {
+      const current = prev[mealKey] || {};
+      const nextDisabled = !current.disabled;
+      return {
+        ...prev,
+        [mealKey]: {
+          ...current,
+          disabled: nextDisabled
+        }
+      };
+    });
+  };
+
+  const isShixingMode = sourceCategory === 'shixing' || isShixing;
+
   const handleSave = () => {
+    if (isShixingMode) {
+      onSave?.({
+        ...formState,
+        sourceCategory: 'shixing',
+        shixingMeals: mealState,
+        linkMode: 'manual'
+      });
+      return;
+    }
     onSave?.({
       ...formState,
+      sourceCategory,
       linkMode
     });
   };
@@ -256,64 +339,6 @@ const CalendarDetailEventEditorPopover = ({
       </div>
 
       <div className="pop-body">
-        <input
-          className="title-input"
-          placeholder="添加标题"
-          value={formState.title}
-          readOnly={linkMode === 'linked'}
-          onChange={(event) => updateField('title', event.target.value)}
-        />
-
-        <div className="field-row">
-          <div className="field-label">时间</div>
-          <div className="field-stack">
-            <input
-              className="mini-input mini-input-readonly"
-              placeholder="日期"
-              value={formatDateText(formState.date)}
-              readOnly
-            />
-            <div className="time-range-row">
-            <input
-              className="mini-input"
-              placeholder="开始"
-              value={formState.startTime}
-              onChange={(event) => updateField('startTime', event.target.value)}
-            />
-            <input
-              className="mini-input"
-              placeholder="结束"
-              value={formState.endTime}
-              onChange={(event) => updateField('endTime', event.target.value)}
-            />
-            </div>
-          </div>
-        </div>
-
-        {isEditMode && (
-          <div className="field-row">
-            <div className="field-label">地点</div>
-            <input
-              className="mini-input"
-              placeholder="地点"
-              value={formState.location}
-              readOnly={linkMode === 'linked'}
-              onChange={(event) => updateField('location', event.target.value)}
-            />
-          </div>
-        )}
-
-        <div className="field-row">
-          <div className="field-label">备注</div>
-          <textarea
-            className="mini-input note-textarea"
-            placeholder="添加备注（可选）"
-            value={formState.description}
-            rows={2}
-            onChange={(event) => updateField('description', event.target.value)}
-          />
-        </div>
-
         <div className="link-section link-section-compact">
           <div className="source-toggle source-toggle-compact">
             <button
@@ -326,9 +351,8 @@ const CalendarDetailEventEditorPopover = ({
             </button>
             <button
               type="button"
-              className={`source-toggle-btn source-toggle-btn-compact ${sourceCategory === 'shixing' || isShixing ? 'active' : ''} ${!isShixing ? 'disabled' : ''}`}
+              className={`source-toggle-btn source-toggle-btn-compact ${isShixingMode ? 'active' : ''}`}
               onClick={() => handleSourceToggle('shixing')}
-              disabled={!isShixing}
             >
               食行卡片
             </button>
@@ -341,9 +365,9 @@ const CalendarDetailEventEditorPopover = ({
               自定义
             </button>
           </div>
-          {sourceMeta.kind === 'shixing' ? (
+          {isShixingMode ? (
             <div className="source-readonly">
-              该活动来自食行卡片，类型已锁定为 {sourceMeta.detail || '食行卡片'}。
+              将同步每日卡片（{sourceMeta.detail || '三餐'}），删除日历活动会同步清空对应餐次。
             </div>
           ) : sourceCategory === 'plan' ? (
             <select
@@ -358,6 +382,132 @@ const CalendarDetailEventEditorPopover = ({
             </select>
           ) : null}
         </div>
+
+        {isShixingMode ? (
+          <>
+            <div className="field-row">
+              <div className="field-label">日期</div>
+              <input
+                className="mini-input mini-input-readonly"
+                placeholder="日期"
+                value={formatDateText(formState.date)}
+                readOnly
+              />
+            </div>
+            <div className="meal-editor-grid">
+              {SHIXING_MEAL_KEYS.map((mealKey) => {
+                const row = mealState[mealKey] || {};
+                const disabled = Boolean(row.disabled);
+                return (
+                  <div className={`meal-editor-row ${disabled ? 'is-disabled' : ''}`} key={mealKey}>
+                    <div className="meal-editor-title">
+                      <span>{SHIXING_MEAL_LABELS[mealKey]}</span>
+                      <button
+                        type="button"
+                        className={`meal-editor-toggle ${disabled ? 'is-off' : ''}`}
+                        onClick={() => toggleMealDisabled(mealKey)}
+                      >
+                        {disabled ? '不安排' : '安排'}
+                      </button>
+                    </div>
+                    <div className="meal-editor-fields">
+                      <input
+                        className="mini-input"
+                        placeholder="地址"
+                        disabled={disabled}
+                        value={row.place || ''}
+                        onChange={(event) => updateMealField(mealKey, 'place', event.target.value)}
+                      />
+                      <input
+                        className="mini-input"
+                        placeholder="餐饮安排"
+                        disabled={disabled}
+                        value={row.plan || ''}
+                        onChange={(event) => updateMealField(mealKey, 'plan', event.target.value)}
+                      />
+                    </div>
+                    <div className="meal-editor-time">
+                      <input
+                        className="mini-input"
+                        placeholder="开始"
+                        disabled={disabled}
+                        value={row.startTime || ''}
+                        onChange={(event) => updateMealField(mealKey, 'startTime', event.target.value)}
+                      />
+                      <input
+                        className="mini-input"
+                        placeholder="结束"
+                        disabled={disabled}
+                        value={row.endTime || ''}
+                        onChange={(event) => updateMealField(mealKey, 'endTime', event.target.value)}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <>
+            <input
+              className="title-input"
+              placeholder="添加标题"
+              value={formState.title}
+              readOnly={linkMode === 'linked'}
+              onChange={(event) => updateField('title', event.target.value)}
+            />
+
+            <div className="field-row">
+              <div className="field-label">时间</div>
+              <div className="field-stack">
+                <input
+                  className="mini-input mini-input-readonly"
+                  placeholder="日期"
+                  value={formatDateText(formState.date)}
+                  readOnly
+                />
+                <div className="time-range-row">
+                  <input
+                    className="mini-input"
+                    placeholder="开始"
+                    value={formState.startTime}
+                    onChange={(event) => updateField('startTime', event.target.value)}
+                  />
+                  <input
+                    className="mini-input"
+                    placeholder="结束"
+                    value={formState.endTime}
+                    onChange={(event) => updateField('endTime', event.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {isEditMode && (
+              <div className="field-row">
+                <div className="field-label">地点</div>
+                <input
+                  className="mini-input"
+                  placeholder="地点"
+                  value={formState.location}
+                  readOnly={linkMode === 'linked'}
+                  onChange={(event) => updateField('location', event.target.value)}
+                />
+              </div>
+            )}
+
+            <div className="field-row">
+              <div className="field-label">备注</div>
+              <textarea
+                className="mini-input note-textarea"
+                placeholder="添加备注（可选）"
+                value={formState.description}
+                rows={2}
+                onChange={(event) => updateField('description', event.target.value)}
+              />
+            </div>
+          </>
+        )}
       </div>
 
       <div className="pop-footer">
