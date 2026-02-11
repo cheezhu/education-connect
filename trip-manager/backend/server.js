@@ -435,6 +435,7 @@ app.use('/api/planning/solver-runs', requireRole(['admin']), require('./src/rout
 app.use('/api/planning', requireRole(['admin']), require('./src/routes/planning'));
 app.use('/api/config', requireRole(['admin']), require('./src/routes/systemConfig'));
 app.use('/api/agent', requireRole(['admin', 'editor']), require('./src/routes/agent'));
+app.use('/api/c2', requireRole(['admin', 'editor']), require('./src/routes/c2'));
 
 app.use('/api/users', require('./src/routes/users'));
 app.use('/api/statistics', requireAccess({ read: readAllRoles }), require('./src/routes/statistics'));

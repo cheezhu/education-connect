@@ -1,0 +1,19 @@
+[Unit]
+Description=C2 Relay (Web AiDock -> OpenClaw responses)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/.openclaw/workspace/deploy/education-connect-tele-agent
+Environment=C2_RELAY_PORT=18791
+Environment=C2_OPENCLAW_AGENT_ID=cheezhu5
+ExecStart=/usr/bin/node /root/.openclaw/workspace/deploy/education-connect-tele-agent/tools/c2-relay/server.js
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+
