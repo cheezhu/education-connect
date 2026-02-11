@@ -35,6 +35,55 @@ const MEAL_LABELS = {
   dinner: '晚餐'
 };
 
+const GROUP_UPDATE_FIELDS = [
+  'name',
+  'type',
+  'student_count',
+  'teacher_count',
+  'start_date',
+  'end_date',
+  'duration',
+  'color',
+  'contact_person',
+  'contact_phone',
+  'emergency_contact',
+  'emergency_phone',
+  'accommodation',
+  'tags',
+  'notes',
+  'itinerary_plan_id',
+  'manual_must_visit_location_ids',
+  'status'
+];
+
+const pickGroupUpdateFields = (group = {}) => (
+  GROUP_UPDATE_FIELDS.reduce((acc, key) => {
+    acc[key] = group[key];
+    return acc;
+  }, {})
+);
+
+const isSameGroupFieldValue = (left, right) => {
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right)) return false;
+    if (left.length !== right.length) return false;
+    for (let i = 0; i < left.length; i += 1) {
+      if (left[i] !== right[i]) return false;
+    }
+    return true;
+  }
+  return left === right;
+};
+
+const diffGroupUpdatePayload = (nextPayload, baselinePayload = {}) => (
+  GROUP_UPDATE_FIELDS.reduce((acc, key) => {
+    if (!isSameGroupFieldValue(nextPayload[key], baselinePayload[key])) {
+      acc[key] = nextPayload[key];
+    }
+    return acc;
+  }, {})
+);
+
 const getRequestErrorMessage = (error, fallback) => (
   error?.response?.data?.message
   || error?.response?.data?.error
@@ -417,6 +466,7 @@ const GroupManagementV2 = () => {
   const scheduleSignatureRef = useRef('');
   const scheduleSnapshotRef = useRef([]);
   const scheduleRevisionRef = useRef({});
+  const groupSnapshotRef = useRef(new Map());
 
   const calculateStatus = (group) => {
     if (group.status === '已取消') return '已取消';
@@ -437,6 +487,11 @@ const GroupManagementV2 = () => {
         ...group,
         status: group.status ?? calculateStatus(group)
       }));
+      const nextSnapshots = new Map(groupSnapshotRef.current);
+      enhancedGroups.forEach((group) => {
+        nextSnapshots.set(group.id, pickGroupUpdateFields(group));
+      });
+      groupSnapshotRef.current = nextSnapshots;
       setGroups(enhancedGroups);
     } catch (error) {
       message.error('加载团组数据失败');
@@ -596,27 +651,6 @@ const GroupManagementV2 = () => {
     setIsSidebarCollapsed(true);
   };
 
-  const buildUpdatePayload = (group) => ({
-    name: group.name,
-    type: group.type,
-    student_count: group.student_count,
-    teacher_count: group.teacher_count,
-    start_date: group.start_date,
-    end_date: group.end_date,
-    duration: group.duration,
-    color: group.color,
-    contact_person: group.contact_person,
-    contact_phone: group.contact_phone,
-    emergency_contact: group.emergency_contact,
-    emergency_phone: group.emergency_phone,
-    accommodation: group.accommodation,
-    tags: group.tags,
-    notes: group.notes,
-    itinerary_plan_id: group.itinerary_plan_id,
-    manual_must_visit_location_ids: group.manual_must_visit_location_ids,
-    status: group.status
-  });
-
   const queueLogisticsSave = useCallback((groupId, logisticsList) => {
     if (!groupId) return;
     clearTimeout(logisticsSaveRef.current);
@@ -674,9 +708,18 @@ const GroupManagementV2 = () => {
     clearTimeout(saveRef.current);
     saveRef.current = setTimeout(async () => {
       try {
-        const payload = buildUpdatePayload(updatedGroup);
+        const nextPayload = pickGroupUpdateFields(updatedGroup);
+        const baselinePayload = groupSnapshotRef.current.get(updatedGroup.id) || {};
+        const payload = diffGroupUpdatePayload(nextPayload, baselinePayload);
+        if (Object.keys(payload).length === 0) {
+          return;
+        }
         const response = await api.put(`/groups/${updatedGroup.id}`, payload);
         if (response.data?.group) {
+          groupSnapshotRef.current.set(
+            updatedGroup.id,
+            pickGroupUpdateFields(response.data.group)
+          );
           setGroups(prev => prev.map(group => {
             if (group.id !== updatedGroup.id) return group;
             const preservedProps = updatedGroup.properties ?? group.properties;
@@ -688,6 +731,8 @@ const GroupManagementV2 = () => {
               logistics: preservedLogistics
             };
           }));
+        } else {
+          groupSnapshotRef.current.set(updatedGroup.id, { ...baselinePayload, ...payload });
         }
       } catch (error) {
         message.error(getRequestErrorMessage(error, '保存失败'));

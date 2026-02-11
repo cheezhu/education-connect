@@ -6,8 +6,12 @@ import {
   Col,
   DatePicker,
   Form,
+  Popconfirm,
   Row,
   Space,
+  Table,
+  Tag,
+  Typography,
   Switch,
   message,
   Result
@@ -27,6 +31,12 @@ function Settings() {
   const { canAccess } = useAuth();
   const [loading, setLoading] = useState(false);
   const [savingItinerary, setSavingItinerary] = useState(false);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [creatingVersion, setCreatingVersion] = useState(false);
+  const [restoringToken, setRestoringToken] = useState('');
+  const [versionItems, setVersionItems] = useState([]);
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(true);
+  const [snapshotIntervalHours, setSnapshotIntervalHours] = useState(6);
   const [itineraryForm] = Form.useForm();
 
   const loadConfig = async () => {
@@ -49,8 +59,27 @@ function Settings() {
     }
   };
 
+  const loadVersions = async () => {
+    setVersionsLoading(true);
+    try {
+      const response = await api.get('/config/group-versions', { params: { limit: 50 } });
+      const data = response.data || {};
+      setVersionItems(Array.isArray(data.items) ? data.items : []);
+      setAutoBackupEnabled(data.autoBackupEnabled !== false);
+      setSnapshotIntervalHours(Number(data.snapshotIntervalHours) || 6);
+    } catch (error) {
+      message.error('加载版本记录失败');
+    } finally {
+      setVersionsLoading(false);
+    }
+  };
+
+  const loadAll = async () => {
+    await Promise.all([loadConfig(), loadVersions()]);
+  };
+
   useEffect(() => {
-    loadConfig();
+    loadAll();
   }, []);
 
   const handleSaveItinerary = async () => {
@@ -74,6 +103,105 @@ function Settings() {
       setSavingItinerary(false);
     }
   };
+
+  const handleCreateVersion = async () => {
+    setCreatingVersion(true);
+    try {
+      const response = await api.post('/config/group-versions/create', {
+        snapshotType: 'manual'
+      });
+      const result = response.data || {};
+      if (result.skipped) {
+        message.info('数据未变化，未创建新快照');
+      } else {
+        message.success('手动快照已创建');
+      }
+      loadVersions();
+    } catch (error) {
+      message.error('创建快照失败');
+    } finally {
+      setCreatingVersion(false);
+    }
+  };
+
+  const handleRestoreVersion = async (snapshotToken) => {
+    if (!snapshotToken) return;
+    setRestoringToken(snapshotToken);
+    try {
+      await api.post('/config/group-versions/restore', { snapshotToken });
+      message.success('版本恢复成功');
+      loadVersions();
+    } catch (error) {
+      message.error('版本恢复失败');
+    } finally {
+      setRestoringToken('');
+    }
+  };
+
+  const versionColumns = [
+    {
+      title: '时间',
+      dataIndex: 'createdAt',
+      width: 160,
+      render: (value) => (value ? dayjs(value).format('MM-DD HH:mm:ss') : '-')
+    },
+    {
+      title: '类型',
+      dataIndex: 'snapshotType',
+      width: 80,
+      render: (value) => (
+        <Tag color={value === 'auto' ? 'blue' : 'geekblue'}>
+          {value === 'auto' ? '自动' : '手动'}
+        </Tag>
+      )
+    },
+    {
+      title: '摘要',
+      dataIndex: 'summary',
+      render: (summary) => {
+        const s = summary || {};
+        return `团组 ${s.groups || 0} · 日程 ${s.schedules || 0} · 活动 ${s.activities || 0}`;
+      }
+    },
+    {
+      title: '令牌',
+      dataIndex: 'snapshotToken',
+      width: 170,
+      render: (value) => (
+        <Typography.Text copyable={{ text: value }} ellipsis style={{ maxWidth: 150 }}>
+          {value}
+        </Typography.Text>
+      )
+    },
+    {
+      title: '恢复时间',
+      dataIndex: 'restoredAt',
+      width: 140,
+      render: (value) => (value ? dayjs(value).format('MM-DD HH:mm') : '-')
+    },
+    {
+      title: '操作',
+      dataIndex: 'actions',
+      width: 80,
+      render: (_, record) => (
+        <Popconfirm
+          title="确认恢复该版本？"
+          description="会覆盖当前团组、日程和每日卡片数据。"
+          okText="恢复"
+          cancelText="取消"
+          onConfirm={() => handleRestoreVersion(record.snapshotToken)}
+        >
+          <Button
+            type="link"
+            size="small"
+            loading={restoringToken === record.snapshotToken}
+          >
+            恢复
+          </Button>
+        </Popconfirm>
+      )
+    }
+  ];
 
   if (!canAccess('settings')) {
     return (
@@ -101,13 +229,13 @@ function Settings() {
           <div style={{ fontSize: 15, fontWeight: 600 }}>系统设置</div>
           <div style={{ fontSize: 12, color: '#666' }}>全局配置，立即生效</div>
         </div>
-        <Button size="small" onClick={loadConfig} loading={loading}>
+        <Button size="small" onClick={loadAll} loading={loading || versionsLoading}>
           刷新
         </Button>
       </div>
 
       <Row gutter={[12, 12]}>
-        <Col xs={24} lg={12}>
+        <Col xs={24} lg={24}>
           <Card
             title="行程设计器设置"
             size="small"
@@ -147,6 +275,38 @@ function Settings() {
                 </Form.Item>
               </Space>
             </Form>
+          </Card>
+        </Col>
+        <Col xs={24} lg={24}>
+          <Card
+            title="版本管理"
+            size="small"
+            extra={(
+              <Button
+                size="small"
+                type="primary"
+                onClick={handleCreateVersion}
+                loading={creatingVersion}
+              >
+                手动快照
+              </Button>
+            )}
+          >
+            <div className="settings-version-meta">
+              <Tag color={autoBackupEnabled ? 'green' : 'default'}>
+                {autoBackupEnabled ? '自动快照已开启' : '自动快照已关闭'}
+              </Tag>
+              <span>每 {snapshotIntervalHours} 小时执行一次；内容未变化则跳过保存。</span>
+            </div>
+            <Table
+              size="small"
+              rowKey="snapshotToken"
+              loading={versionsLoading}
+              columns={versionColumns}
+              dataSource={versionItems}
+              pagination={{ pageSize: 8, showSizeChanger: false }}
+              scroll={{ x: 720 }}
+            />
           </Card>
         </Col>
       </Row>

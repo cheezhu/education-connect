@@ -25,6 +25,26 @@ const ROLE_OPTIONS = [
   }
 ];
 
+const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
+
+const parseDateMs = (value) => {
+  if (!value) return NaN;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : NaN;
+};
+
+const formatDateTime = (value) => {
+  const parsed = parseDateMs(value);
+  if (!Number.isFinite(parsed)) return value ? String(value) : '从未登录';
+  return new Date(parsed).toLocaleString();
+};
+
+const isOnlineRecently = (value) => {
+  const parsed = parseDateMs(value);
+  if (!Number.isFinite(parsed)) return false;
+  return Date.now() - parsed <= ONLINE_THRESHOLD_MS;
+};
+
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -140,6 +160,24 @@ const UserManagement = () => {
         const roleMeta = getRoleMeta(role);
         if (!roleMeta) return role;
         return <Tag color={roleMeta.color}>{roleMeta.label}</Tag>;
+      }
+    },
+    {
+      title: '登录状态',
+      key: 'loginStatus',
+      width: 180,
+      render: (_, record) => {
+        const online = isOnlineRecently(record.lastLogin);
+        return (
+          <div style={{ display: 'grid', gap: 2 }}>
+            <Tag color={online ? 'green' : 'default'} style={{ width: 'fit-content', marginRight: 0 }}>
+              {online ? '在线' : '离线'}
+            </Tag>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              最近登录：{formatDateTime(record.lastLogin)}
+            </Text>
+          </div>
+        );
       }
     },
     {

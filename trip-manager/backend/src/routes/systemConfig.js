@@ -6,6 +6,12 @@ const {
   maskApiKey,
   resolveAiSettings
 } = require('../utils/aiConfig');
+const {
+  AUTO_SNAPSHOT_INTERVAL_MS,
+  createSnapshot,
+  listSnapshots,
+  restoreSnapshot
+} = require('../services/versionSnapshots');
 
 const router = express.Router();
 
@@ -14,6 +20,7 @@ const TIME_SLOTS_KEY = 'itinerary_time_slots';
 const DAILY_FOCUS_KEY = 'itinerary_daily_focus';
 const GROUP_ROW_ALIGN_KEY = 'itinerary_group_row_align';
 const GROUP_CALENDAR_HEIGHT_KEY = 'itinerary_group_calendar_height';
+const AUTO_BACKUP_KEY = 'auto_backup';
 const DEFAULT_TIME_SLOTS = ['MORNING', 'AFTERNOON', 'EVENING'];
 const DEFAULT_GROUP_CALENDAR_HEIGHT = 30;
 const GROUP_CALENDAR_HEIGHT_MIN = 20;
@@ -43,6 +50,13 @@ const normalizeHeight = (value) => {
   if (!Number.isFinite(parsed)) return null;
   const clamped = Math.min(GROUP_CALENDAR_HEIGHT_MAX, Math.max(GROUP_CALENDAR_HEIGHT_MIN, parsed));
   return Math.round(clamped * 10) / 10;
+};
+
+const resolveAutoBackupEnabled = (db) => {
+  const row = getConfigRow(db, AUTO_BACKUP_KEY);
+  if (!row || typeof row.value !== 'string') return true;
+  const normalized = normalizeBoolean(row.value);
+  return normalized ?? true;
 };
 
 router.get('/itinerary-week-start', (req, res) => {
@@ -153,6 +167,44 @@ router.put('/itinerary-group-calendar-height', (req, res) => {
   res.json({ height: normalized });
 });
 
+router.get('/group-versions', (req, res) => {
+  const limit = Math.max(1, Math.min(200, Number(req.query?.limit) || 30));
+  const items = listSnapshots(req.db, limit);
+  return res.json({
+    items,
+    autoBackupEnabled: resolveAutoBackupEnabled(req.db),
+    snapshotIntervalHours: AUTO_SNAPSHOT_INTERVAL_MS / (60 * 60 * 1000)
+  });
+});
+
+router.post('/group-versions/create', (req, res, next) => {
+  try {
+    const snapshotType = String(req.body?.snapshotType || 'manual').trim() || 'manual';
+    const skipIfUnchanged = snapshotType === 'auto' || Boolean(req.body?.skipIfUnchanged);
+    const result = createSnapshot(req.db, {
+      snapshotType,
+      createdBy: req.user || null,
+      skipIfUnchanged
+    });
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/group-versions/restore', (req, res, next) => {
+  try {
+    const snapshotToken = String(req.body?.snapshotToken || '').trim();
+    if (!snapshotToken) {
+      return res.status(400).json({ error: 'Missing snapshotToken' });
+    }
+    const result = restoreSnapshot(req.db, snapshotToken);
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+});
+
 const buildAllConfig = (db) => {
   const weekRow = getConfigRow(db, WEEK_START_KEY);
   const weekStartDate = weekRow && isValidDate(weekRow.value) ? weekRow.value : null;
@@ -193,6 +245,10 @@ const buildAllConfig = (db) => {
       dailyFocus,
       groupRowAlign,
       groupCalendarHeight
+    },
+    versioning: {
+      autoBackupEnabled: resolveAutoBackupEnabled(db),
+      snapshotIntervalHours: AUTO_SNAPSHOT_INTERVAL_MS / (60 * 60 * 1000)
     },
     ai: {
       provider: aiSettings.provider,

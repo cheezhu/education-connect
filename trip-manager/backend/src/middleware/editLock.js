@@ -1,6 +1,19 @@
 const LOCK_ID = 1;
 const LOCK_TTL_MS = 5 * 60 * 1000;
 const EDIT_ROLES = new Set(['admin', 'editor']);
+const LOCK_MODE_KEY = 'edit_lock_mode';
+const LOCK_MODE_DEFAULT = 'role_only';
+
+const resolveLockMode = (db) => {
+  try {
+    const row = db.prepare('SELECT value FROM system_config WHERE key = ?').get(LOCK_MODE_KEY);
+    const mode = String(row?.value || '').trim().toLowerCase();
+    if (mode === 'global') return 'global';
+  } catch (error) {
+    // Fallback to role-only mode.
+  }
+  return LOCK_MODE_DEFAULT;
+};
 
 const requireEditLock = (req, res, next) => {
   const username = req.user || req.auth?.user;
@@ -11,6 +24,11 @@ const requireEditLock = (req, res, next) => {
   const user = req.db.prepare('SELECT role FROM users WHERE username = ?').get(username);
   if (!user || !EDIT_ROLES.has(user.role)) {
     return res.status(403).json({ error: '仅管理员或编辑者可执行保存操作' });
+  }
+
+  const lockMode = resolveLockMode(req.db);
+  if (lockMode !== 'global') {
+    return next();
   }
 
   let lock = req.db.prepare('SELECT * FROM edit_lock WHERE id = ?').get(LOCK_ID);

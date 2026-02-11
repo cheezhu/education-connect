@@ -6,11 +6,15 @@ const path = require('path');
 const bcrypt = require('bcrypt');
 const dotenv = require('dotenv');
 const { requireRole, requireAccess } = require('./src/middleware/permission');
+const { startAutoSnapshotScheduler } = require('./src/services/versionSnapshots');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const LAST_LOGIN_TOUCH_INTERVAL_MS = 60 * 1000;
+const lastLoginTouchMap = new Map();
+let autoSnapshotTimer = null;
 
 // 初始化数据库
 const db = new Database(path.join(__dirname, 'db/trip.db'));
@@ -398,7 +402,9 @@ const authenticator = (username, password, cb) => {
 app.use(basicAuth({
   authorizer: authenticator,
   authorizeAsync: true,
-  challenge: true,
+  // Frontend already handles login and sends Authorization header.
+  // Disable browser-native basic-auth popup to avoid secondary credential prompts.
+  challenge: false,
   realm: 'Trip Manager'
 }));
 
@@ -406,6 +412,18 @@ app.use(basicAuth({
 app.use((req, res, next) => {
   req.db = db;
   req.user = req.auth.user;
+  if (req.user) {
+    const now = Date.now();
+    const lastTouchedAt = Number(lastLoginTouchMap.get(req.user) || 0);
+    if (!Number.isFinite(lastTouchedAt) || now - lastTouchedAt >= LAST_LOGIN_TOUCH_INTERVAL_MS) {
+      lastLoginTouchMap.set(req.user, now);
+      try {
+        db.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE username = ?').run(req.user);
+      } catch (error) {
+        console.error('Failed to update last_login:', error);
+      }
+    }
+  }
   next();
 });
 
@@ -438,6 +456,8 @@ app.use((err, req, res, next) => {
   });
 });
 
+autoSnapshotTimer = startAutoSnapshotScheduler(db);
+
 // 启动服务器
 app.listen(PORT, () => {
   console.log(`服务器运行在 http://localhost:${PORT}`);
@@ -445,8 +465,15 @@ app.listen(PORT, () => {
 });
 
 // 优雅关闭
-process.on('SIGINT', () => {
-  console.log('\n正在关闭服务器...');
+const shutdown = () => {
+  console.log('\nShutting down server...');
+  if (autoSnapshotTimer) {
+    clearInterval(autoSnapshotTimer);
+    autoSnapshotTimer = null;
+  }
   db.close();
   process.exit(0);
-});
+};
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
