@@ -390,17 +390,38 @@ const authenticator = (username, password, cb) => {
   }
 };
 
-app.use(basicAuth({
+const basicAuthMiddleware = basicAuth({
   authorizer: authenticator,
   authorizeAsync: true,
   challenge: true,
   realm: 'Trip Manager'
-}));
+});
+
+const configuredAgentToken = typeof process.env.AGENT_TOOL_TOKEN === 'string'
+  ? process.env.AGENT_TOOL_TOKEN.trim()
+  : '';
+
+app.use((req, res, next) => {
+  const headerTokenRaw = req.header('x-agent-token');
+  const headerToken = typeof headerTokenRaw === 'string' ? headerTokenRaw.trim() : '';
+
+  if (configuredAgentToken && headerToken && headerToken === configuredAgentToken) {
+    req.auth = { user: 'agent' };
+    req.user = 'agent';
+    req.userRole = 'admin';
+    req.isAgent = true;
+    return next();
+  }
+
+  return basicAuthMiddleware(req, res, next);
+});
 
 // 将数据库实例附加到请求对象
 app.use((req, res, next) => {
   req.db = db;
-  req.user = req.auth.user;
+  if (!req.user) {
+    req.user = req.auth?.user;
+  }
   next();
 });
 
@@ -413,6 +434,7 @@ app.use('/api/activities', requireRole(['admin']), require('./src/routes/activit
 app.use('/api/planning/solver-runs', requireRole(['admin']), require('./src/routes/solverPreviewRuns'));
 app.use('/api/planning', requireRole(['admin']), require('./src/routes/planning'));
 app.use('/api/config', requireRole(['admin']), require('./src/routes/systemConfig'));
+app.use('/api/agent', requireRole(['admin']), require('./src/routes/agent'));
 
 app.use('/api/users', require('./src/routes/users'));
 app.use('/api/statistics', requireAccess({ read: readAllRoles }), require('./src/routes/statistics'));
