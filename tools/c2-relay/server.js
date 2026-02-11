@@ -156,6 +156,8 @@ function buildResponsesPayload(inputBody) {
   ].join('\n');
 
   return {
+    model: 'openclaw',
+    user: `web:${groupId}`,
     input: [
       {
         role: 'user',
@@ -360,4 +362,3 @@ server.listen(RELAY_PORT, () => {
   console.log(`[c2-relay] listening on :${RELAY_PORT}`);
   console.log(`[c2-relay] forwarding to ${OPENCLAW_RESPONSES_URL} (agent=${OPENCLAW_AGENT_ID})`);
 });
-
