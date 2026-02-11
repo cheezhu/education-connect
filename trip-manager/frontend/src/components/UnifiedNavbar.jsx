@@ -42,12 +42,13 @@ const UnifiedNavbar = () => {
     { path: '/users', icon: <UserOutlined />, label: '用户管理', permission: 'users' }
   ];
 
-  const visibleItems = navItems.filter(item => !item.permission || canAccess(item.permission));
+  const visibleItems = navItems.filter((item) => !item.permission || canAccess(item.permission));
 
   const roleLabel = ROLE_LABELS[user?.role] || '未知角色';
   const userName = user?.displayName || user?.username || '用户';
 
   const menuItems = [
+    { key: 'username', label: `用户名：${userName}`, disabled: true },
     { key: 'role', label: `角色：${roleLabel}`, disabled: true },
     { type: 'divider' },
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> }
@@ -70,7 +71,7 @@ const UnifiedNavbar = () => {
       </div>
 
       <div className="nav-menu">
-        {visibleItems.map(item => (
+        {visibleItems.map((item) => (
           <Tooltip key={item.path} title={item.label} placement="right">
             <div
               className={`nav-icon-btn ${isActivePath(item.path) ? 'active' : ''}`}
@@ -110,12 +111,14 @@ const UnifiedNavbar = () => {
         )}
       </div>
 
-      <Dropdown menu={userMenuProps} placement="bottomRight">
-        <div className="user-section">
-          <div className="user-avatar">{userName?.slice(0, 1) || '用'}</div>
-          <span className="user-name">{userName}</span>
-        </div>
-      </Dropdown>
+      <Tooltip title={`${userName}（${roleLabel}）`} placement="right">
+        <Dropdown menu={userMenuProps} placement="bottomRight">
+          <div className="user-section">
+            <div className="user-avatar">{userName?.slice(0, 1) || 'U'}</div>
+            <span className="user-name">{userName}</span>
+          </div>
+        </Dropdown>
+      </Tooltip>
     </nav>
   );
 };
