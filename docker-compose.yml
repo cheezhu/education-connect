@@ -5,6 +5,7 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       - TZ=Asia/Hong_Kong
+      - AGENT_TOOL_TOKEN=${AGENT_TOOL_TOKEN}
     volumes:
       - backend_db:/app/backend/db
     restart: unless-stopped
