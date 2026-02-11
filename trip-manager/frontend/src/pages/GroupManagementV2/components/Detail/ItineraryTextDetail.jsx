@@ -88,6 +88,13 @@ const downloadText = (filename, mimeType, content) => {
   window.URL.revokeObjectURL(url);
 };
 
+const escapeHtml = (value) => safeText(value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
 const buildManualMarkdown = ({ group, schedules }) => {
   const groupName = safeText(group?.name || '未命名团组');
   const dateRange = group?.start_date && group?.end_date
@@ -122,6 +129,160 @@ const buildManualMarkdown = ({ group, schedules }) => {
   });
 
   return `${head}\n${dayBlocks.join('\n')}`.trim() + '\n';
+};
+
+const buildWordDocumentHtml = ({ group, schedules }) => {
+  const groupName = escapeHtml(group?.name || '未命名团组');
+  const dateRange = group?.start_date && group?.end_date
+    ? `${dayjs(group.start_date).format('YYYY-MM-DD')} ~ ${dayjs(group.end_date).format('YYYY-MM-DD')}`
+    : '';
+  const students = Number(group?.student_count ?? 0) || 0;
+  const teachers = Number(group?.teacher_count ?? 0) || 0;
+  const total = students + teachers;
+  const exportTime = dayjs().format('YYYY-MM-DD HH:mm');
+
+  const byDay = new Map();
+  sortSchedules(schedules).forEach((s) => {
+    if (!byDay.has(s.date)) byDay.set(s.date, []);
+    byDay.get(s.date).push(s);
+  });
+
+  const dayBlocks = Array.from(byDay.entries()).map(([dateStr, items], dayIndex) => {
+    const weekLabel = WEEK_LABELS[dayjs(dateStr).day()] || '';
+    const title = `${dateStr}${weekLabel ? `（${weekLabel}）` : ''}  Day ${dayIndex + 1}`;
+
+    const rows = items.map((s) => {
+      const source = resolveSource(s).label || '自定义';
+      const time = s.startTime && s.endTime
+        ? `${s.startTime} - ${s.endTime}`
+        : `${s.startTime || s.endTime || '--:--'}`;
+      const main = s.title || s.location || '未命名活动';
+      const location = s.location && s.location !== main ? s.location : '-';
+      const note = truncate(s.description, 80) || '-';
+
+      return `
+        <tr>
+          <td>${escapeHtml(time)}</td>
+          <td>${escapeHtml(main)}</td>
+          <td>${escapeHtml(location)}</td>
+          <td>${escapeHtml(source)}</td>
+          <td>${escapeHtml(note)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div class="day-section">
+        <div class="day-title">${escapeHtml(title)}</div>
+        <table class="event-table">
+          <thead>
+            <tr>
+              <th style="width: 110px;">时间</th>
+              <th style="width: 240px;">活动</th>
+              <th style="width: 190px;">地点</th>
+              <th style="width: 90px;">来源</th>
+              <th>备注</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <html
+      xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40"
+    >
+      <head>
+        <meta charset="utf-8" />
+        <title>行程详情</title>
+        <style>
+          @page { size: A4; margin: 1.6cm 1.6cm; }
+          body {
+            font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+            color: #1f2937;
+            font-size: 11pt;
+            line-height: 1.5;
+          }
+          .doc-wrap {
+            max-width: 780px;
+            margin: 0 auto;
+          }
+          .doc-title {
+            font-size: 20pt;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 8px;
+          }
+          .doc-sub {
+            color: #475569;
+            margin-bottom: 4px;
+          }
+          .meta-row {
+            margin-bottom: 16px;
+            padding: 8px 10px;
+            border: 1px solid #dbe3ef;
+            background: #f8fbff;
+            border-radius: 6px;
+          }
+          .day-section {
+            margin-bottom: 18px;
+            page-break-inside: avoid;
+          }
+          .day-title {
+            font-size: 13pt;
+            font-weight: 700;
+            color: #0f172a;
+            border-left: 4px solid #3b82f6;
+            padding-left: 8px;
+            margin-bottom: 8px;
+          }
+          .event-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+          }
+          .event-table th {
+            background: #eef4ff;
+            border: 1px solid #d6e4ff;
+            color: #1e3a8a;
+            text-align: left;
+            padding: 6px 8px;
+            font-weight: 700;
+          }
+          .event-table td {
+            border: 1px solid #e2e8f0;
+            padding: 6px 8px;
+            vertical-align: top;
+            word-break: break-word;
+          }
+          .footer {
+            margin-top: 20px;
+            color: #64748b;
+            font-size: 9.5pt;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="doc-wrap">
+          <div class="doc-title">行程详情：${groupName}</div>
+          <div class="doc-sub">导出时间：${escapeHtml(exportTime)}</div>
+          <div class="meta-row">
+            ${dateRange ? `<div>团期：${escapeHtml(dateRange)}</div>` : ''}
+            <div>人数：${students} 学生 + ${teachers} 老师 = ${total}</div>
+            <div>活动数量：${schedules.length}</div>
+          </div>
+          ${dayBlocks || '<div class="doc-sub">暂无可导出的行程数据。</div>'}
+          <div class="footer">文档由系统自动生成，可在 Word 中继续编辑排版。</div>
+        </div>
+      </body>
+    </html>
+  `;
 };
 
 const buildDayMeta = (dateStr, groupStart, fallbackIndex) => {
@@ -268,14 +429,14 @@ const ItineraryTextDetail = ({ group, schedules }) => {
     return parts.filter(Boolean).join(' · ');
   }, [pax, days, group?.start_date, group?.end_date, overflowCount]);
 
-  const handleExportMarkdown = async () => {
+  const handleExportWord = async () => {
     if (!group) return;
     setExporting(true);
     try {
-      const md = buildManualMarkdown({ group, schedules: visibleSchedules });
-      const filename = `行程详情_${safeText(group?.name || group?.id)}.md`;
-      downloadText(filename, 'text/markdown;charset=utf-8', md);
-      message.success('已导出 Markdown', 1);
+      const wordHtml = buildWordDocumentHtml({ group, schedules: visibleSchedules });
+      const filename = `行程详情_${safeText(group?.name || group?.id)}.doc`;
+      downloadText(filename, 'application/msword;charset=utf-8', wordHtml);
+      message.success('已导出 Word', 1);
     } finally {
       setExporting(false);
     }
@@ -327,8 +488,8 @@ const ItineraryTextDetail = ({ group, schedules }) => {
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <button type="button" className="action-sm" disabled={exporting} onClick={handleExportMarkdown}>
-            <FileTextOutlined /> 导出 Markdown
+          <button type="button" className="action-sm" disabled={exporting} onClick={handleExportWord}>
+            <FileTextOutlined /> 导出 Word
           </button>
           <button type="button" className="action-sm" onClick={handleCopyMarkdown}>
             <CopyOutlined /> 复制文本

@@ -945,6 +945,66 @@
   display: flex;
 }
 
+/* Help View */
+.group-command-center .group-help-view {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--bg-app);
+  padding: 18px 20px 24px;
+}
+
+.group-command-center .group-help-header h3 {
+  margin: 0;
+  font-size: 20px;
+  color: #1f2937;
+}
+
+.group-command-center .group-help-header p {
+  margin: 8px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.group-command-center .group-help-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  margin-top: 14px;
+}
+
+.group-command-center .group-help-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.group-command-center .group-help-card h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #111827;
+}
+
+.group-command-center .group-help-card ul,
+.group-command-center .group-help-card ol {
+  margin: 0;
+  padding-left: 18px;
+  color: #374151;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.group-command-center .group-help-card li + li {
+  margin-top: 4px;
+}
+
+@media (max-width: 980px) {
+  .group-command-center .group-help-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Profile Layout */
 .group-command-center .profile-layout {
   display: flex;

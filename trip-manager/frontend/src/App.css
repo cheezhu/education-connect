@@ -339,6 +339,14 @@
   font-weight: bold;
 }
 
+.mini-logo-image {
+  width: 28px;
+  height: 28px;
+  display: block;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
 .nav-menu {
   display: flex;
   flex-direction: column;
@@ -383,6 +391,12 @@
   margin-bottom: 8px;
 }
 
+.global-help-entry {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+
 .action-icon {
   width: 32px;
   height: 32px;
@@ -400,6 +414,12 @@
 .action-icon:hover {
   background: #2a2d2e;
   color: #e0e0e0;
+}
+
+.action-icon.active {
+  background: #2a2d2e;
+  color: #ffffff;
+  border-left: 2px solid #0e639c;
 }
 
 .badge-dot {

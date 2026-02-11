@@ -26,17 +26,42 @@ const ROLE_OPTIONS = [
 ];
 
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
+const BEIJING_TIMEZONE = 'Asia/Shanghai';
+const BEIJING_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: BEIJING_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false
+});
+
+const toUtcDate = (value) => {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  // SQLite CURRENT_TIMESTAMP format is "YYYY-MM-DD HH:mm:ss" in UTC.
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)
+    ? `${raw.replace(' ', 'T')}Z`
+    : raw;
+
+  const date = new Date(normalized);
+  return Number.isFinite(date.getTime()) ? date : null;
+};
 
 const parseDateMs = (value) => {
-  if (!value) return NaN;
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : NaN;
+  const date = toUtcDate(value);
+  if (!date) return NaN;
+  return date.getTime();
 };
 
 const formatDateTime = (value) => {
-  const parsed = parseDateMs(value);
-  if (!Number.isFinite(parsed)) return value ? String(value) : '从未登录';
-  return new Date(parsed).toLocaleString();
+  const date = toUtcDate(value);
+  if (!date) return value ? String(value) : '从未登录';
+  return `${BEIJING_FORMATTER.format(date)} GMT+8`;
 };
 
 const isOnlineRecently = (value) => {

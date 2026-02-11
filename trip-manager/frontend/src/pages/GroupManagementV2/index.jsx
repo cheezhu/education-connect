@@ -1,6 +1,6 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { message } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import api from '../../services/api';
 import {
@@ -18,6 +18,7 @@ import ProfileView from './components/Detail/ProfileView';
 import FullCalendarWrapper from './components/Detail/FullCalendarWrapper';
 import LogisticsView from './components/Detail/Logistics/LogisticsView';
 import ItineraryTextDetail from './components/Detail/ItineraryTextDetail';
+import HelpView from './components/Detail/HelpView';
 import BulkCreateModal from './components/Modals/BulkCreateModal';
 import MembersView from './components/Detail/MembersView';
 import GroupCommandCenterSkeleton from './components/GroupCommandCenterSkeleton';
@@ -425,8 +426,10 @@ class TabErrorBoundary extends React.Component {
   }
 }
 
+const TAB_KEYS = new Set(['profile', 'logistics', 'schedule', 'itinerary', 'members', 'help']);
+
 const GroupManagementV2 = () => {
-  const navigate = useNavigate();
+  const location = useLocation();
   const [groups, setGroups] = useState([]);
   const [filteredGroups, setFilteredGroups] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -569,6 +572,14 @@ const GroupManagementV2 = () => {
     fetchItineraryPlans();
     fetchLocations();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab && TAB_KEYS.has(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     let filtered = [...groups];
@@ -988,6 +999,8 @@ const GroupManagementV2 = () => {
         return (
           <MembersView groupId={activeGroup?.id ?? null} />
         );
+      case 'help':
+        return <HelpView />;
       default:
         return null;
     }

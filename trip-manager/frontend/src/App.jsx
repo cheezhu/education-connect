@@ -8,6 +8,7 @@ import ItineraryDesigner from './pages/ItineraryDesigner';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import UserManagement from './pages/UserManagement';
+import HelpCenter from './pages/HelpCenter';
 import UnifiedNavbar from './components/UnifiedNavbar';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import './App.css';
@@ -120,6 +121,14 @@ function AppLayout() {
               element={(
                 <ProtectedRoute permission="groups">
                   <GroupManagementV2 />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="/help"
+              element={(
+                <ProtectedRoute>
+                  <HelpCenter />
                 </ProtectedRoute>
               )}
             />

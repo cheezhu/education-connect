@@ -8,6 +8,7 @@ import {
   EnvironmentOutlined,
   ExportOutlined,
   LogoutOutlined,
+  QuestionCircleOutlined,
   SearchOutlined,
   SettingOutlined,
   TeamOutlined,
@@ -35,11 +36,11 @@ const UnifiedNavbar = () => {
   };
 
   const navItems = [
-    { path: '/designer', icon: <CompassOutlined />, label: '行程设计器', permission: 'designer' },
-    { path: '/groups', icon: <TeamOutlined />, label: '团组管理', permission: 'groups' },
-    { path: '/locations', icon: <EnvironmentOutlined />, label: '资源管理', permission: 'locations' },
-    { path: '/statistics', icon: <BarChartOutlined />, label: '统计报表', permission: 'statistics' },
-    { path: '/users', icon: <UserOutlined />, label: '用户管理', permission: 'users' }
+    { key: 'designer', path: '/designer', icon: <CompassOutlined />, label: '行程设计器', permission: 'designer' },
+    { key: 'groups', path: '/groups', icon: <TeamOutlined />, label: '团组管理', permission: 'groups' },
+    { key: 'locations', path: '/locations', icon: <EnvironmentOutlined />, label: '资源管理', permission: 'locations' },
+    { key: 'statistics', path: '/statistics', icon: <BarChartOutlined />, label: '统计报表', permission: 'statistics' },
+    { key: 'users', path: '/users', icon: <UserOutlined />, label: '用户管理', permission: 'users' }
   ];
 
   const visibleItems = navItems.filter((item) => !item.permission || canAccess(item.permission));
@@ -67,12 +68,12 @@ const UnifiedNavbar = () => {
   return (
     <nav className="unified-navbar">
       <div className="logo-section">
-        <div className="mini-logo">TM</div>
+        <img src="/favicon.svg" alt="HKEIU" className="mini-logo-image" />
       </div>
 
       <div className="nav-menu">
         {visibleItems.map((item) => (
-          <Tooltip key={item.path} title={item.label} placement="right">
+          <Tooltip key={item.key} title={item.label} placement="right">
             <div
               className={`nav-icon-btn ${isActivePath(item.path) ? 'active' : ''}`}
               onClick={() => navigate(item.path)}
@@ -109,6 +110,17 @@ const UnifiedNavbar = () => {
             </div>
           </Tooltip>
         )}
+      </div>
+
+      <div className="global-help-entry">
+        <Tooltip title="系统帮助" placement="right">
+          <div
+            className={`action-icon ${isActivePath('/help') ? 'active' : ''}`}
+            onClick={() => navigate('/help')}
+          >
+            <QuestionCircleOutlined />
+          </div>
+        </Tooltip>
       </div>
 
       <Tooltip title={`${userName}（${roleLabel}）`} placement="right">

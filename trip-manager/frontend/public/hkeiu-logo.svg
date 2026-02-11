@@ -1,0 +1,35 @@
+﻿<svg width="360" height="88" viewBox="0 0 360 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="h" x1="16" y1="8" x2="48" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF7A8A"/>
+      <stop offset="1" stop-color="#FF4FB0"/>
+    </linearGradient>
+    <linearGradient id="k" x1="64" y1="12" x2="116" y2="76" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFA640"/>
+      <stop offset="1" stop-color="#FFC21A"/>
+    </linearGradient>
+    <linearGradient id="e" x1="122" y1="12" x2="182" y2="78" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#D8EE66"/>
+      <stop offset="1" stop-color="#6EEB7F"/>
+    </linearGradient>
+    <linearGradient id="i" x1="188" y1="10" x2="240" y2="78" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4FD9E1"/>
+      <stop offset="1" stop-color="#2E86F7"/>
+    </linearGradient>
+    <linearGradient id="u" x1="248" y1="10" x2="334" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7A6CF6"/>
+      <stop offset="1" stop-color="#9B3ED7"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="12" y="10" width="26" height="68" rx="3" fill="url(#h)"/>
+  <rect x="44" y="34" width="22" height="20" rx="2" fill="#F7A53A"/>
+
+  <path d="M70 10H96V36L118 10H148L122 40L150 78H120L101 52L96 57V78H70V10Z" fill="url(#k)"/>
+
+  <path d="M160 10H216V28H184V36H212V52H184V60H218V78H160V10Z" fill="url(#e)"/>
+
+  <rect x="226" y="10" width="24" height="68" rx="3" fill="url(#i)"/>
+
+  <path d="M262 10H288V54C288 59 291 62 296 62H302V10H328V58C328 72 318 80 304 80H286C272 80 262 72 262 58V10Z" fill="url(#u)"/>
+</svg>
