@@ -22,6 +22,8 @@ import {
   isMealComplete,
   weekdayLabel
 } from './profileUtils';
+import { PROFILE_TEXT, UNNAMED_GROUP_NAME } from '../../constants';
+
 const ProfileView = ({
   group,
   schedules,
@@ -118,8 +120,8 @@ const ProfileView = ({
   if (!group || !draft) {
     return (
       <div className="profile-layout profile-doc">
-        <div className="profile-center">
-          <div className="empty-state">请选择团组以查看详情</div>
+          <div className="profile-center">
+          <div className="empty-state">{PROFILE_TEXT.emptyState}</div>
         </div>
       </div>
     );
@@ -127,6 +129,12 @@ const ProfileView = ({
 
   const handleNameChange = (value) => {
     setDraft((prev) => ({ ...prev, name: value }));
+  };
+
+  const handleNameBlur = () => {
+    const current = String(draft?.name || '').trim();
+    if (current) return;
+    setDraft((prev) => ({ ...prev, name: UNNAMED_GROUP_NAME }));
   };
 
   const handleStatusChange = (value) => {
@@ -196,7 +204,7 @@ const ProfileView = ({
   const handleDeleteGroup = () => {
     if (!group?.id || !onDelete) return;
     const name = draft?.name || group?.name || ('#' + group.id);
-    const confirmed = window.confirm('确定删除团组「' + name + '」？此操作不可撤销。');
+    const confirmed = window.confirm(PROFILE_TEXT.deleteGroupConfirm(name));
     if (!confirmed) return;
     onDelete();
   };
@@ -261,13 +269,7 @@ const ProfileView = ({
     });
   };
 
-  const statusOptions = [
-    { value: null, label: '自动' },
-    { value: '准备中', label: '准备中' },
-    { value: '进行中', label: '进行中' },
-    { value: '已完成', label: '已完成' },
-    { value: '已取消', label: '已取消' }
-  ];
+  const statusOptions = PROFILE_TEXT.statusOptions;
 
   const locationMap = new Map(
     (locations || []).map((location) => [Number(location.id), location])
@@ -302,7 +304,7 @@ const ProfileView = ({
 
   const handleApplyCurrentPlan = () => {
     if (manualMustVisitIds.length > 0) {
-      const confirmed = window.confirm('将使用方案地点替换当前必去点，是否继续？');
+      const confirmed = window.confirm(PROFILE_TEXT.replaceMustVisitConfirm);
       if (!confirmed) return;
     }
     setDraft((prev) => {
@@ -355,11 +357,13 @@ const ProfileView = ({
       <div className="profile-center doc-container">
         <div className="doc-content">
           <div className="profile-headline">
+            {/* Default name stays in data, but title input shows placeholder-style empty state. */}
             <input
               className="doc-title"
-              value={draft.name || ''}
+              value={String(draft.name || '').trim() === UNNAMED_GROUP_NAME ? '' : (draft.name || '')}
               placeholder="输入团组名称"
               onChange={(event) => handleNameChange(event.target.value)}
+              onBlur={handleNameBlur}
             />
             <div className="status-tags">
               {statusOptions.map((option) => (
@@ -389,7 +393,7 @@ const ProfileView = ({
                 onClick={handleDeleteGroup}
                 disabled={!group?.id || !onDelete}
               >
-                删除团组
+                {PROFILE_TEXT.deleteGroup}
               </button>
             )}
           />
