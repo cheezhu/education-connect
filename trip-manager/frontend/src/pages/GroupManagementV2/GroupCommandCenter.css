@@ -6,6 +6,8 @@
   --text: #262626;
   --text-mute: #8c8c8c;
   --accent: #1890ff;
+  --page-content-max-width: 920px;
+  --page-content-padding-x: 24px;
   --hover: #f5f5f5;
   --selected: #e6f7ff;
   --color-danger: #ff4d4f;
@@ -17,7 +19,7 @@
   background: var(--bg-app);
   color: var(--text);
   font-size: 12px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-ui);
   margin: 0;
 }
 
@@ -194,7 +196,21 @@
   padding: 0 16px;
   height: 45px;
   align-items: center;
-  gap: 20px;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.group-command-center .tab-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.group-command-center .tab-group-divider {
+  width: 1px;
+  height: 18px;
+  background: #e2e8f0;
   flex-shrink: 0;
 }
 
@@ -423,9 +439,9 @@
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 
   flex: 1;
-  padding: 24px 32px;
+  padding: 20px var(--page-content-padding-x) 28px;
   overflow-y: auto;
-  max-width: 1200px;
+  max-width: var(--page-content-max-width);
   margin: 0 auto;
   width: 100%;
 }
@@ -532,7 +548,7 @@
 }
 
 .group-command-center .col-time {
-  font-family: 'Menlo', monospace;
+  font-family: inherit;
   font-size: 12px;
   font-weight: 600;
   color: #6b7280;
@@ -765,7 +781,8 @@
 }
 
 .group-command-center .col-id-index {
-  font-family: monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   color: #999999;
   text-align: center;
 }
@@ -814,7 +831,8 @@
 }
 
 .group-command-center .col-phone {
-  font-family: monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   color: #4b5563;
   font-size: 12px;
 }
@@ -941,6 +959,69 @@
   right: 0;
   height: 2px;
   background: var(--accent);
+}
+
+.group-command-center .detail-view.mode-read .tab-container {
+  background: #fcfcfd;
+  border-bottom-color: #e8edf5;
+}
+
+.group-command-center .detail-view.mode-read .tab-content {
+  background: linear-gradient(180deg, #f8fafd 0%, #f3f6fb 100%);
+}
+
+.group-command-center .detail-view.mode-read .tab-item {
+  color: #6b7280;
+}
+
+.group-command-center .detail-view.mode-read .tab-item.active {
+  color: #334155;
+}
+
+.group-command-center .detail-view.mode-read .tab-item.active::after {
+  background: #64748b;
+}
+
+.group-command-center .detail-view.mode-read .tab-ai-btn {
+  border-color: #d5dfeb;
+  background: #f8fafc;
+  color: #466489;
+}
+
+.group-command-center .detail-view.mode-read .tab-ai-btn:hover:not(:disabled) {
+  background: #edf2f7;
+}
+
+.group-command-center .detail-view.mode-work .tab-container {
+  background: #f6f9ff;
+  border-bottom-color: #dbe6f7;
+}
+
+.group-command-center .detail-view.mode-work .tab-content {
+  background: #eef3fb;
+}
+
+.group-command-center .detail-view.mode-work .tab-item {
+  color: #5f6f87;
+}
+
+.group-command-center .detail-view.mode-work .tab-item.active {
+  color: #0f4fa8;
+}
+
+.group-command-center .detail-view.mode-work .tab-item.active::after {
+  height: 3px;
+  background: #1890ff;
+}
+
+.group-command-center .detail-view.mode-work .tab-ai-btn {
+  border-color: #8bb9f5;
+  background: #e7f2ff;
+  color: #0f56b7;
+}
+
+.group-command-center .detail-view.mode-work .tab-ai-btn:hover:not(:disabled) {
+  background: #d8eaff;
 }
 
 .group-command-center .tab-content {
@@ -1183,7 +1264,8 @@
 }
 
 .group-command-center .event-time {
-  font-family: Consolas, 'Courier New', monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   color: #888;
   width: 70px;
   flex-shrink: 0;
@@ -1710,7 +1792,8 @@
 }
 
 .group-command-center .context-time {
-  font-family: Consolas, 'Courier New', monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   color: #999;
   width: 40px;
   flex-shrink: 0;
@@ -2838,10 +2921,17 @@
 .group-command-center .profile-doc .doc-content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 32px 80px;
+  padding: 20px var(--page-content-padding-x) 80px;
   max-width: none;
   margin: 0;
   width: 100%;
+}
+
+.group-command-center .profile-doc .doc-content > * {
+  width: 100%;
+  max-width: var(--page-content-max-width);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .group-command-center .profile-doc .doc-icon {

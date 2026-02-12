@@ -1398,6 +1398,9 @@ const GroupManagementV2 = () => {
     }
   };
 
+  const isReadMode = activeTab === 'profile' || activeTab === 'itinerary';
+  const tabMode = isReadMode ? 'read' : 'work';
+
   return (
     <div className="group-command-center">
       <div className="layout">
@@ -1418,9 +1421,10 @@ const GroupManagementV2 = () => {
             isCollapsed={isSidebarCollapsed}
           />
 
-          <div className="detail-view">
+          <div className={`detail-view ${isReadMode ? 'mode-read' : 'mode-work'}`}>
             <TabBar
               activeTab={activeTab}
+              mode={tabMode}
               onTabChange={handleTabChange}
               isSidebarCollapsed={isSidebarCollapsed}
               onExpandSidebar={handleExpandSidebar}

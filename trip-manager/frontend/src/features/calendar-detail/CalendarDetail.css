@@ -176,7 +176,8 @@
   position: sticky;
   left: 0;
   z-index: 50;
-  font-family: 'Monaco', 'Courier New', monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
   white-space: nowrap;
 }

@@ -13,6 +13,7 @@ import { toMinutes, timeSlotWindows } from '../../../../domain/time';
 const safeText = (value) => (value === undefined || value === null ? '' : String(value));
 const normalizeInlineText = (value) => safeText(value).replace(/\s+/g, ' ').trim();
 const LEGACY_MEAL_TITLES = new Set(['早餐', '午餐', '晚餐', '早饭', '午饭', '晚饭']);
+const EMPTY_NOTE_MARKERS = new Set(['-', '--', '---', '—', '——']);
 
 const resolveScheduleNote = (schedule, options = {}) => {
   if (!schedule || typeof schedule !== 'object') return '';
@@ -70,6 +71,12 @@ const truncate = (value, maxLen = 56) => {
   if (!text) return '';
   if (text.length <= maxLen) return text;
   return `${text.slice(0, Math.max(0, maxLen - 3))}...`;
+};
+
+const hasMeaningfulNote = (value) => {
+  const text = normalizeInlineText(value);
+  if (!text) return false;
+  return !EMPTY_NOTE_MARKERS.has(text);
 };
 
 const buildScheduleMetaItems = (schedule) => {
@@ -387,12 +394,17 @@ const buildWordDocxBlob = async ({ group, schedules }) => {
               makeTextRun(`${row.time}  ${row.title}`, { bold: true, size: 24, color: '0F172A' }),
               makeTextRun(inlineAddress, { size: 24, color: '0F172A' })
             ]
-          }),
-          new Paragraph({
-            spacing: { after: 100 },
-            children: [makeTextRun(`备注：${row.note}`, { size: 22, color: '475569' })]
           })
         );
+
+        if (hasMeaningfulNote(row.note)) {
+          children.push(
+            new Paragraph({
+              spacing: { after: 100 },
+              children: [makeTextRun(`备注：${row.note}`, { size: 22, color: '475569' })]
+            })
+          );
+        }
       });
     });
   }

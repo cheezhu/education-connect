@@ -10,6 +10,8 @@
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/noto-sans-sc": "^5.2.9",
     "@fullcalendar/daygrid": "^6.1.0",
     "@fullcalendar/interaction": "^6.1.0",
     "@fullcalendar/react": "^6.1.0",
