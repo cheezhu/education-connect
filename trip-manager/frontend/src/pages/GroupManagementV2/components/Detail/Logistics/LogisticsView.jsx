@@ -51,6 +51,7 @@ const normalizeLogisticsRow = (date, source = {}) => ({
     flight_no: toText(source.pickup?.flight_no || source.pickup?.flightNo || source.pickup_flight_no),
     airline: toText(source.pickup?.airline || source.pickup_airline),
     terminal: toText(source.pickup?.terminal || source.pickup_terminal),
+    note: toText(source.pickup?.note || source.pickup_note),
     detached: source.pickup?.detached || false,
     disabled: source.pickup?.disabled || source.pickup_disabled || false
   },
@@ -62,6 +63,7 @@ const normalizeLogisticsRow = (date, source = {}) => ({
     flight_no: toText(source.dropoff?.flight_no || source.dropoff?.flightNo || source.dropoff_flight_no),
     airline: toText(source.dropoff?.airline || source.dropoff_airline),
     terminal: toText(source.dropoff?.terminal || source.dropoff_terminal),
+    note: toText(source.dropoff?.note || source.dropoff_note),
     detached: source.dropoff?.detached || false,
     disabled: source.dropoff?.disabled || source.dropoff_disabled || false
   },

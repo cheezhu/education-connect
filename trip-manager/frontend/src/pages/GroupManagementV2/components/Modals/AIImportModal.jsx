@@ -97,7 +97,7 @@ const AIImportModal = ({
                       <th>日期</th>
                       <th>时间</th>
                       <th>标题</th>
-                      <th>地点</th>
+                      <th>地址</th>
                       <th>来源</th>
                     </tr>
                   </thead>

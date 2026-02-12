@@ -13,7 +13,7 @@ const TransferStrip = ({ type, day, onUpdateDay }) => {
 
   const handleChange = (field, value) => {
     onUpdateDay?.(day.date, {
-      [type]: { ...transfer, [field]: value }
+      [type]: { ...transfer, [field]: value, detached: false }
     });
   };
 
@@ -32,7 +32,7 @@ const TransferStrip = ({ type, day, onUpdateDay }) => {
             detached: false,
             disabled: true
           }
-        : { ...transfer, disabled: false }
+        : { ...transfer, disabled: false, detached: false }
     });
   };
 
@@ -76,7 +76,7 @@ const TransferStrip = ({ type, day, onUpdateDay }) => {
             />
           </div>
           <div className="input-group">
-            <label className="label">地点</label>
+            <label className="label">地址</label>
             <input
               className="input-box"
               value={transfer.location || ''}
@@ -122,6 +122,16 @@ const TransferStrip = ({ type, day, onUpdateDay }) => {
               value={transfer.terminal || ''}
               placeholder={disabled ? '已标记不安排' : 'T2 / G18'}
               onChange={(event) => handleChange('terminal', event.target.value)}
+              disabled={disabled}
+            />
+          </div>
+          <div className="input-group">
+            <label className="label">备注</label>
+            <input
+              className="input-box"
+              value={transfer.note || ''}
+              placeholder={disabled ? '已标记不安排' : '补充说明（可选）'}
+              onChange={(event) => handleChange('note', event.target.value)}
               disabled={disabled}
             />
           </div>

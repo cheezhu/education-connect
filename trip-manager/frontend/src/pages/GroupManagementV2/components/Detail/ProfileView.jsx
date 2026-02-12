@@ -714,7 +714,7 @@ const ProfileView = ({
 
   const handleApplyCurrentPlan = () => {
     if (manualMustVisitIds.length > 0) {
-      const confirmed = window.confirm('将使用方案地点替换当前必去点，是否继续？');
+      const confirmed = window.confirm('将使用方案地址替换当前必去点，是否继续？');
       if (!confirmed) return;
     }
     setDraft((prev) => {
@@ -846,7 +846,7 @@ const ProfileView = ({
                   </button>
                 </div>
                 <span className="must-visit-tip">
-                  方案仅用于快捷点选；点击“套用当前方案”才会把方案地点填充到必去点，之后可继续手动微调。
+                  方案仅用于快捷点选；点击“套用当前方案”才会把方案地址填充到必去点，之后可继续手动微调。
                 </span>
               </div>
             </div>
@@ -867,7 +867,7 @@ const ProfileView = ({
                 </div>
                 <div className="must-visit-option-grid">
                   {(locations || []).length === 0 && (
-                    <span className="muted">暂无可选地点</span>
+                    <span className="muted">暂无可选地址</span>
                   )}
                   {(locations || []).map((location) => {
                     const locationId = Number(location.id);

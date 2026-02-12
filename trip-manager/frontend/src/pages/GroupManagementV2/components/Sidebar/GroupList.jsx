@@ -27,6 +27,7 @@ const GroupList = ({
   ), []);
 
   const resolvedTotal = Number.isFinite(totalCount) ? totalCount : groups.length;
+  const visibleCount = groups.length;
 
   const renderMeta = (group) => {
     const start = group.start_date ? dayjs(group.start_date).format('YYYY-MM-DD') : '未设置日期';
@@ -39,7 +40,9 @@ const GroupList = ({
   return (
     <div className={`group-list ${isCollapsed ? 'collapsed' : ''}`} id="sidebar">
       <div className="sidebar-header">
-        <span className="sidebar-title">GROUPS ({resolvedTotal})</span>
+        <span className="sidebar-title">
+          GROUPS ({visibleCount}{resolvedTotal !== visibleCount ? `/${resolvedTotal}` : ''})
+        </span>
         <div className="btn-icon-add" onClick={onCreateGroup}>＋</div>
       </div>
 

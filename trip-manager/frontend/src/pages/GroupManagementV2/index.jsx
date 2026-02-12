@@ -37,6 +37,14 @@ const MEAL_LABELS = {
   lunch: '午餐',
   dinner: '晚餐'
 };
+const LEGACY_MEAL_TITLES = new Set([
+  '早餐',
+  '午餐',
+  '晚餐',
+  '早饭',
+  '午饭',
+  '晚饭'
+]);
 
 const GROUP_UPDATE_FIELDS = [
   'name',
@@ -120,13 +128,38 @@ const hasPickupContent = (pickup) => {
   );
 };
 
-const buildFlightDescription = (pickup) => (
+const buildTransferFlightSummary = (pickup) => (
   [
     pickup.flight_no && `航班 ${pickup.flight_no}`,
     pickup.airline && pickup.airline,
     pickup.terminal && pickup.terminal
   ].filter(Boolean).join(' / ')
 );
+
+const buildTransferScheduleDescription = (transfer = {}) => {
+  const note = typeof transfer.note === 'string' ? transfer.note.trim() : '';
+  if (note) return note;
+  return buildTransferFlightSummary(transfer);
+};
+
+const resolveTransferNoteFromSchedule = (description, transfer = {}) => {
+  const text = typeof description === 'string' ? description.trim() : '';
+  if (!text) return '';
+  const fallback = buildTransferFlightSummary(transfer);
+  return text === fallback ? '' : text;
+};
+
+const resolveMealArrangementFromSchedule = (schedule, fallbackKey) => {
+  const title = typeof schedule?.title === 'string' ? schedule.title.trim() : '';
+  const description = typeof schedule?.description === 'string' ? schedule.description.trim() : '';
+  if (title && !LEGACY_MEAL_TITLES.has(title)) {
+    return title;
+  }
+  if (description) {
+    return description;
+  }
+  return title || (MEAL_LABELS[fallbackKey] || '');
+};
 
 const buildCustomResource = (schedule) => {
   const startTime = schedule?.startTime || schedule?.start_time || '';
@@ -214,11 +247,9 @@ const syncLogisticsFromSchedules = (logistics = [], schedules = []) => {
       const resourceId = buildShixingResourceId(row.date, 'meal', key);
       const schedule = scheduleMap.get(resourceId);
       if (schedule) {
-        const scheduleDescription = schedule.description || '';
-        const scheduleTitle = schedule.title || '';
         meals[`${key}_time`] = schedule.startTime || schedule.start_time || '';
         meals[`${key}_end`] = schedule.endTime || schedule.end_time || '';
-        meals[key] = scheduleDescription || scheduleTitle || meals[key] || '';
+        meals[key] = resolveMealArrangementFromSchedule(schedule, key) || meals[key] || '';
         meals[`${key}_place`] = schedule.location || meals[`${key}_place`] || '';
         meals[`${key}_disabled`] = false;
         meals[`${key}_detached`] = false;
@@ -243,6 +274,7 @@ const syncLogisticsFromSchedules = (logistics = [], schedules = []) => {
     if (pickupSchedule) {
       pickup.time = pickupSchedule.startTime || pickupSchedule.start_time || '';
       pickup.end_time = pickupSchedule.endTime || pickupSchedule.end_time || '';
+      pickup.note = resolveTransferNoteFromSchedule(pickupSchedule.description || '', pickup);
       pickup.detached = false;
     } else if (hasPickupContent(pickup)) {
       pickup.detached = true;
@@ -255,6 +287,7 @@ const syncLogisticsFromSchedules = (logistics = [], schedules = []) => {
     if (dropoffSchedule) {
       dropoff.time = dropoffSchedule.startTime || dropoffSchedule.start_time || '';
       dropoff.end_time = dropoffSchedule.endTime || dropoffSchedule.end_time || '';
+      dropoff.note = resolveTransferNoteFromSchedule(dropoffSchedule.description || '', dropoff);
       dropoff.detached = false;
     } else if (hasPickupContent(dropoff)) {
       dropoff.detached = true;
@@ -323,14 +356,14 @@ const mergeSchedulesWithLogistics = (schedules = [], logistics = [], groupId) =>
 
       const existing = scheduleByResource.get(resourceId);
       const location = meals[`${key}_place`] || '';
-      const description = meals[key] || '';
+      const arrangement = meals[key] || '';
       const basePayload = {
         groupId,
         date,
         type: 'meal',
-        title: description || MEAL_LABELS[key],
+        title: arrangement || MEAL_LABELS[key],
         location,
-        description,
+        description: '',
         resourceId,
         isFromResource: true
       };
@@ -359,14 +392,19 @@ const mergeSchedulesWithLogistics = (schedules = [], logistics = [], groupId) =>
         return;
       }
 
-      const hasTimeRange = data.time && data.end_time;
+      const startTime = data.time || '';
+      const endTime = data.end_time
+        || (startTime
+          ? dayjs(`2000-01-01 ${startTime}`, 'YYYY-MM-DD HH:mm').add(1, 'hour').format('HH:mm')
+          : '');
+      const hasTimeRange = Boolean(startTime && endTime);
       const basePayload = {
         groupId,
         date,
         type: 'transport',
         title: label,
         location: data.location || '',
-        description: buildFlightDescription(data),
+        description: buildTransferScheduleDescription(data),
         resourceId,
         isFromResource: true
       };
@@ -379,8 +417,8 @@ const mergeSchedulesWithLogistics = (schedules = [], logistics = [], groupId) =>
         }
         upsertSchedule(resourceId, {
           ...basePayload,
-          startTime: data.time,
-          endTime: data.end_time
+          startTime,
+          endTime
         });
         return;
       }
@@ -389,8 +427,8 @@ const mergeSchedulesWithLogistics = (schedules = [], logistics = [], groupId) =>
 
       upsertSchedule(resourceId, {
         ...basePayload,
-        startTime: data.time,
-        endTime: data.end_time
+        startTime,
+        endTime
       }, true);
     };
 
@@ -443,6 +481,7 @@ const createEmptyLogisticsRow = (date) => ({
     flight_no: '',
     airline: '',
     terminal: '',
+    note: '',
     disabled: false,
     detached: false
   },
@@ -454,6 +493,7 @@ const createEmptyLogisticsRow = (date) => ({
     flight_no: '',
     airline: '',
     terminal: '',
+    note: '',
     disabled: false,
     detached: false
   },
@@ -516,6 +556,7 @@ const mergeAiLogisticsPatches = (existingRows = [], patches = []) => {
       if (transfer.flightNo !== undefined) next[key].flight_no = transfer.flightNo || '';
       if (transfer.airline !== undefined) next[key].airline = transfer.airline || '';
       if (transfer.terminal !== undefined) next[key].terminal = transfer.terminal || '';
+      if (transfer.note !== undefined) next[key].note = transfer.note || '';
       if (transfer.disabled !== undefined) next[key].disabled = !!transfer.disabled;
       next[key].detached = false;
     });
@@ -624,7 +665,7 @@ const GroupManagementV2 = () => {
 
   const [filters, setFilters] = useState({
     searchText: '',
-    statusFilters: ['准备中', '进行中', '已完成']
+    statusFilters: ['准备中', '进行中', '已完成', '已取消']
   });
 
   const createBulkRow = () => ({

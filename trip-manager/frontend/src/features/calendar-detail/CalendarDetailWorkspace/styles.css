@@ -520,6 +520,33 @@
   color: #374151;
 }
 
+.meal-editor-title-inline {
+  gap: 8px;
+}
+
+.meal-editor-label {
+  flex: 0 0 auto;
+}
+
+.meal-editor-time-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.meal-editor-time-label {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.meal-editor-time-input {
+  width: 78px;
+  flex: 0 0 78px;
+}
+
 .meal-editor-toggle {
   border: 1px solid #bbf7d0;
   background: #ecfdf3;

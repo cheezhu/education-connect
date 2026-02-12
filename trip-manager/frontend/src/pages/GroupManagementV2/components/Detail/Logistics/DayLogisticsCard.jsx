@@ -578,18 +578,18 @@ const DayLogisticsCard = ({
           <div className={`meal-row ${breakfastDisabled ? 'is-disabled' : ''}`}>
             <div className="meal-label-box breakfast">早餐</div>
             <input
+              className="meal-input meal-input-plan"
+              value={meals.breakfast || ''}
+              placeholder={breakfastDisabled ? '已标记不安排' : '早餐餐厅名'}
+              onChange={(event) => handleMealChange('breakfast', event.target.value)}
+              list={`${id}-meal`}
+              disabled={breakfastDisabled}
+            />
+            <input
               className="meal-input meal-input-address"
               value={meals.breakfast_place || ''}
               placeholder={breakfastDisabled ? '已标记不安排' : '地址'}
               onChange={(event) => handleMealChange('breakfast_place', event.target.value)}
-              disabled={breakfastDisabled}
-            />
-            <input
-              className="meal-input meal-input-plan"
-              value={meals.breakfast || ''}
-              placeholder={breakfastDisabled ? '已标记不安排' : '早餐安排'}
-              onChange={(event) => handleMealChange('breakfast', event.target.value)}
-              list={`${id}-meal`}
               disabled={breakfastDisabled}
             />
             <button
@@ -603,18 +603,18 @@ const DayLogisticsCard = ({
           <div className={`meal-row ${lunchDisabled ? 'is-disabled' : ''}`}>
             <div className="meal-label-box lunch">午餐</div>
             <input
+              className="meal-input meal-input-plan"
+              value={meals.lunch || ''}
+              placeholder={lunchDisabled ? '已标记不安排' : '午餐餐厅名'}
+              onChange={(event) => handleMealChange('lunch', event.target.value)}
+              list={`${id}-meal`}
+              disabled={lunchDisabled}
+            />
+            <input
               className="meal-input meal-input-address"
               value={meals.lunch_place || ''}
               placeholder={lunchDisabled ? '已标记不安排' : '地址'}
               onChange={(event) => handleMealChange('lunch_place', event.target.value)}
-              disabled={lunchDisabled}
-            />
-            <input
-              className="meal-input meal-input-plan"
-              value={meals.lunch || ''}
-              placeholder={lunchDisabled ? '已标记不安排' : '午餐安排'}
-              onChange={(event) => handleMealChange('lunch', event.target.value)}
-              list={`${id}-meal`}
               disabled={lunchDisabled}
             />
             <button
@@ -628,18 +628,18 @@ const DayLogisticsCard = ({
           <div className={`meal-row ${dinnerDisabled ? 'is-disabled' : ''}`}>
             <div className="meal-label-box dinner">晚餐</div>
             <input
+              className="meal-input meal-input-plan"
+              value={meals.dinner || ''}
+              placeholder={dinnerDisabled ? '已标记不安排' : '晚餐餐厅名'}
+              onChange={(event) => handleMealChange('dinner', event.target.value)}
+              list={`${id}-meal`}
+              disabled={dinnerDisabled}
+            />
+            <input
               className="meal-input meal-input-address"
               value={meals.dinner_place || ''}
               placeholder={dinnerDisabled ? '已标记不安排' : '地址'}
               onChange={(event) => handleMealChange('dinner_place', event.target.value)}
-              disabled={dinnerDisabled}
-            />
-            <input
-              className="meal-input meal-input-plan"
-              value={meals.dinner || ''}
-              placeholder={dinnerDisabled ? '已标记不安排' : '晚餐安排'}
-              onChange={(event) => handleMealChange('dinner', event.target.value)}
-              list={`${id}-meal`}
               disabled={dinnerDisabled}
             />
             <button
@@ -716,7 +716,7 @@ const DayLogisticsCard = ({
             <span className={`summary-status ${statusClassName(securityStatus)}`}>{securityStatus}</span>
           </div>
           <div className="summary-status-item">
-            <span>餐饮安排</span>
+            <span>餐厅名</span>
             <span className={`summary-status ${statusClassName(mealStatus)}`}>{mealStatus}</span>
           </div>
         </div>
