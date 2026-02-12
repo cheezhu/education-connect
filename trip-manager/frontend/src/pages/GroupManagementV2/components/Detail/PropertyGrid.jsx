@@ -143,7 +143,13 @@ const PropertyRow = ({
   );
 };
 
-const PropertyGrid = ({ properties = [], onChangeProperty, onAddProperty, showAdd = true }) => {
+const PropertyGrid = ({
+  properties = [],
+  onChangeProperty,
+  onAddProperty,
+  showAdd = true,
+  footer = null
+}) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingFocusId, setPendingFocusId] = useState(null);
   const wrapperRef = useRef(null);
@@ -199,6 +205,8 @@ const PropertyGrid = ({ properties = [], onChangeProperty, onAddProperty, showAd
           </div>
         </div>
       )}
+
+      {!showAdd && footer ? <div className="add-prop-wrapper">{footer}</div> : null}
     </div>
   );
 };

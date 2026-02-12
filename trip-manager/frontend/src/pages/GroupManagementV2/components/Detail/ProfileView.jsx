@@ -657,22 +657,6 @@ const ProfileView = ({
     });
   };
 
-  const handleAddProperty = (typeMeta) => {
-    const fallbackType = typeMeta?.type || 'text';
-    const newId = `prop-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const label = typeMeta?.label || '文本';
-    const nextProp = {
-      id: newId,
-      key: label,
-      value: '',
-      type: fallbackType,
-      icon: typeMeta?.icon || 'Aa',
-      placeholder: fallbackType === 'date' ? 'YYYY-MM-DD → YYYY-MM-DD' : '未填写'
-    };
-    setProperties((prev) => [...prev, nextProp]);
-    return newId;
-  };
-
   const statusOptions = [
     { value: null, label: '自动' },
     { value: '准备中', label: '准备中' },
@@ -765,28 +749,8 @@ const ProfileView = ({
   return (
     <div className="profile-layout profile-doc">
       <div className="profile-center doc-container">
-        <div className="doc-actions">
-          <div className="breadcrumb">
-            <span>团组</span>
-            <span className="breadcrumb-sep">/</span>
-            <span>{draft.name || '未命名团组'}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span className="doc-status">自动保存</span>
-            <button
-              type="button"
-              className="btn-delete"
-              onClick={handleDeleteGroup}
-              disabled={!group?.id || !onDelete}
-            >
-              删除团组
-            </button>
-          </div>
-        </div>
-
         <div className="doc-content">
-          <div>
-            <div className="doc-icon">🗂️</div>
+          <div className="profile-headline">
             <input
               className="doc-title"
               value={draft.name || ''}
@@ -809,7 +773,17 @@ const ProfileView = ({
           <PropertyGrid
             properties={properties}
             onChangeProperty={handlePropertyUpdate}
-            onAddProperty={handleAddProperty}
+            showAdd={false}
+            footer={(
+              <button
+                type="button"
+                className="add-prop-btn profile-delete-btn"
+                onClick={handleDeleteGroup}
+                disabled={!group?.id || !onDelete}
+              >
+                删除团组
+              </button>
+            )}
           />
 
           <div className="must-visit-module">

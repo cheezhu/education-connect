@@ -6,9 +6,7 @@ const TabBar = ({
   onTabChange,
   isSidebarCollapsed,
   onExpandSidebar,
-  onCollapseSidebar,
-  onOpenAiImport,
-  aiImportDisabled = false
+  onCollapseSidebar
 }) => {
   return (
     <div className="tab-container">
@@ -62,17 +60,6 @@ const TabBar = ({
         </div>
       </div>
 
-      <div className="tab-actions">
-        <button
-          type="button"
-          className="tab-ai-btn"
-          onClick={onOpenAiImport}
-          disabled={aiImportDisabled}
-          title={aiImportDisabled ? '请先选择团组' : '粘贴文本自动导入到日历与每日卡片'}
-        >
-          AI导入
-        </button>
-      </div>
     </div>
   );
 };

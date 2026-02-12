@@ -21,7 +21,6 @@ import LogisticsView from './components/Detail/Logistics/LogisticsView';
 import ItineraryTextDetail from './components/Detail/ItineraryTextDetail';
 import HelpView from './components/Detail/HelpView';
 import BulkCreateModal from './components/Modals/BulkCreateModal';
-import AIImportModal from './components/Modals/AIImportModal';
 import MembersView from './components/Detail/MembersView';
 import GroupCommandCenterSkeleton from './components/GroupCommandCenterSkeleton';
 import './GroupCommandCenter.css';
@@ -500,125 +499,6 @@ const createEmptyLogisticsRow = (date) => ({
   note: ''
 });
 
-const mergeAiLogisticsPatches = (existingRows = [], patches = []) => {
-  const map = new Map();
-  (Array.isArray(existingRows) ? existingRows : []).forEach((row) => {
-    if (!row?.date) return;
-    map.set(row.date, {
-      ...createEmptyLogisticsRow(row.date),
-      ...row,
-      meals: { ...createEmptyLogisticsRow(row.date).meals, ...(row.meals || {}) },
-      pickup: { ...createEmptyLogisticsRow(row.date).pickup, ...(row.pickup || {}) },
-      dropoff: { ...createEmptyLogisticsRow(row.date).dropoff, ...(row.dropoff || {}) },
-      vehicle: { driver: '', plate: '', phone: '', ...(row.vehicle || {}) },
-      guide: { name: '', phone: '', ...(row.guide || {}) },
-      security: { name: '', phone: '', ...(row.security || {}) }
-    });
-  });
-
-  (Array.isArray(patches) ? patches : []).forEach((patch) => {
-    const date = patch?.date;
-    if (!date) return;
-    const current = map.get(date) || createEmptyLogisticsRow(date);
-    const next = {
-      ...current,
-      meals: { ...current.meals },
-      pickup: { ...current.pickup },
-      dropoff: { ...current.dropoff }
-    };
-
-    ['city', 'departure_city', 'arrival_city', 'hotel', 'hotel_address', 'note'].forEach((field) => {
-      if (patch[field] !== undefined && patch[field] !== null && String(patch[field]).trim() !== '') {
-        next[field] = String(patch[field]).trim();
-      }
-    });
-
-    if (patch.meals && typeof patch.meals === 'object') {
-      ['breakfast', 'lunch', 'dinner'].forEach((key) => {
-        const meal = patch.meals[key];
-        if (!meal || typeof meal !== 'object') return;
-        if (meal.arrangement !== undefined) next.meals[key] = meal.arrangement || '';
-        if (meal.place !== undefined) next.meals[`${key}_place`] = meal.place || '';
-        if (meal.disabled !== undefined) next.meals[`${key}_disabled`] = !!meal.disabled;
-        if (meal.startTime !== undefined) next.meals[`${key}_time`] = meal.startTime || '';
-        if (meal.endTime !== undefined) next.meals[`${key}_end`] = meal.endTime || '';
-        next.meals[`${key}_detached`] = false;
-      });
-    }
-
-    ['pickup', 'dropoff'].forEach((key) => {
-      const transfer = patch[key];
-      if (!transfer || typeof transfer !== 'object') return;
-      if (transfer.time !== undefined) next[key].time = transfer.time || '';
-      if (transfer.endTime !== undefined) next[key].end_time = transfer.endTime || '';
-      if (transfer.location !== undefined) next[key].location = transfer.location || '';
-      if (transfer.contact !== undefined) next[key].contact = transfer.contact || '';
-      if (transfer.flightNo !== undefined) next[key].flight_no = transfer.flightNo || '';
-      if (transfer.airline !== undefined) next[key].airline = transfer.airline || '';
-      if (transfer.terminal !== undefined) next[key].terminal = transfer.terminal || '';
-      if (transfer.note !== undefined) next[key].note = transfer.note || '';
-      if (transfer.disabled !== undefined) next[key].disabled = !!transfer.disabled;
-      next[key].detached = false;
-    });
-
-    map.set(date, next);
-  });
-
-  return Array.from(map.values()).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
-};
-
-const buildScheduleDedupeKey = (schedule) => (
-  [
-    schedule?.date || '',
-    schedule?.startTime || '',
-    schedule?.endTime || '',
-    schedule?.type || '',
-    schedule?.title || '',
-    schedule?.location || ''
-  ].join('|')
-);
-
-const mergeAiScheduleCandidates = (existing = [], candidates = [], groupId) => {
-  const list = (Array.isArray(existing) ? existing : []).map((item) => ({ ...item }));
-  const keys = new Set(list.map(buildScheduleDedupeKey));
-
-  (Array.isArray(candidates) ? candidates : []).forEach((candidate) => {
-    const resourceId = candidate?.resourceId || '';
-    if (typeof resourceId === 'string' && resourceId.startsWith('daily:')) {
-      return;
-    }
-    if (!candidate?.date || !candidate?.startTime || !candidate?.endTime) {
-      return;
-    }
-
-    const normalized = {
-      id: null,
-      groupId,
-      date: candidate.date,
-      startTime: candidate.startTime,
-      endTime: candidate.endTime,
-      type: candidate.type || 'visit',
-      title: candidate.title || '',
-      location: candidate.location || '',
-      description: candidate.description || '',
-      color: candidate.color || null,
-      resourceId: resourceId || null,
-      isFromResource: !!candidate.isFromResource,
-      locationId: candidate.locationId ?? null
-    };
-    const key = buildScheduleDedupeKey(normalized);
-    if (keys.has(key)) return;
-    keys.add(key);
-    list.push(normalized);
-  });
-
-  return list.sort((a, b) => {
-    const aKey = `${a.date || ''}|${a.startTime || ''}|${a.endTime || ''}|${a.title || ''}`;
-    const bKey = `${b.date || ''}|${b.startTime || ''}|${b.endTime || ''}|${b.title || ''}`;
-    return aKey.localeCompare(bKey);
-  });
-};
-
 class TabErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -681,11 +561,6 @@ const GroupManagementV2 = () => {
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [bulkRows, setBulkRows] = useState(() => [createBulkRow()]);
   const [bulkErrors, setBulkErrors] = useState({});
-  const [aiImportOpen, setAiImportOpen] = useState(false);
-  const [aiImportText, setAiImportText] = useState('');
-  const [aiImportParsing, setAiImportParsing] = useState(false);
-  const [aiImportApplying, setAiImportApplying] = useState(false);
-  const [aiImportResult, setAiImportResult] = useState(null);
 
   const saveRef = useRef(null);
   const scheduleSaveRef = useRef(null);
@@ -956,10 +831,6 @@ const GroupManagementV2 = () => {
 
   useEffect(() => {
     scheduleSnapshotRef.current = [];
-  }, [activeGroupId]);
-
-  useEffect(() => {
-    setAiImportResult(null);
   }, [activeGroupId]);
 
   const activeGroup = useMemo(() => (
@@ -1241,82 +1112,6 @@ const GroupManagementV2 = () => {
     }
   };
 
-  const handleOpenAiImport = () => {
-    if (!activeGroupId || !activeGroup) {
-      message.warning('请先选择团组');
-      return;
-    }
-    setAiImportResult(null);
-    setAiImportOpen(true);
-  };
-
-  const handleParseAiImport = async () => {
-    if (!activeGroupId) {
-      message.warning('请先选择团组');
-      return;
-    }
-    const text = aiImportText.trim();
-    if (!text) {
-      message.warning('请先粘贴行程文本');
-      return;
-    }
-
-    setAiImportParsing(true);
-    try {
-      const response = await api.post('/ai/itinerary/parse', {
-        groupId: activeGroupId,
-        rawText: text
-      });
-      setAiImportResult(response.data || null);
-      message.success('解析完成，请确认后导入');
-    } catch (error) {
-      message.error(getRequestErrorMessage(error, 'AI解析失败'));
-    } finally {
-      setAiImportParsing(false);
-    }
-  };
-
-  const handleApplyAiImport = async () => {
-    if (!activeGroup || !activeGroupId || !aiImportResult) return;
-
-    setAiImportApplying(true);
-    try {
-      const nextLogisticsRaw = mergeAiLogisticsPatches(
-        activeGroup.logistics || [],
-        aiImportResult.logisticsPatches || []
-      );
-      const nextSchedulesPre = mergeAiScheduleCandidates(
-        groupSchedules,
-        aiImportResult.scheduleCandidates || [],
-        activeGroupId
-      );
-      const nextSchedules = mergeSchedulesWithLogistics(nextSchedulesPre, nextLogisticsRaw, activeGroupId);
-      const syncedLogistics = syncLogisticsFromSchedules(nextLogisticsRaw, nextSchedules);
-      const nextCustomResources = mergeCustomResources(activeGroup.customResources || [], nextSchedules);
-
-      setGroups(prev => prev.map((group) => (
-        group.id === activeGroupId
-          ? { ...group, logistics: syncedLogistics, customResources: nextCustomResources }
-          : group
-      )));
-
-      setGroupSchedules(nextSchedules);
-      scheduleSignatureRef.current = buildScheduleSignature(nextSchedules);
-      scheduleSnapshotRef.current = nextSchedules;
-
-      queueLogisticsSave(activeGroupId, syncedLogistics);
-      queueScheduleSave(activeGroupId, nextSchedules);
-
-      setAiImportOpen(false);
-      setAiImportResult(null);
-      message.success(`AI导入完成：${nextSchedules.length} 条活动，${syncedLogistics.length} 天每日卡片`);
-    } catch (error) {
-      message.error(getRequestErrorMessage(error, '应用导入结果失败'));
-    } finally {
-      setAiImportApplying(false);
-    }
-  };
-
   if (loading && groups.length === 0) {
     return <GroupCommandCenterSkeleton />;
   }
@@ -1429,12 +1224,10 @@ const GroupManagementV2 = () => {
               isSidebarCollapsed={isSidebarCollapsed}
               onExpandSidebar={handleExpandSidebar}
               onCollapseSidebar={handleCollapseSidebar}
-              onOpenAiImport={handleOpenAiImport}
-              aiImportDisabled={!activeGroupId}
             />
 
             <div className="tab-content">
-              <div className="content-pane active">
+              <div className={`content-pane active ${activeTab === 'itinerary' ? 'pane-itinerary' : ''}`}>
                 <TabErrorBoundary
                   fallback="当前标签页渲染失败，请检查控制台错误。"
                 >
@@ -1459,23 +1252,6 @@ const GroupManagementV2 = () => {
         }}
         onSubmit={handleBulkCreate}
         submitting={bulkSubmitting}
-      />
-
-      <AIImportModal
-        open={aiImportOpen}
-        groupName={activeGroup?.name || ''}
-        rawText={aiImportText}
-        onRawTextChange={setAiImportText}
-        onClose={() => {
-          if (aiImportParsing || aiImportApplying) return;
-          setAiImportOpen(false);
-          setAiImportResult(null);
-        }}
-        onParse={handleParseAiImport}
-        onApply={handleApplyAiImport}
-        parsing={aiImportParsing}
-        applying={aiImportApplying}
-        result={aiImportResult}
       />
 
       {loading && groups.length > 0 && (

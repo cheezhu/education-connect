@@ -638,16 +638,16 @@ const ItineraryTextDetail = ({ group, schedules }) => {
     <div className="itinerary-view">
       <div className="itinerary-header">
         <div className="iti-title-compact">
-          <span>{groupTitle}</span>
-          {groupId ? <span className="iti-tag">{groupId}</span> : null}
-          {compactMetaText ? (
-            <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 400 }}>
-              {compactMetaText}
-            </span>
-          ) : null}
+          <div className="iti-title-main">{groupTitle}</div>
+          <div className="iti-meta-line">
+            {groupId ? <span className="iti-tag">{groupId}</span> : null}
+            {compactMetaText ? (
+              <span className="iti-meta-text">{compactMetaText}</span>
+            ) : null}
+          </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div className="itinerary-header-actions">
           <button type="button" className="action-sm" disabled={exporting} onClick={handleExportWord}>
             <FileTextOutlined /> 导出 DOCX
           </button>
