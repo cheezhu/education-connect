@@ -32,6 +32,7 @@ CREATE TABLE groups (
     accommodation TEXT,
     tags TEXT,
     notes TEXT,
+    notes_images TEXT DEFAULT '[]',
     must_visit_mode TEXT DEFAULT 'plan',
     manual_must_visit_location_ids TEXT DEFAULT '[]',
     schedule_revision INTEGER DEFAULT 0,

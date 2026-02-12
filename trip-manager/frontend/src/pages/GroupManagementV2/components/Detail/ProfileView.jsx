@@ -55,6 +55,77 @@ const normalizeNotes = (value) => {
   return text;
 };
 
+const MAX_NOTE_IMAGE_COUNT = 8;
+const MAX_NOTE_IMAGE_SIZE = 5 * 1024 * 1024;
+const MAX_NOTE_IMAGE_TOTAL_CHARS = 8 * 1024 * 1024;
+const NOTE_IMAGE_MAX_EDGE = 1600;
+const NOTE_IMAGE_QUALITY = 0.82;
+
+const normalizeNotesImages = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return normalizeNotesImages(parsed);
+      }
+    } catch (error) {
+      // ignore parse error
+    }
+  }
+  return [];
+};
+
+const readFileAsDataUrlRaw = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result || ''));
+  reader.onerror = () => reject(new Error('file_read_failed'));
+  reader.readAsDataURL(file);
+});
+
+const loadImageElement = (src) => new Promise((resolve, reject) => {
+  const image = new Image();
+  image.onload = () => resolve(image);
+  image.onerror = () => reject(new Error('image_decode_failed'));
+  image.src = src;
+});
+
+const compressImageDataUrl = async (dataUrl) => {
+  const image = await loadImageElement(dataUrl);
+  const originWidth = Number(image.naturalWidth || image.width || 0);
+  const originHeight = Number(image.naturalHeight || image.height || 0);
+  if (!originWidth || !originHeight) return dataUrl;
+
+  const scale = Math.min(1, NOTE_IMAGE_MAX_EDGE / Math.max(originWidth, originHeight));
+  const width = Math.max(1, Math.round(originWidth * scale));
+  const height = Math.max(1, Math.round(originHeight * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return dataUrl;
+  ctx.drawImage(image, 0, 0, width, height);
+
+  const compressed = canvas.toDataURL('image/jpeg', NOTE_IMAGE_QUALITY);
+  return compressed.length < dataUrl.length ? compressed : dataUrl;
+};
+
+const readFileAsDataUrl = async (file) => {
+  const raw = await readFileAsDataUrlRaw(file);
+  if (!String(file?.type || '').startsWith('image/')) {
+    return raw;
+  }
+  try {
+    return await compressImageDataUrl(raw);
+  } catch (error) {
+    return raw;
+  }
+};
+
 const normalizeMustVisitMode = (value, fallback = 'plan') => {
   const mode = String(value || '').trim().toLowerCase();
   if (mode === 'plan' || mode === 'manual') {
@@ -359,6 +430,9 @@ const ProfileView = ({
 }) => {
   const [draft, setDraft] = useState(group || null);
   const [properties, setProperties] = useState([]);
+  const [uploadError, setUploadError] = useState('');
+  const [previewImage, setPreviewImage] = useState('');
+  const imageInputRef = useRef(null);
   const hydrateRef = useRef(false);
   const debounceRef = useRef(null);
   const lastDraftRef = useRef(null);
@@ -367,10 +441,18 @@ const ProfileView = ({
     if (!group) {
       setDraft(null);
       setProperties([]);
+      setUploadError('');
+      setPreviewImage('');
       return;
     }
     hydrateRef.current = true;
-    setDraft({ ...group, notes: normalizeNotes(group.notes) });
+    setDraft({
+      ...group,
+      notes: normalizeNotes(group.notes),
+      notes_images: normalizeNotesImages(group.notes_images)
+    });
+    setUploadError('');
+    setPreviewImage('');
     const base = buildBaseProperties(group, hasMembers);
     setProperties(mergeCustomProperties(base, group.properties));
   }, [group?.id, hasMembers]);
@@ -427,6 +509,7 @@ const ProfileView = ({
   }, [schedules]);
 
   const previewDays = useMemo(() => logistics, [logistics]);
+  const noteImages = useMemo(() => normalizeNotesImages(draft?.notes_images), [draft?.notes_images]);
 
   if (!group || !draft) {
     return (
@@ -444,6 +527,66 @@ const ProfileView = ({
 
   const handleStatusChange = (value) => {
     setDraft((prev) => ({ ...prev, status: value || null }));
+  };
+
+  const handleOpenImagePicker = () => {
+    imageInputRef.current?.click();
+  };
+
+  const handleUploadImages = async (event) => {
+    const files = Array.from(event.target?.files || []);
+    // Allow selecting the same file again.
+    event.target.value = '';
+    if (!files.length) return;
+
+    const currentImages = normalizeNotesImages(draft?.notes_images);
+    const remain = Math.max(0, MAX_NOTE_IMAGE_COUNT - currentImages.length);
+    if (remain <= 0) {
+      setUploadError(`Max ${MAX_NOTE_IMAGE_COUNT} images.`);
+      return;
+    }
+
+    const selected = files.slice(0, remain);
+    const hasNonImage = selected.some((file) => !String(file.type || '').startsWith('image/'));
+    if (hasNonImage) {
+      setUploadError('Only image files are supported.');
+      return;
+    }
+
+    const tooLarge = selected.some((file) => Number(file.size || 0) > MAX_NOTE_IMAGE_SIZE);
+    if (tooLarge) {
+      setUploadError(`Each image must be <= ${Math.round(MAX_NOTE_IMAGE_SIZE / (1024 * 1024))}MB.`);
+      return;
+    }
+
+    try {
+      const uploaded = await Promise.all(selected.map((file) => readFileAsDataUrl(file)));
+      const combined = [...currentImages, ...uploaded];
+      const totalChars = combined.reduce((acc, item) => acc + String(item || '').length, 0);
+      if (totalChars > MAX_NOTE_IMAGE_TOTAL_CHARS) {
+        setUploadError('Total image size is too large. Please upload fewer/smaller images.');
+        return;
+      }
+      setDraft((prev) => ({
+        ...prev,
+        notes_images: [...normalizeNotesImages(prev?.notes_images), ...uploaded]
+      }));
+      setUploadError('');
+    } catch (error) {
+      setUploadError('Failed to read image files.');
+    }
+  };
+
+  const handleRemoveImage = (index) => {
+    setDraft((prev) => {
+      const nextImages = normalizeNotesImages(prev?.notes_images).filter((_, idx) => idx !== index);
+      return { ...prev, notes_images: nextImages };
+    });
+  };
+
+  const handlePreviewImage = (url) => {
+    if (!url) return;
+    setPreviewImage(url);
   };
 
   const handleDeleteGroup = () => {
@@ -932,9 +1075,68 @@ const ProfileView = ({
               value={draft.notes || ''}
               onChange={(event) => setDraft((prev) => ({ ...prev, notes: event.target.value }))}
             />
+            <div className="notes-image-tools">
+              <button
+                type="button"
+                className="notes-image-upload-btn"
+                onClick={handleOpenImagePicker}
+              >
+                Upload Image
+              </button>
+              <span className="notes-image-counter">{noteImages.length}/{MAX_NOTE_IMAGE_COUNT}</span>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="notes-image-input"
+                onChange={handleUploadImages}
+              />
+            </div>
+            {uploadError ? (
+              <div className="notes-image-error">{uploadError}</div>
+            ) : null}
+            {noteImages.length > 0 ? (
+              <div className="notes-image-grid">
+                {noteImages.map((imageUrl, index) => (
+                  <div className="notes-image-item" key={`${index}-${imageUrl.slice(0, 24)}`}>
+                    <button
+                      type="button"
+                      className="notes-image-thumb"
+                      onClick={() => handlePreviewImage(imageUrl)}
+                      title="Preview"
+                    >
+                      <img src={imageUrl} alt={`note-${index + 1}`} />
+                    </button>
+                    <button
+                      type="button"
+                      className="notes-image-remove"
+                      onClick={() => handleRemoveImage(index)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
+
+      {previewImage ? (
+        <div className="notes-image-preview-mask" onClick={() => setPreviewImage('')}>
+          <div className="notes-image-preview-dialog" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="notes-image-preview-close"
+              onClick={() => setPreviewImage('')}
+            >
+              Close
+            </button>
+            <img src={previewImage} alt="preview" className="notes-image-preview-img" />
+          </div>
+        </div>
+      ) : null}
 
     </div>
   );

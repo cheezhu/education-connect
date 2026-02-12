@@ -14,6 +14,7 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 const app = express();
 const PORT = process.env.PORT || 3001;
 const LAST_LOGIN_TOUCH_INTERVAL_MS = 60 * 1000;
+const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '25mb';
 const lastLoginTouchMap = new Map();
 let autoSnapshotTimer = null;
 
@@ -266,12 +267,16 @@ if (!groupColumns.includes('must_visit_mode')) {
 if (!groupColumns.includes('manual_must_visit_location_ids')) {
   db.exec('ALTER TABLE groups ADD COLUMN manual_must_visit_location_ids TEXT');
 }
+if (!groupColumns.includes('notes_images')) {
+  db.exec("ALTER TABLE groups ADD COLUMN notes_images TEXT DEFAULT '[]'");
+}
 if (!groupColumns.includes('group_code')) {
   db.exec('ALTER TABLE groups ADD COLUMN group_code VARCHAR(32)');
 }
 db.exec("UPDATE groups SET must_visit_mode = 'plan' WHERE must_visit_mode IS NULL OR TRIM(must_visit_mode) = ''");
 db.exec("UPDATE groups SET must_visit_mode = 'plan' WHERE must_visit_mode NOT IN ('plan', 'manual')");
 db.exec("UPDATE groups SET manual_must_visit_location_ids = '[]' WHERE manual_must_visit_location_ids IS NULL OR TRIM(manual_must_visit_location_ids) = ''");
+db.exec("UPDATE groups SET notes_images = '[]' WHERE notes_images IS NULL OR TRIM(notes_images) = ''");
 db.exec("UPDATE groups SET group_code = 'TG' || printf('%06d', id) WHERE group_code IS NULL OR TRIM(group_code) = ''");
 db.exec(`
   WITH duplicate_codes AS (
@@ -401,7 +406,7 @@ ensureGroupTypeConstraint();
 
 // 中间件
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
 app.use(express.static('public'));
 
 // 基础认证
@@ -494,6 +499,12 @@ app.use('/api/ai', require('./src/routes/aiImport'));
 app.use((err, req, res, next) => {
   console.error(err.stack);
   const status = Number(err?.status || err?.statusCode || 500);
+  if (status === 413) {
+    return res.status(413).json({
+      error: 'request_too_large',
+      message: 'Request payload is too large. Please upload fewer/smaller images.'
+    });
+  }
   res.status(Number.isFinite(status) ? status : 500).json({ 
     error: '服务器错误',
     message: process.env.NODE_ENV === 'development' ? err.message : undefined

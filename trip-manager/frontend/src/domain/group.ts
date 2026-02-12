@@ -27,6 +27,7 @@ export type Group = {
   accommodation?: string;
   tags?: string[]; // hydrated to array
   notes?: string;
+  notes_images?: string[];
 
   created_at?: string;
   updated_at?: string;

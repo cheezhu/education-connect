@@ -104,24 +104,17 @@ const normalizeLogisticsRow = (date, source = {}) => ({
   note: toText(source.note)
 });
 
-const cloneRowValues = (date, source) => ({
-  date,
-  city: source.city || '',
-  departure_city: source.departure_city || source.departureCity || '',
-  arrival_city: source.arrival_city || source.arrivalCity || '',
+const copyPrevTravelFields = (target, source) => ({
+  ...target,
   hotel: source.hotel || '',
   hotel_address: source.hotel_address || source.hotelAddress || '',
   hotel_disabled: source.hotel_disabled || false,
-  pickup: { ...(source.pickup || {}) },
-  dropoff: { ...(source.dropoff || {}) },
-  meals: { ...(source.meals || {}) },
   vehicle: { ...(source.vehicle || {}) },
   vehicle_disabled: source.vehicle_disabled || false,
   guide: { ...(source.guide || {}) },
   guide_disabled: source.guide_disabled || false,
   security: { ...(source.security || {}) },
-  security_disabled: source.security_disabled || false,
-  note: source.note || ''
+  security_disabled: source.security_disabled || false
 });
 
 const buildScheduleMap = (schedules = []) => {
@@ -444,7 +437,7 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
       const source = prev[index - 1];
       if (!source) return prev;
       const next = prev.map((row, idx) => (
-        idx === index ? cloneRowValues(row.date, source) : row
+        idx === index ? copyPrevTravelFields(row, source) : row
       ));
       queueSave(next);
       return next;

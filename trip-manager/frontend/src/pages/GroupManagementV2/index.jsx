@@ -54,6 +54,7 @@ const GROUP_UPDATE_FIELDS = [
   'accommodation',
   'tags',
   'notes',
+  'notes_images',
   'itinerary_plan_id',
   'manual_must_visit_location_ids',
   'status'

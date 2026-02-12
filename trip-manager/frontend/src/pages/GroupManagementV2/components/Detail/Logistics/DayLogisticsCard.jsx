@@ -405,7 +405,7 @@ const DayLogisticsCard = ({
             disabled={index === 0}
             onClick={() => onCopyPrevDay?.(index)}
           >
-            复制上一日
+            复制上一日出行安排
           </button>
         </div>
       </div>

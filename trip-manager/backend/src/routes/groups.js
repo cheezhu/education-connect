@@ -85,6 +85,29 @@ const normalizeTags = (value) => {
 
 const serializeTags = (value) => JSON.stringify(normalizeTags(value));
 
+const normalizeNotesImages = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return normalizeNotesImages(parsed);
+      }
+    } catch (error) {
+      // ignore parse error
+    }
+  }
+  return [];
+};
+
+const serializeNotesImages = (value) => JSON.stringify(normalizeNotesImages(value));
+
 const normalizeMustVisitMode = (value, fallback = 'plan') => {
   const mode = String(value || '').trim().toLowerCase();
   if (mode === 'plan' || mode === 'manual') {
@@ -135,6 +158,7 @@ const hydrateGroup = (group) => {
   return {
     ...group,
     tags: normalizeTags(group.tags),
+    notes_images: normalizeNotesImages(group.notes_images),
     must_visit_mode: normalizeMustVisitMode(group.must_visit_mode, fallbackMode),
     manual_must_visit_location_ids: manualMustVisitLocationIds
   };
@@ -163,6 +187,7 @@ const normalizeGroupPayload = (payload = {}) => {
   const accommodation = payload.accommodation ?? '';
   const tags = serializeTags(payload.tags);
   const notes = payload.notes ?? '';
+  const notesImages = serializeNotesImages(payload.notesImages ?? payload.notes_images);
   const manualMustVisitLocationIds = mustVisitMode === 'manual'
     ? serializeManualMustVisitLocationIds(manualMustVisitLocationIdsRaw)
     : '[]';
@@ -185,6 +210,7 @@ const normalizeGroupPayload = (payload = {}) => {
     accommodation,
     tags,
     notes,
+    notesImages,
     mustVisitMode,
     manualMustVisitLocationIds
   };
@@ -207,8 +233,8 @@ router.post('/batch', requireEditLock, (req, res) => {
       name, type, student_count, teacher_count,
       start_date, end_date, duration, color, itinerary_plan_id, contact_person,
       contact_phone, emergency_contact, emergency_phone, accommodation, tags, notes,
-      must_visit_mode, manual_must_visit_location_ids
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      notes_images, must_visit_mode, manual_must_visit_location_ids
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const selectStmt = req.db.prepare('SELECT * FROM groups WHERE id = ?');
 
@@ -242,6 +268,7 @@ router.post('/batch', requireEditLock, (req, res) => {
         normalized.accommodation,
         normalized.tags,
         normalized.notes,
+        normalized.notesImages,
         normalized.mustVisitMode,
         normalized.manualMustVisitLocationIds
       );
@@ -281,6 +308,8 @@ router.post('/', requireEditLock, (req, res) => {
     accommodation,
     tags,
     notes,
+    notesImages,
+    notes_images,
     mustVisitMode,
     must_visit_mode,
     manualMustVisitLocationIds,
@@ -312,6 +341,7 @@ router.post('/', requireEditLock, (req, res) => {
   const resolvedItineraryPlanId = resolvedMustVisitMode === 'manual' ? null : resolvedItineraryPlanIdRaw;
   const resolvedAccommodation = accommodation ?? '';
   const resolvedTags = serializeTags(tags);
+  const resolvedNotesImages = serializeNotesImages(notesImages ?? notes_images);
   const resolvedManualMustVisitLocationIds = resolvedMustVisitMode === 'manual'
     ? serializeManualMustVisitLocationIds(manualMustVisitLocationIds ?? manual_must_visit_location_ids ?? [])
     : '[]';
@@ -331,13 +361,13 @@ router.post('/', requireEditLock, (req, res) => {
         name, type, student_count, teacher_count, 
         start_date, end_date, duration, color, itinerary_plan_id, status, contact_person,
         contact_phone, emergency_contact, emergency_phone, accommodation, tags, notes,
-        must_visit_mode, manual_must_visit_location_ids
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        notes_images, must_visit_mode, manual_must_visit_location_ids
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name, type, resolvedStudentCount, resolvedTeacherCount,
       resolvedStartDate, resolvedEndDate, resolvedDuration, resolvedColor, resolvedItineraryPlanId,
       resolvedStatus, resolvedContactPerson, resolvedContactPhone, resolvedEmergencyContact, resolvedEmergencyPhone,
-      resolvedAccommodation, resolvedTags, notes,
+      resolvedAccommodation, resolvedTags, notes, resolvedNotesImages,
       resolvedMustVisitMode, resolvedManualMustVisitLocationIds
     );
 
@@ -460,7 +490,7 @@ router.put('/:id', requireEditLock, (req, res) => {
     'name', 'type', 'student_count', 'teacher_count',
     'start_date', 'end_date', 'duration', 'color', 'contact_person',
     'contact_phone', 'emergency_contact', 'emergency_phone',
-    'accommodation', 'tags', 'notes', 'itinerary_plan_id', 'status',
+    'accommodation', 'tags', 'notes', 'notes_images', 'itinerary_plan_id', 'status',
     'must_visit_mode', 'manual_must_visit_location_ids'
   ];
 
@@ -469,6 +499,8 @@ router.put('/:id', requireEditLock, (req, res) => {
       updates.push(`${field} = ?`);
       if (field === 'tags') {
         values.push(serializeTags(normalizedBody[field]));
+      } else if (field === 'notes_images') {
+        values.push(serializeNotesImages(normalizedBody[field]));
       } else if (field === 'must_visit_mode') {
         values.push(normalizeMustVisitMode(normalizedBody[field], 'plan'));
       } else if (field === 'manual_must_visit_location_ids') {
