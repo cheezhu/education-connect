@@ -27,7 +27,7 @@ const TabBar = ({
           className={`tab-item ${activeTab === 'profile' ? 'active' : ''}`}
           onClick={() => onTabChange('profile')}
         >
-          团组信息
+          团组设置
         </div>
         <div
           className={`tab-item ${activeTab === 'itinerary' ? 'active' : ''}`}
