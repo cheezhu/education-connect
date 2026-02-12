@@ -39,8 +39,24 @@ export const getGroupHeadcount = (group: Group | null | undefined): number => {
   return students + teachers;
 };
 
+const normalizeGroupType = (type: GroupType | null | undefined): string => {
+  const raw = String(type || '').trim();
+  if (!raw) return '';
+  const normalized = raw.toLowerCase();
+  if (normalized === 'primary' || raw === '小学' || raw === '小學' || raw === '灏忓' || raw === 'å°å­¦') {
+    return 'primary';
+  }
+  if (normalized === 'secondary' || raw === '中学' || raw === '中學' || raw === '涓' || raw === 'ä¸­å­¦') {
+    return 'secondary';
+  }
+  if (normalized === 'vip') {
+    return 'vip';
+  }
+  return normalized;
+};
+
 export const getGroupTypeLabel = (type: GroupType | null | undefined): string => {
-  const normalized = String(type || '').trim().toLowerCase();
+  const normalized = normalizeGroupType(type);
   if (!normalized) return '';
   if (normalized === 'primary') return '小学';
   if (normalized === 'secondary') return '中学';

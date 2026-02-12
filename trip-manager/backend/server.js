@@ -227,6 +227,46 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS feedback_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    module_key TEXT NOT NULL DEFAULT 'other',
+    status TEXT NOT NULL DEFAULT 'open',
+    is_pinned BOOLEAN DEFAULT 0,
+    created_by TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    resolved_at DATETIME
+  );
+
+  CREATE TABLE IF NOT EXISTS feedback_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES feedback_posts(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    is_admin_reply BOOLEAN DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS feedback_reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES feedback_posts(id) ON DELETE CASCADE,
+    username TEXT NOT NULL,
+    reaction_type TEXT NOT NULL DEFAULT 'like',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(post_id, username, reaction_type)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_feedback_posts_status ON feedback_posts(status);
+  CREATE INDEX IF NOT EXISTS idx_feedback_posts_module ON feedback_posts(module_key);
+  CREATE INDEX IF NOT EXISTS idx_feedback_posts_pinned ON feedback_posts(is_pinned, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_feedback_comments_post ON feedback_comments(post_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_feedback_reactions_post ON feedback_reactions(post_id, reaction_type);
+`);
+
 const activityColumns = db.prepare("PRAGMA table_info(activities)").all().map(col => col.name);
 if (!activityColumns.includes('schedule_id')) {
   db.exec('ALTER TABLE activities ADD COLUMN schedule_id INTEGER');
@@ -278,6 +318,10 @@ db.exec("UPDATE groups SET must_visit_mode = 'plan' WHERE must_visit_mode NOT IN
 db.exec("UPDATE groups SET manual_must_visit_location_ids = '[]' WHERE manual_must_visit_location_ids IS NULL OR TRIM(manual_must_visit_location_ids) = ''");
 db.exec("UPDATE groups SET notes_images = '[]' WHERE notes_images IS NULL OR TRIM(notes_images) = ''");
 db.exec("UPDATE groups SET group_code = 'TG' || printf('%06d', id) WHERE group_code IS NULL OR TRIM(group_code) = ''");
+// Normalize historical/non-canonical type values to avoid mojibake in UI.
+db.exec("UPDATE groups SET type = 'primary' WHERE type IN ('小学', '小學', '灏忓', 'å°å­¦')");
+db.exec("UPDATE groups SET type = 'secondary' WHERE type IN ('中学', '中學', '涓', 'ä¸­å­¦')");
+db.exec("UPDATE groups SET type = 'vip' WHERE lower(trim(type)) = 'vip'");
 db.exec(`
   WITH duplicate_codes AS (
     SELECT group_code
@@ -484,6 +528,7 @@ app.use('/api/planning', requireRole(['admin']), require('./src/routes/planning'
 app.use('/api/config', requireRole(['admin']), require('./src/routes/systemConfig'));
 
 app.use('/api/users', require('./src/routes/users'));
+app.use('/api/feedback', requireAccess({ read: readAllRoles, write: readAllRoles }), require('./src/routes/feedback'));
 app.use('/api/statistics', requireAccess({ read: readAllRoles }), require('./src/routes/statistics'));
 app.use('/api/realtime', requireAccess({ read: readAllRoles }), require('./src/routes/realtime'));
 app.use('/api/groups', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/groups'));

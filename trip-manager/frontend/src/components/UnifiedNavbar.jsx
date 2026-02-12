@@ -8,6 +8,7 @@ import {
   EnvironmentOutlined,
   ExportOutlined,
   LogoutOutlined,
+  MessageOutlined,
   QuestionCircleOutlined,
   SearchOutlined,
   SettingOutlined,
@@ -102,6 +103,16 @@ const UnifiedNavbar = () => {
             <SettingOutlined />
           </div>
         )}
+      </div>
+
+      <div className="global-help-entry">
+        <div
+          className={`action-icon ${isActivePath('/feedback') ? 'active' : ''}`}
+          onClick={() => navigate('/feedback')}
+          title="意见反馈"
+        >
+          <MessageOutlined />
+        </div>
       </div>
 
       <div className="global-help-entry">

@@ -1,423 +1,27 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import PropertyGrid from './PropertyGrid';
-
-const weekdayLabel = (dateStr) => {
-  const day = dayjs(dateStr).day();
-  const labels = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-  return labels[day] || '';
-};
-
-const resolveEventTitle = (event) => {
-  return event?.title || event?.location || event?.description || '未命名活动';
-};
-
-const isItineraryItem = (item) => {
-  const type = (item?.type || '').toString().toLowerCase();
-  if (!type) return true;
-  return !['meal', 'transport', 'rest', 'free'].includes(type);
-};
-
-const buildDateValue = (startDate, endDate) => {
-  if (startDate && endDate) return `${startDate} → ${endDate}`;
-  return startDate || endDate || '';
-};
-
-const isValidDateString = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value || '');
-
-const isDraftValid = (value) => {
-  if (!value) return false;
-  if (!value.name || !String(value.name).trim()) return false;
-  if (!value.type) return false;
-  if (!isValidDateString(value.start_date) || !isValidDateString(value.end_date)) return false;
-  const start = dayjs(value.start_date);
-  const end = dayjs(value.end_date);
-  if (!start.isValid() || !end.isValid() || end.isBefore(start, 'day')) return false;
-  const duration = Number(value.duration);
-  if (!Number.isFinite(duration) || duration <= 0) return false;
-  return true;
-};
-
-const parseDateRangeInput = (value, fallbackEnd) => {
-  const matches = String(value || '').match(/\d{4}-\d{2}-\d{2}/g) || [];
-  if (matches.length === 0) return { start: '', end: '' };
-  if (matches.length === 1) return { start: matches[0], end: fallbackEnd || '' };
-  return { start: matches[0], end: matches[1] };
-};
-
-const normalizeNotes = (value) => {
-  if (value === null || value === undefined) return '';
-  const text = String(value);
-  const trimmed = text.trim();
-  if (!trimmed) return '';
-  const cleaned = trimmed.replace(/[.。…]+/g, '');
-  if (/^[?？]+$/.test(cleaned)) return '';
-  return text;
-};
-
-const MAX_NOTE_IMAGE_COUNT = 8;
-const MAX_NOTE_IMAGE_SIZE = 5 * 1024 * 1024;
-const MAX_NOTE_IMAGE_TOTAL_CHARS = 8 * 1024 * 1024;
-const NOTE_IMAGE_MAX_EDGE = 1600;
-const NOTE_IMAGE_QUALITY = 0.82;
-
-const normalizeNotesImages = (value) => {
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item || '').trim()).filter(Boolean);
-  }
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (!trimmed) return [];
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) {
-        return normalizeNotesImages(parsed);
-      }
-    } catch (error) {
-      // ignore parse error
-    }
-  }
-  return [];
-};
-
-const readFileAsDataUrlRaw = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve(String(reader.result || ''));
-  reader.onerror = () => reject(new Error('file_read_failed'));
-  reader.readAsDataURL(file);
-});
-
-const loadImageElement = (src) => new Promise((resolve, reject) => {
-  const image = new Image();
-  image.onload = () => resolve(image);
-  image.onerror = () => reject(new Error('image_decode_failed'));
-  image.src = src;
-});
-
-const compressImageDataUrl = async (dataUrl) => {
-  const image = await loadImageElement(dataUrl);
-  const originWidth = Number(image.naturalWidth || image.width || 0);
-  const originHeight = Number(image.naturalHeight || image.height || 0);
-  if (!originWidth || !originHeight) return dataUrl;
-
-  const scale = Math.min(1, NOTE_IMAGE_MAX_EDGE / Math.max(originWidth, originHeight));
-  const width = Math.max(1, Math.round(originWidth * scale));
-  const height = Math.max(1, Math.round(originHeight * scale));
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return dataUrl;
-  ctx.drawImage(image, 0, 0, width, height);
-
-  const compressed = canvas.toDataURL('image/jpeg', NOTE_IMAGE_QUALITY);
-  return compressed.length < dataUrl.length ? compressed : dataUrl;
-};
-
-const readFileAsDataUrl = async (file) => {
-  const raw = await readFileAsDataUrlRaw(file);
-  if (!String(file?.type || '').startsWith('image/')) {
-    return raw;
-  }
-  try {
-    return await compressImageDataUrl(raw);
-  } catch (error) {
-    return raw;
-  }
-};
-
-const normalizeMustVisitMode = (value, fallback = 'plan') => {
-  const mode = String(value || '').trim().toLowerCase();
-  if (mode === 'plan' || mode === 'manual') {
-    return mode;
-  }
-  return fallback;
-};
-
-const normalizeManualMustVisitLocationIds = (value) => {
-  if (Array.isArray(value)) {
-    return Array.from(new Set(
-      value
-        .map(item => Number(item))
-        .filter(id => Number.isFinite(id) && id > 0)
-    ));
-  }
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (!trimmed) return [];
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) {
-        return normalizeManualMustVisitLocationIds(parsed);
-      }
-    } catch (error) {
-      // ignore parse error and fallback to split
-    }
-    return Array.from(new Set(
-      trimmed
-        .split(/[,\uFF0C\u3001;|]/)
-        .map(item => Number(item.trim()))
-        .filter(id => Number.isFinite(id) && id > 0)
-    ));
-  }
-  return [];
-};
-
-const extractPlanLocationIds = (items = []) => (
-  Array.from(new Set(
-    (Array.isArray(items) ? items : [])
-      .map((item) => Number(item?.location_id))
-      .filter((id) => Number.isFinite(id) && id > 0)
-  ))
-);
-
-const buildBaseProperties = (group, hasMembers) => {
-  const tagsValue = Array.isArray(group.tags) ? group.tags.join(', ') : (group.tags || '');
-  const dateValue = buildDateValue(group.start_date, group.end_date);
-  const totalCount = (group.student_count || 0) + (group.teacher_count || 0);
-  const typeOptions = [
-    { value: 'primary', label: '小学' },
-    { value: 'secondary', label: '中学' },
-    { value: 'vip', label: 'VIP' }
-  ];
-
-  return [
-    {
-      id: 'dates',
-      key: '日期范围',
-      value: dateValue,
-      type: 'date',
-      icon: 'CAL',
-      field: 'dates',
-      placeholder: 'YYYY-MM-DD → YYYY-MM-DD'
-    },
-    {
-      id: 'duration',
-      key: '行程天数',
-      value: group.duration || '',
-      type: 'number',
-      icon: '#',
-      field: 'duration',
-      readOnly: true
-    },
-    {
-      id: 'group_code',
-      key: '团组编号',
-      value: group.group_code || '',
-      type: 'text',
-      icon: 'ID',
-      field: 'group_code',
-      readOnly: true
-    },
-    {
-      id: 'type',
-      key: '团组类型',
-      value: group.type || '',
-      type: 'select',
-      icon: 'SCH',
-      field: 'type',
-      options: typeOptions
-    },
-    {
-      id: 'students',
-      key: '学生人数',
-      value: group.student_count ?? '',
-      type: 'number',
-      icon: '#',
-      field: 'student_count',
-      readOnly: hasMembers,
-      badge: hasMembers ? '自动' : ''
-    },
-    {
-      id: 'teachers',
-      key: '教师人数',
-      value: group.teacher_count ?? '',
-      type: 'number',
-      icon: '#',
-      field: 'teacher_count',
-      readOnly: hasMembers,
-      badge: hasMembers ? '自动' : ''
-    },
-    {
-      id: 'total',
-      key: '总人数',
-      value: totalCount,
-      type: 'number',
-      icon: '#',
-      field: 'total',
-      readOnly: true
-    },
-    {
-      id: 'accommodation',
-      key: '住宿酒店',
-      value: group.accommodation || '',
-      type: 'text',
-      icon: 'HOT',
-      field: 'accommodation'
-    },
-    {
-      id: 'color',
-      key: '标识颜色',
-      value: group.color || '#1890ff',
-      type: 'color',
-      icon: 'CLR',
-      field: 'color'
-    },
-    {
-      id: 'tags',
-      key: '标签',
-      value: tagsValue,
-      type: 'text',
-      icon: 'TAG',
-      field: 'tags'
-    },
-    {
-      id: 'contact_person',
-      key: '联系人',
-      value: group.contact_person || '',
-      type: 'person',
-      icon: '@',
-      field: 'contact_person'
-    },
-    {
-      id: 'contact_phone',
-      key: '联系电话',
-      value: group.contact_phone || '',
-      type: 'text',
-      icon: 'TEL',
-      field: 'contact_phone'
-    },
-    {
-      id: 'emergency_contact',
-      key: '紧急联系人',
-      value: group.emergency_contact || '',
-      type: 'person',
-      icon: '!',
-      field: 'emergency_contact'
-    },
-    {
-      id: 'emergency_phone',
-      key: '紧急电话',
-      value: group.emergency_phone || '',
-      type: 'text',
-      icon: 'TEL',
-      field: 'emergency_phone'
-    }
-  ];
-};
-
-const mergeCustomProperties = (baseProperties, groupProperties) => {
-  if (!Array.isArray(groupProperties)) return baseProperties;
-  const baseIds = new Set(baseProperties.map((prop) => prop.id));
-  const custom = groupProperties.filter((prop) => prop && !baseIds.has(prop.id));
-  return [...baseProperties, ...custom];
-};
-
-const isTextFilled = (value) => {
-  if (value === null || value === undefined) return false;
-  return String(value).trim() !== '' && String(value).trim() !== '[object Object]';
-};
-
-const isMealComplete = (meals = {}, fallbackDisabled = false) => {
-  if (fallbackDisabled || meals.disabled || meals.all_disabled) return true;
-  return ['breakfast', 'lunch', 'dinner'].every((key) => (
-    meals[`${key}_disabled`] || isTextFilled(meals[key]) || isTextFilled(meals[`${key}_place`])
-  ));
-};
-
-const isTransferComplete = (transfer = {}, fallbackDisabled = false) => (
-  transfer.disabled
-  || fallbackDisabled
-  || isTextFilled(transfer.time)
-  || isTextFilled(transfer.end_time)
-  || isTextFilled(transfer.location)
-  || isTextFilled(transfer.contact)
-  || isTextFilled(transfer.flight_no)
-  || isTextFilled(transfer.airline)
-  || isTextFilled(transfer.terminal)
-);
-
-const buildCompletionStats = (logistics = [], group) => {
-  if (!Array.isArray(logistics) || logistics.length === 0) {
-    return { percent: 0, modules: [] };
-  }
-
-  const startDate = group?.start_date || '';
-  const endDate = group?.end_date || '';
-  const moduleKeys = [
-    { key: 'hotel', label: '住宿酒店', color: '#2d9d78' },
-    { key: 'vehicle', label: '车辆调度', color: '#2383e2' },
-    { key: 'guide', label: '随团导游', color: '#d9730d' },
-    { key: 'security', label: '安保人员', color: '#7b1fa2' },
-    { key: 'meals', label: '餐饮安排', color: '#2d9d78' },
-    { key: 'pickup', label: '接站', color: '#2383e2' },
-    { key: 'dropoff', label: '送站', color: '#2383e2' }
-  ];
-
-  const moduleTotals = Object.fromEntries(moduleKeys.map(item => [item.key, { total: 0, done: 0 }]));
-
-  let totalCount = 0;
-  let doneCount = 0;
-
-  logistics.forEach((row) => {
-    const isStart = startDate && row.date === startDate;
-    const isEnd = endDate && row.date === endDate;
-
-    const hotelDone = row.hotel_disabled || isTextFilled(row.hotel) || isTextFilled(row.hotel_address);
-    const vehicleDone = row.vehicle_disabled
-      || isTextFilled(row.vehicle?.plate)
-      || isTextFilled(row.vehicle?.driver)
-      || isTextFilled(row.vehicle?.phone)
-      || isTextFilled(row.vehicle?.name);
-    const guideDone = row.guide_disabled || isTextFilled(row.guide?.name) || isTextFilled(row.guide?.phone);
-    const securityDone = row.security_disabled || isTextFilled(row.security?.name) || isTextFilled(row.security?.phone);
-    const mealsDone = isMealComplete(row.meals || {}, row.meals_disabled);
-
-    const modules = [
-      { key: 'hotel', done: hotelDone },
-      { key: 'vehicle', done: vehicleDone },
-      { key: 'guide', done: guideDone },
-      { key: 'security', done: securityDone },
-      { key: 'meals', done: mealsDone }
-    ];
-
-    modules.forEach((module) => {
-      moduleTotals[module.key].total += 1;
-      if (module.done) moduleTotals[module.key].done += 1;
-      totalCount += 1;
-      if (module.done) doneCount += 1;
-    });
-
-    if (isStart) {
-      moduleTotals.pickup.total += 1;
-      if (isTransferComplete(row.pickup || {}, row.pickup_disabled)) moduleTotals.pickup.done += 1;
-      totalCount += 1;
-      if (isTransferComplete(row.pickup || {}, row.pickup_disabled)) doneCount += 1;
-    }
-    if (isEnd) {
-      moduleTotals.dropoff.total += 1;
-      if (isTransferComplete(row.dropoff || {}, row.dropoff_disabled)) moduleTotals.dropoff.done += 1;
-      totalCount += 1;
-      if (isTransferComplete(row.dropoff || {}, row.dropoff_disabled)) doneCount += 1;
-    }
-  });
-
-  const percent = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
-  const modules = moduleKeys
-    .filter((module) => moduleTotals[module.key].total > 0)
-    .map((module) => {
-      const { total, done } = moduleTotals[module.key];
-      const ratio = total ? Math.round((done / total) * 100) : 0;
-      return {
-        ...module,
-        ratio
-      };
-    })
-    .filter((module) => module.ratio > 0 || module.key === 'hotel' || module.key === 'vehicle');
-
-  return { percent, modules };
-};
-
+import {
+  MAX_NOTE_IMAGE_COUNT,
+  MAX_NOTE_IMAGE_SIZE,
+  MAX_NOTE_IMAGE_TOTAL_CHARS,
+  buildBaseProperties,
+  buildCompletionStats,
+  buildDateValue,
+  extractPlanLocationIds,
+  isDraftValid,
+  isItineraryItem,
+  mergeCustomProperties,
+  normalizeManualMustVisitLocationIds,
+  normalizeNotes,
+  normalizeNotesImages,
+  parseDateRangeInput,
+  readFileAsDataUrl,
+  resolveEventTitle,
+  isTextFilled,
+  isMealComplete,
+  weekdayLabel
+} from './profileUtils';
 const ProfileView = ({
   group,
   schedules,
@@ -542,7 +146,7 @@ const ProfileView = ({
     const currentImages = normalizeNotesImages(draft?.notes_images);
     const remain = Math.max(0, MAX_NOTE_IMAGE_COUNT - currentImages.length);
     if (remain <= 0) {
-      setUploadError(`Max ${MAX_NOTE_IMAGE_COUNT} images.`);
+      setUploadError('Max ' + MAX_NOTE_IMAGE_COUNT + ' images.');
       return;
     }
 
@@ -555,7 +159,7 @@ const ProfileView = ({
 
     const tooLarge = selected.some((file) => Number(file.size || 0) > MAX_NOTE_IMAGE_SIZE);
     if (tooLarge) {
-      setUploadError(`Each image must be <= ${Math.round(MAX_NOTE_IMAGE_SIZE / (1024 * 1024))}MB.`);
+      setUploadError('Each image must be <= ' + Math.round(MAX_NOTE_IMAGE_SIZE / (1024 * 1024)) + 'MB.');
       return;
     }
 
@@ -591,8 +195,8 @@ const ProfileView = ({
 
   const handleDeleteGroup = () => {
     if (!group?.id || !onDelete) return;
-    const name = draft?.name || group?.name || `#${group.id}`;
-    const confirmed = window.confirm(`确定删除团组「${name}」？此操作不可撤销。`);
+    const name = draft?.name || group?.name || ('#' + group.id);
+    const confirmed = window.confirm('确定删除团组「' + name + '」？此操作不可撤销。');
     if (!confirmed) return;
     onDelete();
   };
@@ -678,7 +282,7 @@ const ProfileView = ({
     const location = locationMap.get(locationId);
     return {
       location_id: locationId,
-      location_name: location?.name || `#${locationId}`,
+      location_name: location?.name || ('#' + locationId),
       sort_order: index,
       source: 'manual'
     };
@@ -698,7 +302,7 @@ const ProfileView = ({
 
   const handleApplyCurrentPlan = () => {
     if (manualMustVisitIds.length > 0) {
-      const confirmed = window.confirm('将使用方案地址替换当前必去点，是否继续？');
+      const confirmed = window.confirm('将使用方案地点替换当前必去点，是否继续？');
       if (!confirmed) return;
     }
     setDraft((prev) => {
@@ -761,7 +365,11 @@ const ProfileView = ({
               {statusOptions.map((option) => (
                 <span
                   key={option.label}
-                  className={`status-tag ${draft.status === option.value || (!draft.status && option.value === null) ? 'active' : ''}`}
+                  className={'status-tag ' + (
+                    draft.status === option.value || (!draft.status && option.value === null)
+                      ? 'active'
+                      : ''
+                  )}
                   onClick={() => handleStatusChange(option.value)}
                 >
                   {option.label}
@@ -789,8 +397,8 @@ const ProfileView = ({
           <div className="must-visit-module">
             <div className="must-visit-head">
               <div className="must-visit-title">必去行程点配置</div>
-              <span className={`must-visit-badge ${mustVisitConfigured ? 'ok' : 'warn'}`}>
-                {mustVisitConfigured ? `已配置 ${resolvedMustVisit.length} 项` : '未配置'}
+              <span className={'must-visit-badge ' + (mustVisitConfigured ? 'ok' : 'warn')}>
+                {mustVisitConfigured ? ('已配置 ' + resolvedMustVisit.length + ' 项') : '未配置'}
               </span>
             </div>
 
@@ -820,7 +428,7 @@ const ProfileView = ({
                   </button>
                 </div>
                 <span className="must-visit-tip">
-                  方案仅用于快捷点选；点击“套用当前方案”才会把方案地址填充到必去点，之后可继续手动微调。
+                  方案仅用于快捷点选；点击“套用当前方案”才会把方案地点填充到必去点，之后可继续手动微调。
                 </span>
               </div>
             </div>
@@ -841,7 +449,7 @@ const ProfileView = ({
                 </div>
                 <div className="must-visit-option-grid">
                   {(locations || []).length === 0 && (
-                    <span className="muted">暂无可选地址</span>
+                    <span className="muted">暂无可选地点</span>
                   )}
                   {(locations || []).map((location) => {
                     const locationId = Number(location.id);
@@ -850,13 +458,13 @@ const ProfileView = ({
                       <button
                         key={location.id}
                         type="button"
-                        className={`must-visit-option ${isSelected ? 'active' : ''}`}
+                        className={'must-visit-option ' + (isSelected ? 'active' : '')}
                         onClick={() => handleToggleManualMustVisit(locationId)}
                       >
-                        <span className="must-visit-option-check">{isSelected ? '✓' : '+'}</span>
-                        <span className="must-visit-option-name">{location.name || `#${location.id}`}</span>
-                      </button>
-                    );
+                          <span className="must-visit-option-check">{isSelected ? '✓' : '+'}</span>
+                          <span className="must-visit-option-name">{location.name || ('#' + location.id)}</span>
+                        </button>
+                      );
                   })}
                 </div>
               </div>
@@ -867,7 +475,7 @@ const ProfileView = ({
                 <span className="muted">未配置必去行程点，行程设计器导出会被拦截。</span>
               ) : (
                 resolvedMustVisit.map((item, index) => (
-                  <span className="schedule-chip" key={`${item.location_id}-${index}`}>
+                  <span className="schedule-chip" key={item.location_id + '-' + index}>
                     {item.location_name}
                   </span>
                 ))
@@ -900,7 +508,7 @@ const ProfileView = ({
                 </div>
                 <div className="ring-title">整体完成度</div>
                 <div className="ring-sub">
-                  {daysToStart !== null ? `预计 ${Math.max(daysToStart, 0)} 天后出发` : '未设置出发日期'}
+                  {daysToStart !== null ? ('预计 ' + Math.max(daysToStart, 0) + ' 天后出发') : '未设置出发日期'}
                 </div>
               </div>
 
@@ -915,7 +523,7 @@ const ProfileView = ({
                     <div className="staff-role">按食行卡片填写完成度统计</div>
                   </div>
                   <div className="task-bar">
-                    <div className="task-fill" style={{ width: `${module.ratio}%`, background: module.color }}></div>
+                    <div className="task-fill" style={{ width: module.ratio + '%', background: module.color }}></div>
                     </div>
                     <div className="task-stat" style={{ color: module.color }}>{module.ratio}%</div>
                   </div>
@@ -985,7 +593,7 @@ const ProfileView = ({
               ];
               const visibleMeals = mealEntries.filter((meal) => !meal.disabled);
               return (
-                <div className="shixing-card" key={`${day.date}-${index}`}>
+                <div className="shixing-card" key={day.date + '-' + index}>
                   <div className="card-row">
                     <div className="card-label">日期</div>
                     <div className="card-content">
@@ -998,8 +606,8 @@ const ProfileView = ({
                     <div className="card-content">
                       {statusItems.map((item) => (
                         <span
-                          key={`${day.date}-${item.key}`}
-                          className={`status-badge ${item.done ? 'done' : 'pending'}`}
+                          key={day.date + '-' + item.key}
+                          className={'status-badge ' + (item.done ? 'done' : 'pending')}
                         >
                           {item.label}{item.done ? '已填' : '未填'}
                         </span>
@@ -1015,7 +623,7 @@ const ProfileView = ({
                       {visibleMeals.map((meal) => {
                         const text = [meal.place, meal.plan].filter(Boolean).join(' · ') || '未填写';
                         return (
-                          <span className="schedule-chip" key={`${day.date}-${meal.key}`}>
+                          <span className="schedule-chip" key={day.date + '-' + meal.key}>
                             {meal.label}：{text}
                           </span>
                         );
@@ -1029,7 +637,7 @@ const ProfileView = ({
                         <span className="muted">暂无行程安排</span>
                       )}
                       {scheduleItems.map((item) => (
-                        <span className="schedule-chip" key={`${day.date}-${item.id || item.startTime}`}>
+                        <span className="schedule-chip" key={day.date + '-' + (item.id || item.startTime)}>
                           {(item.startTime || item.start_time || '--:--')} {resolveEventTitle(item)}
                         </span>
                       ))}
@@ -1073,14 +681,14 @@ const ProfileView = ({
             {noteImages.length > 0 ? (
               <div className="notes-image-grid">
                 {noteImages.map((imageUrl, index) => (
-                  <div className="notes-image-item" key={`${index}-${imageUrl.slice(0, 24)}`}>
+                  <div className="notes-image-item" key={index + '-' + imageUrl.slice(0, 24)}>
                     <button
                       type="button"
                       className="notes-image-thumb"
                       onClick={() => handlePreviewImage(imageUrl)}
                       title="Preview"
                     >
-                      <img src={imageUrl} alt={`note-${index + 1}`} />
+                      <img src={imageUrl} alt={'note-' + (index + 1)} />
                     </button>
                     <button
                       type="button"
@@ -1117,4 +725,5 @@ const ProfileView = ({
 };
 
 export default ProfileView;
+
 

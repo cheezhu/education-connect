@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import React from 'react';
 import dayjs from 'dayjs';
 import SidebarFooter from './SidebarFooter';
 import { getGroupTypeLabel } from '../../../../domain/group';
@@ -12,20 +12,10 @@ const GroupList = ({
   onBulkCreate,
   filters,
   onSearchChange,
-  onToggleStatus,
   isCollapsed
 }) => {
-  const [filterOpen, setFilterOpen] = useState(false);
-
-  const statusOptions = useMemo(() => (
-    [
-      { value: '准备中', label: '准备中' },
-      { value: '进行中', label: '进行中' },
-      { value: '已完成', label: '已完成' },
-      { value: '已取消', label: '已取消' }
-    ]
-  ), []);
-
+  const toGroupIdKey = (value) => String(value ?? '');
+  const isSameGroupId = (left, right) => toGroupIdKey(left) !== '' && toGroupIdKey(left) === toGroupIdKey(right);
   const resolvedTotal = Number.isFinite(totalCount) ? totalCount : groups.length;
   const visibleCount = groups.length;
 
@@ -53,29 +43,13 @@ const GroupList = ({
           value={filters.searchText}
           onChange={(event) => onSearchChange(event.target.value)}
         />
-        <div className="btn-filter" onClick={() => setFilterOpen(prev => !prev)}>
-          ▼
-        </div>
-      </div>
-
-      <div className={`filter-popover ${filterOpen ? 'visible' : ''}`}>
-        {statusOptions.map(option => (
-          <label key={option.value} style={{ display: 'block', padding: '4px' }}>
-            <input
-              type="checkbox"
-              checked={filters.statusFilters.includes(option.value)}
-              onChange={() => onToggleStatus(option.value)}
-            />{' '}
-            {option.label}
-          </label>
-        ))}
       </div>
 
       <div className="list-content">
         {groups.map((group) => (
           <div
             key={group.id}
-            className={`list-item ${group.id === activeGroupId ? 'active' : ''}`}
+            className={`list-item ${isSameGroupId(group.id, activeGroupId) ? 'active' : ''}`}
             onClick={() => onSelectGroup(group.id)}
           >
             <div className="item-name">{group.name || '未命名团组'}</div>

@@ -1,0 +1,279 @@
+.feedback-stream-page {
+  padding: 10px 0;
+  height: 100%;
+  overflow: auto;
+  background: #ffffff;
+}
+
+.feedback-stream {
+  max-width: 760px;
+  margin: 0 auto;
+  background: #ffffff;
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.feedback-stream-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid #edf0f3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.compose-box {
+  padding: 10px 14px;
+  border-bottom: 1px solid #edf0f3;
+  background: #ffffff;
+}
+
+.compose-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.feed-item {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  background: #ffffff;
+}
+
+.feed-item.expanded {
+  background: #fcfcfd;
+}
+
+.feed-item-avatar {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 50%;
+  background: #eef2f7;
+  color: #4b5563;
+  font-weight: 600;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.feed-item-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.feed-item-head {
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.feed-item-topic {
+  font-size: 11px;
+  color: #9ca3af;
+  line-height: 1.4;
+  margin-bottom: 3px;
+}
+
+.feed-item-submeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #6b7280;
+  margin-bottom: 3px;
+}
+
+.feed-item-content {
+  margin-bottom: 6px;
+  color: #111827;
+  font-size: 14px;
+  line-height: 1.62;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.feed-item-content.collapsed {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+}
+
+.feed-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  margin-left: -10px;
+}
+
+.icon-action-btn {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 !important;
+  color: #6b7280;
+}
+
+.icon-action-btn:hover {
+  color: #111827 !important;
+  background: #f3f4f6 !important;
+}
+
+.icon-badge .ant-badge-count {
+  box-shadow: none;
+  background: #e5e7eb;
+  color: #374151;
+  font-size: 10px;
+  min-width: 14px;
+  height: 14px;
+  line-height: 14px;
+  padding-inline: 4px;
+}
+
+.thread-panel {
+  margin-top: 6px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 6px;
+}
+
+.thread-comment {
+  padding: 8px 0 !important;
+  border-block-end: none !important;
+}
+
+.thread-comment-layout {
+  width: 100%;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.thread-comment-rail {
+  width: 10px;
+  min-width: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.thread-comment-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  margin-top: 10px;
+  background: #cbd5e1;
+}
+
+.thread-comment-line {
+  width: 2px;
+  flex: 1;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #dbe2ea, #edf2f7);
+}
+
+.thread-comment-inner {
+  flex: 1;
+  border: 1px solid #edf0f3;
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: #ffffff;
+}
+
+.thread-comment-head {
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.thread-comment-content {
+  color: #1f2937;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+}
+
+.thread-reply-form {
+  margin-top: 6px;
+}
+
+.mention-token {
+  display: inline-block;
+  margin: 0 1px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.feed-sep {
+  color: #d1d5db;
+}
+
+.feed-meta-label {
+  color: #4b5563;
+  font-size: 11px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.status-open {
+  background: #9ca3af;
+}
+
+.status-in_review {
+  background: #3b82f6;
+}
+
+.status-planned {
+  background: #8b5cf6;
+}
+
+.status-resolved {
+  background: #16a34a;
+}
+
+.status-rejected {
+  background: #f59e0b;
+}
+
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+@media (max-width: 768px) {
+  .feedback-stream-page {
+    padding: 0;
+  }
+
+  .feedback-stream {
+    border-radius: 0;
+  }
+}

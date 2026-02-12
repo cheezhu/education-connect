@@ -9,7 +9,8 @@ const PERMISSIONS = {
   locations: { read: ['admin', 'editor', 'viewer'], write: ['admin', 'editor'] },
   statistics: { read: ['admin', 'editor', 'viewer'], write: [] },
   users: { read: ['admin'], write: ['admin'] },
-  settings: { read: ['admin'], write: ['admin'] }
+  settings: { read: ['admin'], write: ['admin'] },
+  feedback: { read: ['admin', 'editor', 'viewer'], write: ['admin', 'editor', 'viewer'] }
 };
 
 export const AuthProvider = ({ children }) => {
