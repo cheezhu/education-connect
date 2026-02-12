@@ -4,6 +4,24 @@ const requireEditLock = require('../middleware/editLock');
 const { bumpScheduleRevision } = require('../utils/scheduleRevision');
 const CANCELLED_STATUS = '已取消';
 const ALLOWED_GROUP_TYPES = new Set(['primary', 'secondary', 'vip']);
+const GROUP_CODE_PREFIX = 'TG';
+
+const buildGroupCode = (id) => {
+  const normalizedId = Number(id);
+  if (!Number.isFinite(normalizedId) || normalizedId <= 0) return '';
+  return `${GROUP_CODE_PREFIX}${String(Math.floor(normalizedId)).padStart(6, '0')}`;
+};
+
+const assignGroupCodeById = (db, id) => {
+  const code = buildGroupCode(id);
+  if (!code) return '';
+  db.prepare(`
+    UPDATE groups
+    SET group_code = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(code, id);
+  return code;
+};
 
 // 获取所有团组
 router.get('/', (req, res) => {
@@ -228,6 +246,7 @@ router.post('/batch', requireEditLock, (req, res) => {
         normalized.manualMustVisitLocationIds
       );
 
+      assignGroupCodeById(req.db, result.lastInsertRowid);
       created.push(selectStmt.get(result.lastInsertRowid));
     });
 
@@ -322,6 +341,7 @@ router.post('/', requireEditLock, (req, res) => {
       resolvedMustVisitMode, resolvedManualMustVisitLocationIds
     );
 
+    assignGroupCodeById(req.db, result.lastInsertRowid);
     const newGroup = req.db.prepare('SELECT * FROM groups WHERE id = ?').get(result.lastInsertRowid);
     res.json({ success: true, group: hydrateGroup(newGroup) });
   } catch (error) {

@@ -182,6 +182,8 @@ const CalendarDetailWorkspace = ({
     selectedPlanId,
     itineraryPlans,
     designerSourceList: designerSourceState.list,
+    manualMustVisitLocationIds: groupData?.manual_must_visit_location_ids,
+    locations,
     activities,
     schedules
   });

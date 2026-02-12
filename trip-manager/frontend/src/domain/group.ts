@@ -13,6 +13,7 @@ export type Group = {
   end_date?: string; // YYYY-MM-DD
   duration?: number;
   color?: string;
+  group_code?: string;
   itinerary_plan_id?: number | null;
 
   must_visit_mode?: MustVisitMode;

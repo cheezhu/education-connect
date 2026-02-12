@@ -32,7 +32,8 @@ const GroupList = ({
     const start = group.start_date ? dayjs(group.start_date).format('YYYY-MM-DD') : '未设置日期';
     const total = (group.student_count || 0) + (group.teacher_count || 0);
     const typeLabel = getGroupTypeLabel(group.type) || '未设置类型';
-    return `${typeLabel} • ${start} • ${total}人`;
+    const code = group.group_code ? `#${group.group_code}` : '#未生成';
+    return `${code} • ${typeLabel} • ${start} • ${total}人`;
   };
 
   return (

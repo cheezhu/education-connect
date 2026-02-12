@@ -22,6 +22,7 @@ CREATE TABLE groups (
     end_date DATE NOT NULL,
     duration INTEGER CHECK(duration > 0) DEFAULT 5,
     color VARCHAR(7) DEFAULT '#1890ff',
+    group_code VARCHAR(32) UNIQUE,
     itinerary_plan_id INTEGER,
     status VARCHAR(20),
     contact_person VARCHAR(100),

@@ -133,12 +133,6 @@ const buildManualMarkdown = ({ group, schedules }) => {
 
 const buildWordDocumentHtml = ({ group, schedules }) => {
   const groupName = escapeHtml(group?.name || '未命名团组');
-  const dateRange = group?.start_date && group?.end_date
-    ? `${dayjs(group.start_date).format('YYYY-MM-DD')} ~ ${dayjs(group.end_date).format('YYYY-MM-DD')}`
-    : '';
-  const students = Number(group?.student_count ?? 0) || 0;
-  const teachers = Number(group?.teacher_count ?? 0) || 0;
-  const total = students + teachers;
   const exportTime = dayjs().format('YYYY-MM-DD HH:mm');
 
   const byDay = new Map();
@@ -272,11 +266,6 @@ const buildWordDocumentHtml = ({ group, schedules }) => {
         <div class="doc-wrap">
           <div class="doc-title">行程详情：${groupName}</div>
           <div class="doc-sub">导出时间：${escapeHtml(exportTime)}</div>
-          <div class="meta-row">
-            ${dateRange ? `<div>团期：${escapeHtml(dateRange)}</div>` : ''}
-            <div>人数：${students} 学生 + ${teachers} 老师 = ${total}</div>
-            <div>活动数量：${schedules.length}</div>
-          </div>
           ${dayBlocks || '<div class="doc-sub">暂无可导出的行程数据。</div>'}
           <div class="footer">文档由系统自动生成，可在 Word 中继续编辑排版。</div>
         </div>

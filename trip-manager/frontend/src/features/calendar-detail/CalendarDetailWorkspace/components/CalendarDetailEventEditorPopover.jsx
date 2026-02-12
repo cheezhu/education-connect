@@ -230,6 +230,8 @@ const CalendarDetailEventEditorPopover = ({
 
     const positionPopover = () => {
       const pop = popoverRef.current;
+      const maxHeight = Math.max(260, window.innerHeight - PADDING * 2);
+      pop.style.maxHeight = `${maxHeight}px`;
       const popWidth = pop.offsetWidth || DEFAULT_WIDTH;
       const popHeight = pop.offsetHeight || 0;
       let left = anchorRect.right + GAP;
@@ -241,19 +243,27 @@ const CalendarDetailEventEditorPopover = ({
       let top = anchorRect.top;
       top = Math.max(PADDING, Math.min(top, window.innerHeight - popHeight - PADDING));
 
-      setPosition({ top, left });
+      setPosition((prev) => (
+        prev.top === top && prev.left === left ? prev : { top, left }
+      ));
     };
 
     const raf = requestAnimationFrame(positionPopover);
+    let observer = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(positionPopover);
+      observer.observe(popoverRef.current);
+    }
     window.addEventListener('resize', positionPopover);
     window.addEventListener('scroll', positionPopover, true);
 
     return () => {
       cancelAnimationFrame(raf);
+      if (observer) observer.disconnect();
       window.removeEventListener('resize', positionPopover);
       window.removeEventListener('scroll', positionPopover, true);
     };
-  }, [isOpen, anchorRect, formState.title, formState.location, linkMode, isEditMode]);
+  }, [isOpen, anchorRect, sourceCategory, linkMode, isEditMode]);
 
   const updateField = (key, value) => {
     setFormState((prev) => ({ ...prev, [key]: value }));
@@ -375,7 +385,9 @@ const CalendarDetailEventEditorPopover = ({
               value={formState.planItemId}
               onChange={(event) => updateField('planItemId', event.target.value)}
             >
-              <option value="">选择必去行程点</option>
+              <option value="">
+                {resolvedPlanItems.length > 0 ? '选择必去行程点' : '暂无可用必去行程点'}
+              </option>
               {resolvedPlanItems.map((item) => (
                 <option key={item.id} value={item.id}>{item.title || item.name}</option>
               ))}

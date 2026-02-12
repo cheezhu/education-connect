@@ -130,6 +130,15 @@ const buildBaseProperties = (group, hasMembers) => {
       readOnly: true
     },
     {
+      id: 'group_code',
+      key: '团组编号',
+      value: group.group_code || '',
+      type: 'text',
+      icon: 'ID',
+      field: 'group_code',
+      readOnly: true
+    },
+    {
       id: 'type',
       key: '团组类型',
       value: group.type || '',

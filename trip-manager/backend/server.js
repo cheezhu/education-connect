@@ -7,6 +7,7 @@ const bcrypt = require('bcrypt');
 const dotenv = require('dotenv');
 const { requireRole, requireAccess } = require('./src/middleware/permission');
 const { startAutoSnapshotScheduler } = require('./src/services/versionSnapshots');
+const { publishChange } = require('./src/realtime/hub');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -265,9 +266,26 @@ if (!groupColumns.includes('must_visit_mode')) {
 if (!groupColumns.includes('manual_must_visit_location_ids')) {
   db.exec('ALTER TABLE groups ADD COLUMN manual_must_visit_location_ids TEXT');
 }
+if (!groupColumns.includes('group_code')) {
+  db.exec('ALTER TABLE groups ADD COLUMN group_code VARCHAR(32)');
+}
 db.exec("UPDATE groups SET must_visit_mode = 'plan' WHERE must_visit_mode IS NULL OR TRIM(must_visit_mode) = ''");
 db.exec("UPDATE groups SET must_visit_mode = 'plan' WHERE must_visit_mode NOT IN ('plan', 'manual')");
 db.exec("UPDATE groups SET manual_must_visit_location_ids = '[]' WHERE manual_must_visit_location_ids IS NULL OR TRIM(manual_must_visit_location_ids) = ''");
+db.exec("UPDATE groups SET group_code = 'TG' || printf('%06d', id) WHERE group_code IS NULL OR TRIM(group_code) = ''");
+db.exec(`
+  WITH duplicate_codes AS (
+    SELECT group_code
+    FROM groups
+    WHERE group_code IS NOT NULL AND TRIM(group_code) <> ''
+    GROUP BY group_code
+    HAVING COUNT(*) > 1
+  )
+  UPDATE groups
+  SET group_code = 'TG' || printf('%06d', id)
+  WHERE group_code IN (SELECT group_code FROM duplicate_codes)
+`);
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_groups_group_code ON groups(group_code)');
 
 const locationColumns = db.prepare("PRAGMA table_info(locations)").all().map(col => col.name);
 if (!locationColumns.includes('open_hours')) {
@@ -376,6 +394,7 @@ const ensureGroupTypeConstraint = () => {
   // Recreate indexes that were defined on the old table.
   db.exec('CREATE INDEX IF NOT EXISTS idx_groups_date_range ON groups(start_date, end_date)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_groups_itinerary_plan ON groups(itinerary_plan_id)');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_groups_group_code ON groups(group_code)');
 };
 
 ensureGroupTypeConstraint();
@@ -427,6 +446,29 @@ app.use((req, res, next) => {
   next();
 });
 
+// Broadcast successful write operations for frontend realtime refresh.
+app.use((req, res, next) => {
+  const method = String(req.method || '').toUpperCase();
+  const shouldWatch = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+  if (!shouldWatch || !String(req.path || '').startsWith('/api')) {
+    next();
+    return;
+  }
+  const startedAt = Date.now();
+  res.on('finish', () => {
+    if (res.statusCode >= 400) return;
+    if (String(req.path || '').startsWith('/api/realtime')) return;
+    publishChange({
+      method,
+      path: req.path,
+      status: res.statusCode,
+      user: req.user || null,
+      durationMs: Date.now() - startedAt
+    });
+  });
+  next();
+});
+
 // 路由
 const readAllRoles = ['admin', 'editor', 'viewer'];
 const writeEditorRoles = ['admin', 'editor'];
@@ -438,6 +480,7 @@ app.use('/api/config', requireRole(['admin']), require('./src/routes/systemConfi
 
 app.use('/api/users', require('./src/routes/users'));
 app.use('/api/statistics', requireAccess({ read: readAllRoles }), require('./src/routes/statistics'));
+app.use('/api/realtime', requireAccess({ read: readAllRoles }), require('./src/routes/realtime'));
 app.use('/api/groups', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/groups'));
 app.use('/api/locations', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/locations'));
 app.use('/api/itinerary-plans', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/itineraryPlans'));
@@ -445,6 +488,7 @@ app.use('/api', requireAccess({ read: readAllRoles, write: writeEditorRoles }), 
 app.use('/api', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/logistics'));
 app.use('/api', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/resources'));
 app.use('/api', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/members'));
+app.use('/api/ai', require('./src/routes/aiImport'));
 
 // 错误处理
 app.use((err, req, res, next) => {

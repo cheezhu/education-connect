@@ -218,12 +218,14 @@
 .g-popover {
   position: fixed;
   width: 420px;
+  max-height: calc(100vh - 32px);
   background: white;
   border-radius: 8px;
   box-shadow: var(--shadow);
   z-index: 1000;
   display: none;
   flex-direction: column;
+  overflow: hidden;
   animation: popFade 0.1s cubic-bezier(0.0, 0.0, 0.2, 1);
 }
 
@@ -303,6 +305,8 @@
 
 .pop-body {
   padding: 14px 16px;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .title-input {
