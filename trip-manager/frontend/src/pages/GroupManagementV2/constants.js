@@ -19,7 +19,8 @@ export const TAB_GROUPS = [
       { key: 'schedule', label: '\u65e5\u5386\u89c4\u5212' },
       { key: 'points', label: '\u884c\u7a0b\u70b9' },
       { key: 'meals', label: '\u9910\u996e' },
-      { key: 'transfer', label: '\u63a5\u9001\u7ad9' }
+      { key: 'transfer', label: '\u63a5\u9001\u7ad9' },
+      { key: 'logistics_sheet', label: '\u6bcf\u65e5\u8d44\u6e90\u8868' }
     ]
   },
   {
@@ -33,7 +34,7 @@ export const TAB_GROUPS = [
 ];
 
 export const TAB_ALIAS = {
-  logistics: 'meals'
+  logistics: 'logistics_sheet'
 };
 
 const TAB_GROUP_KEYS = TAB_GROUPS.flatMap((group) => group.tabs.map((tab) => tab.key));

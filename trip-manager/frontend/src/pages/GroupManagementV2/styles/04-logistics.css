@@ -886,4 +886,156 @@
   font-style: italic;
 }
 
+/* Logistics spreadsheet */
+.group-command-center .logistics-spreadsheet-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 14px 16px 10px;
+  gap: 10px;
+}
+
+.group-command-center .logistics-spreadsheet-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2f3a4d;
+  letter-spacing: 0.01em;
+}
+
+.group-command-center .logistics-handsontable-wrap {
+  height: 100%;
+  min-height: 280px;
+  width: 100%;
+  border: 1px solid #e7ebf3;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.group-command-center .logistics-table-shell {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group-command-center .logistics-table-card {
+  border: 1px solid #e7ebf3;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.group-command-center .logistics-handsontable-wrap--split {
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+}
+
+.group-command-center .logistics-sheet-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.group-command-center .logistics-sheet-tab {
+  height: 28px;
+  padding: 0 14px;
+  border: 1px solid #d9dfeb;
+  border-radius: 8px 8px 0 0;
+  background: #f3f6fb;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.group-command-center .logistics-sheet-tab:hover {
+  background: #ebf0fa;
+  color: #3a465a;
+}
+
+.group-command-center .logistics-sheet-tab.is-active {
+  border-color: #1890ff;
+  background: #ffffff;
+  color: #1765cc;
+  box-shadow: 0 -2px 0 0 rgba(24, 144, 255, 0.18);
+}
+
+.group-command-center .logistics-handsontable-wrap .ht-theme-main {
+  height: 100%;
+  width: 100%;
+  font-size: 12px;
+}
+
+.group-command-center .logistics-handsontable-wrap .handsontable {
+  font-family: "Inter", "Noto Sans SC", sans-serif;
+  color: #2f3a4d;
+}
+
+.group-command-center .logistics-handsontable-wrap .handsontable thead th,
+.group-command-center .logistics-handsontable-wrap .handsontable .ht_clone_top th {
+  background: #f8f9fc;
+  color: #3a465a;
+  font-weight: 600;
+  border-color: #e7ebf3;
+  text-align: left !important;
+}
+
+.group-command-center .logistics-handsontable-wrap .handsontable thead th .relative,
+.group-command-center .logistics-handsontable-wrap .handsontable .ht_clone_top th .relative {
+  justify-content: flex-start !important;
+  text-align: left !important;
+  padding-left: 8px;
+}
+
+.group-command-center .logistics-handsontable-wrap .handsontable .hot-group-header {
+  color: #22324d;
+  font-weight: 700;
+}
+
+.group-command-center .logistics-handsontable-wrap .handsontable .htCore td,
+.group-command-center .logistics-handsontable-wrap .handsontable .htCore th {
+  border-color: #eef1f6;
+}
+
+.group-command-center .logistics-handsontable-wrap .handsontable .htCore td {
+  vertical-align: middle;
+}
+
+.group-command-center .logistics-handsontable-wrap td.hot-meal-cell {
+  background: #fcfdfd;
+}
+
+.group-command-center .logistics-handsontable-wrap td.hot-cell-placeholder {
+  color: #98a2b3 !important;
+}
+
+.group-command-center .logistics-handsontable-wrap td.hot-busy-driver-cell {
+  background: #fff1f0 !important;
+}
+
+.group-command-center .logistics-handsontable-wrap .handsontable td.htDimmed {
+  background: #f7f9fc;
+  color: #3f4b60;
+  font-weight: 600;
+}
+
+.group-command-center .logistics-handsontable-wrap .handsontable .wtBorder {
+  background-color: #1890ff !important;
+}
+
+.group-command-center .logistics-handsontable-wrap .handsontableInput {
+  font-size: 12px;
+  color: #1f2937;
+}
+
 

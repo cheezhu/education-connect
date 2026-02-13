@@ -65,6 +65,7 @@ const SHIXING_MEAL_DEFAULTS = {
   lunch: { start: '12:00', end: '13:00' },
   dinner: { start: '18:00', end: '19:00' }
 };
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const CalendarDetailWorkspace = ({
   groupData,

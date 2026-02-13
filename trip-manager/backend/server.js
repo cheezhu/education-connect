@@ -531,6 +531,7 @@ app.use('/api/users', require('./src/routes/users'));
 app.use('/api/feedback', requireAccess({ read: readAllRoles, write: readAllRoles }), require('./src/routes/feedback'));
 app.use('/api/statistics', requireAccess({ read: readAllRoles }), require('./src/routes/statistics'));
 app.use('/api/realtime', requireAccess({ read: readAllRoles }), require('./src/routes/realtime'));
+app.use('/api/group-ui', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/groupUiPrefs'));
 app.use('/api/groups', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/groups'));
 app.use('/api/locations', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/locations'));
 app.use('/api/itinerary-plans', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/itineraryPlans'));

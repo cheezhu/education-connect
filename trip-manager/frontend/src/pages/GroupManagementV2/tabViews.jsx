@@ -7,6 +7,7 @@ const PointCardsView = lazy(() => import('./components/Detail/PointCardsView'));
 const AccommodationView = lazy(() => import('./components/Detail/AccommodationView'));
 const FullCalendarWrapper = lazy(() => import('./components/Detail/FullCalendarWrapper'));
 const LogisticsView = lazy(() => import('./components/Detail/Logistics/LogisticsView'));
+const LogisticsSpreadsheet = lazy(() => import('./components/Detail/Logistics/LogisticsSpreadsheet'));
 const ItineraryTextDetail = lazy(() => import('./components/Detail/ItineraryTextDetail'));
 const HelpView = lazy(() => import('./components/Detail/HelpView'));
 const MembersView = lazy(() => import('./components/Detail/MembersView'));
@@ -55,7 +56,6 @@ export const renderTabView = ({
           onNavigateTab={onNavigateTab}
         />
       );
-    case 'logistics':
     case 'meals':
       return (
         <LogisticsView
@@ -72,6 +72,14 @@ export const renderTabView = ({
           schedules={groupSchedules}
           onUpdate={onLogisticsChange}
           viewMode="transfer"
+        />
+      );
+    case 'logistics':
+    case 'logistics_sheet':
+      return (
+        <LogisticsSpreadsheet
+          group={activeGroup}
+          onUpdate={onLogisticsChange}
         />
       );
     case 'points':
