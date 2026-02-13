@@ -1,5 +1,6 @@
 import React, { lazy } from 'react';
 import ProfileView from './components/Detail/ProfileView';
+import ProgressView from './components/Detail/ProgressView';
 
 const FullCalendarWrapper = lazy(() => import('./components/Detail/FullCalendarWrapper'));
 const LogisticsView = lazy(() => import('./components/Detail/Logistics/LogisticsView'));
@@ -7,7 +8,7 @@ const ItineraryTextDetail = lazy(() => import('./components/Detail/ItineraryText
 const HelpView = lazy(() => import('./components/Detail/HelpView'));
 const MembersView = lazy(() => import('./components/Detail/MembersView'));
 
-export const isReadModeTab = (tabKey) => tabKey === 'profile' || tabKey === 'itinerary';
+export const isReadModeTab = (tabKey) => tabKey === 'profile' || tabKey === 'progress' || tabKey === 'itinerary';
 
 export const renderTabView = ({
   activeTab,
@@ -34,7 +35,6 @@ export const renderTabView = ({
       return (
         <ProfileView
           group={activeGroup}
-          schedules={groupSchedules}
           hasMembers={hasMembers}
           itineraryPlans={itineraryPlans}
           locations={locations}
@@ -42,6 +42,13 @@ export const renderTabView = ({
           onDelete={onDeleteGroup}
           rightPanelWidth={rightPanelWidth}
           onResizeRightPanel={onResizeRightPanel}
+        />
+      );
+    case 'progress':
+      return (
+        <ProgressView
+          group={activeGroup}
+          schedules={groupSchedules}
           onNavigateTab={onNavigateTab}
         />
       );
@@ -84,4 +91,3 @@ export const renderTabView = ({
       return null;
   }
 };
-

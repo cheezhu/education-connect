@@ -32,6 +32,7 @@ vi.mock('./components/Detail/TabBar', () => ({
   default: (props) => (
     <div data-testid="tabbar" data-active={props.activeTab} data-mode={props.mode}>
       <button data-testid="tab-profile" onClick={() => props.onTabChange('profile')}>profile</button>
+      <button data-testid="tab-progress" onClick={() => props.onTabChange('progress')}>progress</button>
       <button data-testid="tab-schedule" onClick={() => props.onTabChange('schedule')}>schedule</button>
     </div>
   )
@@ -48,7 +49,7 @@ vi.mock('./components/GroupCommandCenterSkeleton', () => ({
 }));
 
 vi.mock('./tabViews', () => ({
-  isReadModeTab: (tabKey) => tabKey === 'profile' || tabKey === 'itinerary',
+  isReadModeTab: (tabKey) => tabKey === 'profile' || tabKey === 'progress' || tabKey === 'itinerary',
   renderTabView: ({ activeTab }) => <div data-testid="tab-view">{activeTab}</div>
 }));
 
@@ -148,6 +149,21 @@ describe('GroupManagementV2 container', () => {
     await waitFor(() => {
       expect(screen.getByTestId('tab-view').textContent).toBe('schedule');
       expect(screen.getByTestId('tabbar').getAttribute('data-active')).toBe('schedule');
+    });
+  });
+
+  it('loads progress tab from query and keeps read mode', async () => {
+    mockUseLocation.mockReturnValue({ search: '?tab=progress' });
+    mockUseGroupData.mockReturnValue(createHookState({
+      groups: [{ id: 1 }],
+      filteredGroups: [{ id: 1 }]
+    }));
+
+    render(<GroupManagementV2 />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tab-view').textContent).toBe('progress');
+      expect(screen.getByTestId('tabbar').getAttribute('data-mode')).toBe('read');
     });
   });
 

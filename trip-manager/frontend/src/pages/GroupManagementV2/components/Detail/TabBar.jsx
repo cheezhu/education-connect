@@ -30,10 +30,16 @@ const TabBar = ({
           团组设置
         </div>
         <div
+          className={`tab-item ${activeTab === 'progress' ? 'active' : ''}`}
+          onClick={() => onTabChange('progress')}
+        >
+          准备进度
+        </div>
+        <div
           className={`tab-item ${activeTab === 'itinerary' ? 'active' : ''}`}
           onClick={() => onTabChange('itinerary')}
         >
-          行程详情
+          行程导出
         </div>
       </div>
 

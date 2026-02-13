@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 
 export const UNNAMED_GROUP_NAME = '未命名团组';
 
-export const TAB_KEYS = new Set(['profile', 'logistics', 'schedule', 'itinerary', 'members', 'help']);
+export const TAB_KEYS = new Set(['profile', 'progress', 'logistics', 'schedule', 'itinerary', 'members', 'help']);
 
 export const QUICK_CREATE_DEFAULTS = {
   name: UNNAMED_GROUP_NAME,

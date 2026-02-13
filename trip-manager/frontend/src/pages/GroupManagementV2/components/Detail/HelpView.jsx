@@ -24,7 +24,7 @@ const HelpView = () => (
           <li><strong>团组信息</strong>：团组基础档案与状态管理。</li>
           <li><strong>食行卡片</strong>：按天录入旅行资源，支持“不安排”。</li>
           <li><strong>日历详情</strong>：可视化时段排程，支持拖拽调整。</li>
-          <li><strong>行程详情</strong>：查看并导出文本化行程。</li>
+          <li><strong>行程导出</strong>：查看并导出文本化行程。</li>
           <li><strong>人员信息</strong>：维护团员名单与联系方式。</li>
         </ul>
       </section>
