@@ -43,23 +43,35 @@ const normalizeGroupType = (type: GroupType | null | undefined): string => {
   const raw = String(type || '').trim();
   if (!raw) return '';
   const normalized = raw.toLowerCase();
-  if (normalized === 'primary' || raw === '小学' || raw === '小學' || raw === '灏忓' || raw === 'å°å­¦') {
+
+  if (
+    normalized === 'primary'
+    || raw === '\u5c0f\u5b66'
+    || raw === '\u5c0f\u5b78'
+  ) {
     return 'primary';
   }
-  if (normalized === 'secondary' || raw === '中学' || raw === '中學' || raw === '涓' || raw === 'ä¸­å­¦') {
+
+  if (
+    normalized === 'secondary'
+    || raw === '\u4e2d\u5b66'
+    || raw === '\u4e2d\u5b78'
+  ) {
     return 'secondary';
   }
+
   if (normalized === 'vip') {
     return 'vip';
   }
+
   return normalized;
 };
 
 export const getGroupTypeLabel = (type: GroupType | null | undefined): string => {
   const normalized = normalizeGroupType(type);
   if (!normalized) return '';
-  if (normalized === 'primary') return '小学';
-  if (normalized === 'secondary') return '中学';
+  if (normalized === 'primary') return '\u5c0f\u5b66';
+  if (normalized === 'secondary') return '\u4e2d\u5b66';
   if (normalized === 'vip') return 'VIP';
   return String(type);
 };

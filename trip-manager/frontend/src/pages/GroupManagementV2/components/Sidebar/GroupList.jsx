@@ -11,8 +11,6 @@ const GroupList = ({
   onSelectGroup,
   onCreateGroup,
   onBulkCreate,
-  filters,
-  onSearchChange,
   isCollapsed
 }) => {
   const toGroupIdKey = (value) => String(value ?? '');
@@ -39,16 +37,6 @@ const GroupList = ({
           GROUPS ({visibleCount}{resolvedTotal !== visibleCount ? `/${resolvedTotal}` : ''})
         </span>
         <div className="btn-icon-add" onClick={onCreateGroup}>＋</div>
-      </div>
-
-      <div className="sidebar-search">
-        <input
-          type="text"
-          className="search-input"
-          placeholder="Search..."
-          value={filters.searchText}
-          onChange={(event) => onSearchChange(event.target.value)}
-        />
       </div>
 
       <div className="list-content">

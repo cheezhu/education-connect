@@ -1,98 +1,16 @@
-﻿import React, { useId } from 'react';
+import React, { useId } from 'react';
 import dayjs from 'dayjs';
-
-const weekdayLabel = (dateStr) => {
-  if (!dateStr) return '';
-  return dayjs(dateStr).format('ddd / MMM');
-};
-
-const resolveEventTitle = (event) => {
-  return event?.title || event?.location || event?.description || '未命名活动';
-};
-
-const toPlainText = (value) => {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'string' || typeof value === 'number') {
-    const text = String(value).trim();
-    if (!text || text === '[object Object]' || text === 'undefined' || text === 'null') {
-      return '';
-    }
-    return text;
-  }
-  if (typeof value === 'object') {
-    if (typeof value.name === 'string') return value.name;
-    if (typeof value.label === 'string') return value.label;
-    if (typeof value.value === 'string' || typeof value.value === 'number') {
-      return String(value.value);
-    }
-  }
-  return '';
-};
-
-const isItineraryItem = (item) => {
-  const type = (item?.type || '').toString().toLowerCase();
-  if (!type) return true;
-  return !['meal', 'transport', 'rest', 'free'].includes(type);
-};
-
-const parseHour = (timeStr = '') => {
-  if (!timeStr) return null;
-  const match = String(timeStr).match(/\d{1,2}/);
-  if (!match) return null;
-  const hour = Number(match[0]);
-  if (Number.isNaN(hour)) return null;
-  return hour;
-};
-
-const splitScheduleItems = (items = []) => {
-  const buckets = {
-    morning: [],
-    afternoon: [],
-    evening: []
-  };
-
-  items.forEach((item) => {
-    const time = item.startTime || item.start_time || item.time || '';
-    const hour = parseHour(time);
-    let bucket = 'morning';
-    if (hour !== null) {
-      if (hour < 12) bucket = 'morning';
-      else if (hour < 18) bucket = 'afternoon';
-      else bucket = 'evening';
-    }
-    buckets[bucket].push(item);
-  });
-
-  return buckets;
-};
-
-const buildSlotList = (items = []) => {
-  if (!items.length) return ['未安排'];
-  return items.map((item) => {
-    const title = resolveEventTitle(item);
-    const location = item?.location || item?.place || item?.venue || '';
-    return location || title;
-  }).filter(Boolean);
-};
-
-const formatWeatherTime = (value) => {
-  if (!value) return '';
-  const parsed = dayjs(value);
-  if (!parsed.isValid()) return value;
-  return parsed.format('MM-DD HH:mm');
-};
-
-const downloadJson = (filename, payload) => {
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
-};
+import DaySummaryPanel from './DaySummaryPanel';
+import {
+  buildSlotList,
+  downloadJson,
+  formatWeatherTime,
+  isItineraryItem,
+  resolveEventTitle,
+  splitScheduleItems,
+  toPlainText,
+  weekdayLabel
+} from './dayCardUtils';
 
 const DayLogisticsCard = ({
   day,
@@ -108,7 +26,8 @@ const DayLogisticsCard = ({
   groupSize = 0,
   isFirstDay = false,
   isLastDay = false,
-  weatherData
+  weatherData,
+  viewMode = 'full'
 }) => {
   const id = useId();
   const meals = day.meals || {};
@@ -159,7 +78,7 @@ const DayLogisticsCard = ({
   ];
   const filledCount = mealFilledList.filter(Boolean).length;
   const mealStatus = filledCount === 0 ? '未填' : filledCount === 3 ? '已填' : '部分未填';
-  const statusClassName = (value) => (value === '已填' ? 'status-ok' : 'status-warn');
+  const isMealsOnly = viewMode === 'meals';
 
   const handleUpdate = (updates) => {
     onUpdateDay?.(day.date, updates);
@@ -411,168 +330,172 @@ const DayLogisticsCard = ({
       </div>
 
       <div className="day-form">
-        <div className="form-grid">
-          <div className={`input-group ${hotelDisabled ? 'is-disabled' : ''}`}>
-            <div className="section-header">
-              <label className="label">住宿酒店</label>
-              <button
-                className={`section-toggle ${hotelDisabled ? 'is-off' : ''}`}
-                type="button"
-                onClick={handleHotelToggle}
-              >
-                {hotelDisabled ? '未安排' : '不安排'}
-              </button>
-            </div>
-            <div className="multi-input">
-              <input
-                className="input-box input-main"
-                value={day.hotel || ''}
-                placeholder={hotelDisabled ? '已标记不安排' : '输入酒店名称'}
-                onChange={(event) => handleUpdate({ hotel: event.target.value })}
-                list={`${id}-hotel`}
-                disabled={hotelDisabled}
-              />
-              <input
-                className="input-box input-sub"
-                value={day.hotel_address || ''}
-                placeholder={hotelDisabled ? '已标记不安排' : '酒店地址'}
-                onChange={(event) => handleUpdate({ hotel_address: event.target.value })}
-                disabled={hotelDisabled}
-              />
-            </div>
-            {hotelOptions.length > 0 && (
-              <datalist id={`${id}-hotel`}>
-                {hotelOptions.map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-            )}
-          </div>
-          <div className={`input-group ${vehicleDisabled ? 'is-disabled' : ''}`}>
-            <div className="section-header">
-              <label className="label">车辆调度</label>
-              <button
-                className={`section-toggle ${vehicleDisabled ? 'is-off' : ''}`}
-                type="button"
-                onClick={handleVehicleToggle}
-              >
-                {vehicleDisabled ? '未安排' : '不安排'}
-              </button>
-            </div>
-            <div className="vehicle-stack">
-              <div className="vehicle-row">
-                <input
-                  className="input-box vehicle-input"
-                  value={vehicle.plate || ''}
-                  placeholder={vehicleDisabled ? '已标记不安排' : '车牌号'}
-                  onChange={(event) => handleVehicleChange('plate', event.target.value)}
-                  disabled={vehicleDisabled}
-                />
+        {!isMealsOnly && (
+          <>
+            <div className="form-grid">
+              <div className={`input-group ${hotelDisabled ? 'is-disabled' : ''}`}>
+                <div className="section-header">
+                  <label className="label">住宿酒店</label>
+                  <button
+                    className={`section-toggle ${hotelDisabled ? 'is-off' : ''}`}
+                    type="button"
+                    onClick={handleHotelToggle}
+                  >
+                    {hotelDisabled ? '未安排' : '不安排'}
+                  </button>
+                </div>
+                <div className="multi-input">
+                  <input
+                    className="input-box input-main"
+                    value={day.hotel || ''}
+                    placeholder={hotelDisabled ? '已标记不安排' : '输入酒店名称'}
+                    onChange={(event) => handleUpdate({ hotel: event.target.value })}
+                    list={`${id}-hotel`}
+                    disabled={hotelDisabled}
+                  />
+                  <input
+                    className="input-box input-sub"
+                    value={day.hotel_address || ''}
+                    placeholder={hotelDisabled ? '已标记不安排' : '酒店地址'}
+                    onChange={(event) => handleUpdate({ hotel_address: event.target.value })}
+                    disabled={hotelDisabled}
+                  />
+                </div>
+                {hotelOptions.length > 0 && (
+                  <datalist id={`${id}-hotel`}>
+                    {hotelOptions.map((option) => (
+                      <option key={option} value={option} />
+                    ))}
+                  </datalist>
+                )}
               </div>
-              <div className="vehicle-row">
-                <input
-                  className="input-box vehicle-input"
-                  value={vehicleDriver}
-                  placeholder={vehicleDisabled ? '已标记不安排' : '司机姓名'}
-                  onChange={(event) => handleVehicleChange('driver', event.target.value)}
-                  list={`${id}-vehicle`}
-                  disabled={vehicleDisabled}
-                />
-              </div>
-              <div className="vehicle-row">
-                <input
-                  className="input-box vehicle-input"
-                  value={vehicle.phone || ''}
-                  placeholder={vehicleDisabled ? '已标记不安排' : '联系电话'}
-                  onChange={(event) => handleVehicleChange('phone', event.target.value)}
-                  disabled={vehicleDisabled}
-                />
+              <div className={`input-group ${vehicleDisabled ? 'is-disabled' : ''}`}>
+                <div className="section-header">
+                  <label className="label">车辆调度</label>
+                  <button
+                    className={`section-toggle ${vehicleDisabled ? 'is-off' : ''}`}
+                    type="button"
+                    onClick={handleVehicleToggle}
+                  >
+                    {vehicleDisabled ? '未安排' : '不安排'}
+                  </button>
+                </div>
+                <div className="vehicle-stack">
+                  <div className="vehicle-row">
+                    <input
+                      className="input-box vehicle-input"
+                      value={vehicle.plate || ''}
+                      placeholder={vehicleDisabled ? '已标记不安排' : '车牌号'}
+                      onChange={(event) => handleVehicleChange('plate', event.target.value)}
+                      disabled={vehicleDisabled}
+                    />
+                  </div>
+                  <div className="vehicle-row">
+                    <input
+                      className="input-box vehicle-input"
+                      value={vehicleDriver}
+                      placeholder={vehicleDisabled ? '已标记不安排' : '司机姓名'}
+                      onChange={(event) => handleVehicleChange('driver', event.target.value)}
+                      list={`${id}-vehicle`}
+                      disabled={vehicleDisabled}
+                    />
+                  </div>
+                  <div className="vehicle-row">
+                    <input
+                      className="input-box vehicle-input"
+                      value={vehicle.phone || ''}
+                      placeholder={vehicleDisabled ? '已标记不安排' : '联系电话'}
+                      onChange={(event) => handleVehicleChange('phone', event.target.value)}
+                      disabled={vehicleDisabled}
+                    />
+                  </div>
+                </div>
+                {vehicleOptions.length > 0 && (
+                  <datalist id={`${id}-vehicle`}>
+                    {vehicleOptions.map((option) => (
+                      <option key={option} value={option} />
+                    ))}
+                  </datalist>
+                )}
               </div>
             </div>
-            {vehicleOptions.length > 0 && (
-              <datalist id={`${id}-vehicle`}>
-                {vehicleOptions.map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-            )}
-          </div>
-        </div>
 
-        <div className="form-grid">
-          <div className={`input-group ${guideDisabled ? 'is-disabled' : ''}`}>
-            <div className="section-header">
-              <label className="label">随团导游</label>
-              <button
-                className={`section-toggle ${guideDisabled ? 'is-off' : ''}`}
-                type="button"
-                onClick={handleGuideToggle}
-              >
-                {guideDisabled ? '未安排' : '不安排'}
-              </button>
+            <div className="form-grid">
+              <div className={`input-group ${guideDisabled ? 'is-disabled' : ''}`}>
+                <div className="section-header">
+                  <label className="label">随团导游</label>
+                  <button
+                    className={`section-toggle ${guideDisabled ? 'is-off' : ''}`}
+                    type="button"
+                    onClick={handleGuideToggle}
+                  >
+                    {guideDisabled ? '未安排' : '不安排'}
+                  </button>
+                </div>
+                <div className="multi-input">
+                  <input
+                    className="input-box input-main normal"
+                    value={guideName}
+                    placeholder={guideDisabled ? '已标记不安排' : '导游姓名'}
+                    onChange={(event) => handleGuideChange('name', event.target.value)}
+                    list={`${id}-guide`}
+                    disabled={guideDisabled}
+                  />
+                  <input
+                    className="input-box input-sub"
+                    value={guide.phone || ''}
+                    placeholder={guideDisabled ? '已标记不安排' : '联系电话'}
+                    onChange={(event) => handleGuideChange('phone', event.target.value)}
+                    disabled={guideDisabled}
+                  />
+                </div>
+                {guideOptions.length > 0 && (
+                  <datalist id={`${id}-guide`}>
+                    {guideOptions.map((option) => (
+                      <option key={option} value={option} />
+                    ))}
+                  </datalist>
+                )}
+              </div>
+              <div className={`input-group ${securityDisabled ? 'is-disabled' : ''}`}>
+                <div className="section-header">
+                  <label className="label">安保人员</label>
+                  <button
+                    className={`section-toggle ${securityDisabled ? 'is-off' : ''}`}
+                    type="button"
+                    onClick={handleSecurityToggle}
+                  >
+                    {securityDisabled ? '未安排' : '不安排'}
+                  </button>
+                </div>
+                <div className="multi-input">
+                  <input
+                    className="input-box input-main normal"
+                    value={securityName}
+                    placeholder={securityDisabled ? '已标记不安排' : '安保姓名'}
+                    onChange={(event) => handleSecurityChange('name', event.target.value)}
+                    list={`${id}-security`}
+                    disabled={securityDisabled}
+                  />
+                  <input
+                    className="input-box input-sub"
+                    value={security.phone || ''}
+                    placeholder={securityDisabled ? '已标记不安排' : '联系电话'}
+                    onChange={(event) => handleSecurityChange('phone', event.target.value)}
+                    disabled={securityDisabled}
+                  />
+                </div>
+                {securityOptions.length > 0 && (
+                  <datalist id={`${id}-security`}>
+                    {securityOptions.map((option) => (
+                      <option key={option} value={option} />
+                    ))}
+                  </datalist>
+                )}
+              </div>
             </div>
-            <div className="multi-input">
-              <input
-                className="input-box input-main normal"
-                  value={guideName}
-                  placeholder={guideDisabled ? '已标记不安排' : '导游姓名'}
-                  onChange={(event) => handleGuideChange('name', event.target.value)}
-                  list={`${id}-guide`}
-                  disabled={guideDisabled}
-              />
-              <input
-                className="input-box input-sub"
-                value={guide.phone || ''}
-                placeholder={guideDisabled ? '已标记不安排' : '联系电话'}
-                onChange={(event) => handleGuideChange('phone', event.target.value)}
-                disabled={guideDisabled}
-              />
-            </div>
-            {guideOptions.length > 0 && (
-              <datalist id={`${id}-guide`}>
-                {guideOptions.map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-            )}
-          </div>
-          <div className={`input-group ${securityDisabled ? 'is-disabled' : ''}`}>
-            <div className="section-header">
-              <label className="label">安保人员</label>
-              <button
-                className={`section-toggle ${securityDisabled ? 'is-off' : ''}`}
-                type="button"
-                onClick={handleSecurityToggle}
-              >
-                {securityDisabled ? '未安排' : '不安排'}
-              </button>
-            </div>
-            <div className="multi-input">
-              <input
-                className="input-box input-main normal"
-                  value={securityName}
-                  placeholder={securityDisabled ? '已标记不安排' : '安保姓名'}
-                  onChange={(event) => handleSecurityChange('name', event.target.value)}
-                  list={`${id}-security`}
-                  disabled={securityDisabled}
-              />
-              <input
-                className="input-box input-sub"
-                value={security.phone || ''}
-                placeholder={securityDisabled ? '已标记不安排' : '联系电话'}
-                onChange={(event) => handleSecurityChange('phone', event.target.value)}
-                disabled={securityDisabled}
-              />
-            </div>
-            {securityOptions.length > 0 && (
-              <datalist id={`${id}-security`}>
-                {securityOptions.map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-            )}
-          </div>
-        </div>
+          </>
+        )}
 
         <div className="meal-section">
           <div className={`meal-row ${breakfastDisabled ? 'is-disabled' : ''}`}>
@@ -659,73 +582,31 @@ const DayLogisticsCard = ({
           )}
         </div>
 
-        <div className="input-group">
-          <textarea
-            className="input-box note-input"
-            placeholder="添加当日特殊备注..."
-            value={day.note || ''}
-            onChange={(event) => handleUpdate({ note: event.target.value })}
-          />
-        </div>
+        {!isMealsOnly && (
+          <div className="input-group">
+            <textarea
+              className="input-box note-input"
+              placeholder="添加当日特殊备注..."
+              value={day.note || ''}
+              onChange={(event) => handleUpdate({ note: event.target.value })}
+            />
+          </div>
+        )}
 
       </div>
 
-      <div className="day-summary">
-        <div className="summary-card">
-          <div className="summary-title">当日行程摘要</div>
-          <div className="summary-slot">
-            <div className="summary-slot-label">上午</div>
-            <div className="summary-slot-list">
-              {morningItems.map((item, idx) => (
-                <div className="summary-slot-main" key={`${day.date}-morning-${idx}`}>
-                  {item}
-                </div>
-              ))}
-            </div>
-            {groupSize > 0 && <div className="summary-slot-sub">{groupSize}人</div>}
-          </div>
-          <div className="summary-slot">
-            <div className="summary-slot-label">下午</div>
-            <div className="summary-slot-list">
-              {afternoonItems.map((item, idx) => (
-                <div className="summary-slot-main" key={`${day.date}-afternoon-${idx}`}>
-                  {item}
-                </div>
-              ))}
-            </div>
-            {groupSize > 0 && <div className="summary-slot-sub">{groupSize}人</div>}
-          </div>
-        </div>
-
-        <div className="summary-card">
-          <div className="summary-title">录入状态</div>
-          <div className="summary-status-item">
-            <span>住宿酒店</span>
-            <span className={`summary-status ${statusClassName(hotelStatus)}`}>{hotelStatus}</span>
-          </div>
-          <div className="summary-status-item">
-            <span>车辆调度</span>
-            <span className={`summary-status ${statusClassName(vehicleStatus)}`}>{vehicleStatus}</span>
-          </div>
-          <div className="summary-status-item">
-            <span>随团导游</span>
-            <span className={`summary-status ${statusClassName(guideStatus)}`}>{guideStatus}</span>
-          </div>
-          <div className="summary-status-item">
-            <span>安保人员</span>
-            <span className={`summary-status ${statusClassName(securityStatus)}`}>{securityStatus}</span>
-          </div>
-          <div className="summary-status-item">
-            <span>餐厅名</span>
-            <span className={`summary-status ${statusClassName(mealStatus)}`}>{mealStatus}</span>
-          </div>
-        </div>
-
-        <div className="summary-save">
-          <span className="status-dot" />
-          自动保存
-        </div>
-      </div>
+      <DaySummaryPanel
+        dayDate={day.date}
+        morningItems={morningItems}
+        afternoonItems={afternoonItems}
+        groupSize={groupSize}
+        isMealsOnly={isMealsOnly}
+        hotelStatus={hotelStatus}
+        vehicleStatus={vehicleStatus}
+        guideStatus={guideStatus}
+        securityStatus={securityStatus}
+        mealStatus={mealStatus}
+      />
     </div>
   );
 };

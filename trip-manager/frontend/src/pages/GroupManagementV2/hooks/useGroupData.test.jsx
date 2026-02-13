@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { GROUP_MESSAGES } from '../constants';
 import { sortAndFilterGroups, useGroupData } from './useGroupData';
 
 const createApiClient = () => ({
@@ -32,7 +33,7 @@ afterEach(() => {
 });
 
 describe('useGroupData', () => {
-  it('sortAndFilterGroups sorts by created_at desc and falls back to start_date desc', () => {
+  it('sorts by created_at desc and falls back to start_date desc', () => {
     const list = [
       { id: 1, name: 'A', created_at: '2025-06-01T00:00:00.000Z', start_date: '2025-07-01' },
       { id: 2, name: 'B', created_at: '2025-06-03T00:00:00.000Z', start_date: '2025-07-02' },
@@ -43,7 +44,7 @@ describe('useGroupData', () => {
     expect(sorted.map((item) => item.id)).toEqual([2, 1, 3, 4]);
   });
 
-  it('sortAndFilterGroups matches by name/group_code/contact fields', () => {
+  it('matches by name/group_code/contact fields', () => {
     const list = [
       { id: 1, name: 'Alpha', group_code: 'G-100', contact_person: 'Tom', contact_phone: '111' },
       { id: 2, name: 'Beta', group_code: 'VIP-9', contact_person: 'Jerry', contact_phone: '222' }
@@ -60,7 +61,7 @@ describe('useGroupData', () => {
       groups: [
         {
           id: 1,
-          name: '旧团组',
+          name: 'Legacy Group',
           type: 'primary',
           student_count: 12,
           teacher_count: 1,
@@ -98,19 +99,18 @@ describe('useGroupData', () => {
     await waitFor(() => {
       expect(result.current.activeGroupId).toBe(99);
       expect(result.current.groups[0]?.id).toBe(99);
-      expect(result.current.filters.searchText).toBe('');
     });
-    expect(notify.success).toHaveBeenCalledWith('已新建团组');
+    expect(notify.success).toHaveBeenCalledWith(GROUP_MESSAGES.groupCreated);
   });
 
-  it('keeps the selected group stable while filter changes', async () => {
+  it('keeps the selected group stable after list refresh', async () => {
     const apiClient = createApiClient();
     const notify = createNotify();
     setupDefaultGetMocks(apiClient, {
       groups: [
         {
           id: 1,
-          name: '北京团组',
+          name: 'Beijing Group',
           type: 'primary',
           student_count: 10,
           teacher_count: 0,
@@ -120,7 +120,7 @@ describe('useGroupData', () => {
         },
         {
           id: 2,
-          name: '上海团组',
+          name: 'Shanghai Group',
           type: 'vip',
           student_count: 8,
           teacher_count: 1,
@@ -145,12 +145,12 @@ describe('useGroupData', () => {
       expect(apiClient.get).toHaveBeenCalledWith('/groups/2/logistics');
     });
 
-    act(() => {
-      result.current.updateSearch('北京');
+    await act(async () => {
+      await result.current.fetchGroups();
     });
 
     expect(result.current.activeGroupId).toBe(2);
-    expect(result.current.filteredGroups.map((item) => item.id)).toEqual([1]);
+    expect(result.current.filteredGroups.map((item) => item.id)).toEqual([2, 1]);
   });
 
   it('saves edited group with diff payload only', async () => {
@@ -158,7 +158,7 @@ describe('useGroupData', () => {
     const notify = createNotify();
     const baseGroup = {
       id: 7,
-      name: '原名称',
+      name: 'Original Name',
       type: 'primary',
       student_count: 20,
       teacher_count: 2,
@@ -172,7 +172,7 @@ describe('useGroupData', () => {
       data: {
         group: {
           ...baseGroup,
-          name: '新名称'
+          name: 'Updated Name'
         }
       }
     });
@@ -185,7 +185,7 @@ describe('useGroupData', () => {
 
     vi.useFakeTimers();
     act(() => {
-      result.current.handleGroupUpdate({ ...baseGroup, name: '新名称' });
+      result.current.handleGroupUpdate({ ...baseGroup, name: 'Updated Name' });
     });
 
     await act(async () => {
@@ -193,6 +193,6 @@ describe('useGroupData', () => {
     });
 
     expect(apiClient.put).toHaveBeenCalledTimes(1);
-    expect(apiClient.put).toHaveBeenCalledWith('/groups/7', { name: '新名称' });
+    expect(apiClient.put).toHaveBeenCalledWith('/groups/7', { name: 'Updated Name' });
   });
 });

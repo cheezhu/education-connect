@@ -1,14 +1,17 @@
 import React, { lazy } from 'react';
-import ProfileView from './components/Detail/ProfileView';
-import ProgressView from './components/Detail/ProgressView';
+import { READ_MODE_TAB_KEYS } from './constants';
 
+const ProfileView = lazy(() => import('./components/Detail/ProfileView'));
+const ProgressView = lazy(() => import('./components/Detail/ProgressView'));
+const PointCardsView = lazy(() => import('./components/Detail/PointCardsView'));
+const AccommodationView = lazy(() => import('./components/Detail/AccommodationView'));
 const FullCalendarWrapper = lazy(() => import('./components/Detail/FullCalendarWrapper'));
 const LogisticsView = lazy(() => import('./components/Detail/Logistics/LogisticsView'));
 const ItineraryTextDetail = lazy(() => import('./components/Detail/ItineraryTextDetail'));
 const HelpView = lazy(() => import('./components/Detail/HelpView'));
 const MembersView = lazy(() => import('./components/Detail/MembersView'));
 
-export const isReadModeTab = (tabKey) => tabKey === 'profile' || tabKey === 'progress' || tabKey === 'itinerary';
+export const isReadModeTab = (tabKey) => READ_MODE_TAB_KEYS.has(tabKey);
 
 export const renderTabView = ({
   activeTab,
@@ -53,11 +56,31 @@ export const renderTabView = ({
         />
       );
     case 'logistics':
+    case 'meals':
       return (
         <LogisticsView
           group={activeGroup}
           schedules={groupSchedules}
           onUpdate={onLogisticsChange}
+          viewMode="meals"
+        />
+      );
+    case 'transfer':
+      return (
+        <LogisticsView
+          group={activeGroup}
+          schedules={groupSchedules}
+          onUpdate={onLogisticsChange}
+          viewMode="transfer"
+        />
+      );
+    case 'points':
+      return (
+        <PointCardsView
+          group={activeGroup}
+          locations={locations}
+          schedules={groupSchedules}
+          onNavigateTab={onNavigateTab}
         />
       );
     case 'schedule':
@@ -84,6 +107,13 @@ export const renderTabView = ({
     case 'members':
       return (
         <MembersView groupId={activeGroup?.id ?? null} />
+      );
+    case 'accommodation':
+      return (
+        <AccommodationView
+          group={activeGroup}
+          onUpdate={onLogisticsChange}
+        />
       );
     case 'help':
       return <HelpView />;

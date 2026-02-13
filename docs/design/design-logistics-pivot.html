@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EC Logistics Pivot - Production Grade</title>
+    <style>
+        :root {
+            --bg-app: #f8fafc;
+            --accent: #6366f1;
+            --accent-soft: #e0e7ff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-light: #94a3b8;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg-app);
+            color: var(--text);
+            margin: 0; height: 100vh; display: flex; flex-direction: column;
+        }
+
+        .pivot-nav {
+            background: white; padding: 0 32px; height: 60px; display: flex; align-items: center; gap: 40px;
+            border-bottom: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.03); flex-shrink: 0;
+        }
+        .pivot-tab {
+            display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-light);
+            cursor: pointer; height: 100%; border-bottom: 3px solid transparent; font-size: 14px; transition: color 0.2s;
+        }
+        .pivot-tab:hover { color: var(--text); }
+        .pivot-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        .stage { flex: 1; overflow: hidden; position: relative; }
+        .view-layer { display: none; height: 100%; width: 100%; overflow-y: auto; padding: 32px 40px; }
+        .view-layer.active { display: block; }
+
+        /* --- VIEW 1: FLEET (Multi-Track Gantt) --- */
+        .gantt-container { 
+            max-width: 1100px; margin: 0 auto; background: white; border-radius: 12px; 
+            border: 1px solid var(--border); overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        }
+        
+        .gantt-header { display: grid; grid-template-columns: 180px repeat(5, 1fr); background: #f8fafc; border-bottom: 1px solid var(--border); }
+        .gh-cell { 
+            padding: 12px; font-size: 11px; font-weight: 700; color: var(--text-light); 
+            text-align: center; border-right: 1px solid var(--border); text-transform: uppercase;
+        }
+        
+        .gantt-row { display: grid; grid-template-columns: 180px 1fr; border-bottom: 1px solid var(--border); position: relative; }
+        
+        .g-label-area { 
+            background: #fff; border-right: 1px solid var(--border); padding: 16px; 
+            display: flex; flex-direction: column; justify-content: center;
+        }
+        .g-label-title { font-weight: 700; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px; }
+        .g-label-sub { font-size: 11px; color: var(--text-light); margin-top: 4px; }
+        
+        .g-track-container { display: flex; flex-direction: column; }
+        .g-track { 
+            display: grid; grid-template-columns: repeat(5, 1fr); padding: 8px; gap: 8px; 
+            min-height: 50px; border-bottom: 1px dashed #f1f5f9; position: relative;
+        }
+        .g-track:last-child { border-bottom: none; }
+        
+        /* Grid Lines */
+        .g-grid-lines { 
+            position: absolute; top: 0; bottom: 0; left: 0; right: 0; pointer-events: none;
+            display: grid; grid-template-columns: repeat(5, 1fr); 
+        }
+        .g-line { border-right: 1px dashed #f1f5f9; height: 100%; }
+
+        /* The Bar */
+        .g-bar {
+            background: var(--accent-soft); border: 1px solid #c7d2fe; border-radius: 6px;
+            display: flex; align-items: center; padding: 0 12px; justify-content: space-between;
+            color: var(--accent); font-weight: 600; font-size: 12px; z-index: 2;
+            cursor: grab; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: all 0.2s;
+        }
+        .g-bar:hover { background: #c7d2fe; transform: translateY(-1px); }
+        
+        .g-bar.conflict { background: #fef2f2; border-color: #fecaca; color: var(--danger); }
+        .g-bar.conflict::after { content: '⚠️ 冲突'; font-size: 10px; background: white; padding: 2px 6px; border-radius: 4px; border: 1px solid #fecaca; }
+
+        .btn-add-track { 
+            font-size: 11px; color: var(--accent); background: transparent; border: 1px dashed var(--accent); 
+            border-radius: 4px; padding: 4px 8px; cursor: pointer; margin-top: 8px; width: fit-content;
+        }
+
+        /* --- VIEW 2: MEALS (Excel Detail) --- */
+        .meal-table { 
+            width: 100%; border-collapse: separate; border-spacing: 0; background: white; 
+            border-radius: 12px; border: 1px solid var(--border); overflow: hidden; 
+            max-width: 1100px; margin: 0 auto;
+        }
+        .meal-table th { 
+            background: #f8fafc; padding: 12px 16px; text-align: left; font-size: 11px; 
+            font-weight: 700; color: var(--text-light); border-bottom: 1px solid var(--border); text-transform: uppercase;
+        }
+        .meal-table td { padding: 0; border-bottom: 1px solid var(--border); border-right: 1px solid #f1f5f9; vertical-align: top; }
+        
+        .date-cell { padding: 16px !important; background: #fff; width: 100px; }
+        
+        /* Compound Cell */
+        .m-cell { padding: 8px; display: flex; flex-direction: column; gap: 6px; position: relative; transition: background 0.1s; }
+        .m-cell:hover { background: #f8fafc; }
+        
+        .m-select { 
+            width: 100%; border: none; font-weight: 600; font-size: 13px; color: var(--text); 
+            background: transparent; outline: none; cursor: pointer;
+        }
+        .m-meta-row { display: flex; gap: 8px; align-items: center; }
+        .m-price { 
+            font-size: 11px; color: var(--text-light); background: #f1f5f9; padding: 2px 6px; border-radius: 4px;
+            border: none; width: 60px; text-align: center;
+        }
+        .m-note { 
+            flex: 1; font-size: 11px; border: none; border-bottom: 1px dashed #e2e8f0; 
+            background: transparent; padding: 2px; color: var(--text);
+        }
+        
+        /* Drag Handle */
+        .m-handle { 
+            position: absolute; bottom: 0; right: 0; width: 8px; height: 8px; background: var(--accent); 
+            cursor: crosshair; opacity: 0; 
+        }
+        .m-cell:hover .m-handle { opacity: 1; }
+
+        /* --- VIEW 3: HOTEL (Sub-Rows) --- */
+        .hotel-flow { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+        
+        .h-segment { 
+            background: white; border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+            box-shadow: 0 2px 8px -2px rgba(0,0,0,0.05);
+        }
+        .h-header { 
+            padding: 16px 24px; background: #f8fafc; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .h-range { font-weight: 700; color: var(--text); font-size: 15px; display: flex; gap: 8px; align-items: center; }
+        .h-badge { background: var(--text); color: white; font-size: 11px; padding: 2px 8px; border-radius: 99px; }
+        
+        .h-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+        .h-main-input { 
+            font-size: 16px; font-weight: 600; width: 100%; border: 1px solid #e2e8f0; 
+            padding: 10px; border-radius: 6px; 
+        }
+        
+        /* Sub Rooms */
+        .room-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding-left: 12px; border-left: 2px solid #e2e8f0; }
+        .room-row { display: flex; gap: 12px; align-items: center; }
+        .room-qty { width: 60px; text-align: center; border: 1px solid #e2e8f0; padding: 6px; border-radius: 4px; font-size: 13px; }
+        .room-type { flex: 1; border: 1px solid #e2e8f0; padding: 6px; border-radius: 4px; font-size: 13px; }
+        .btn-add-room { font-size: 11px; color: var(--accent); cursor: pointer; display: flex; align-items: center; gap: 4px; }
+
+    </style>
+</head>
+<body>
+
+    <div class="pivot-nav">
+        <div class="pivot-tab active" onclick="switchView('fleet', this)">🚌 车导调度 (Fleet)</div>
+        <div class="pivot-tab" onclick="switchView('meals', this)">🍽️ 餐饮策划 (Meals)</div>
+        <div class="pivot-tab" onclick="switchView('hotel', this)">🏨 住宿管理 (Hotel)</div>
+    </div>
+
+    <div class="stage">
+        
+        <!-- 1. FLEET SCHEDULER (Multi-Track) -->
+        <div id="view-fleet" class="view-layer active">
+            <div class="gantt-container">
+                <div class="gantt-header">
+                    <div class="gh-cell" style="text-align:left; padding-left:24px">Resource</div>
+                    <div class="gh-cell">Day 1</div>
+                    <div class="gh-cell">Day 2</div>
+                    <div class="gh-cell">Day 3</div>
+                    <div class="gh-cell">Day 4</div>
+                    <div class="gh-cell">Day 5</div>
+                </div>
+                
+                <!-- Vehicle Row -->
+                <div class="gantt-row">
+                    <div class="g-label-area">
+                        <div class="g-label-title">🚌 车辆 <button class="btn-add-track">+ Add</button></div>
+                    </div>
+                    <div class="g-track-container">
+                        <!-- Track 1: Main Bus -->
+                        <div class="g-track">
+                            <div class="g-grid-lines"><div class="g-line"></div><div class="g-line"></div><div class="g-line"></div><div class="g-line"></div></div>
+                            <div class="g-bar" style="grid-column: 1 / span 3">王师傅 (粤B·12345)</div>
+                            <div class="g-bar conflict" style="grid-column: 4 / span 2">李师傅 (冲突!)</div>
+                        </div>
+                        <!-- Track 2: Support Car -->
+                        <div class="g-track">
+                            <div class="g-grid-lines"><div class="g-line"></div><div class="g-line"></div><div class="g-line"></div><div class="g-line"></div></div>
+                            <div class="g-bar" style="grid-column: 3 / span 1; background:#f1f5f9; border-color:#cbd5e1; color:#64748b">
+                                别克商务 (行李车)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Guide Row -->
+                <div class="gantt-row">
+                    <div class="g-label-area"><div class="g-label-title">🚩 导游</div></div>
+                    <div class="g-track-container">
+                        <div class="g-track">
+                            <div class="g-grid-lines"><div class="g-line"></div><div class="g-line"></div><div class="g-line"></div><div class="g-line"></div></div>
+                            <div class="g-bar" style="grid-column: 1 / span 5; background:#fff7ed; border-color:#fdba74; color:#c2410c">
+                                张小导 (全程)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. MEAL PLANNER (Excel Detail) -->
+        <div id="view-meals" class="view-layer">
+            <table class="meal-table">
+                <thead>
+                    <tr>
+                        <th style="width:100px">Date</th>
+                        <th>Breakfast</th>
+                        <th>Lunch</th>
+                        <th>Dinner</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="date-cell">
+                            <strong>09-12</strong><br><span style="color:#94a3b8; font-size:11px">Day 1</span>
+                        </td>
+                        <td>
+                            <div class="m-cell">
+                                <select class="m-select"><option>酒店自助</option></select>
+                                <div class="m-meta-row">
+                                    <input class="m-price" value="含房费">
+                                    <input class="m-note" placeholder="备注...">
+                                </div>
+                                <div class="m-handle" title="Drag down to copy"></div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="m-cell">
+                                <select class="m-select"><option>基地围餐</option></select>
+                                <div class="m-meta-row">
+                                    <input class="m-price" value="30元/人">
+                                    <input class="m-note" value="⚠️ 清真席位 x2" style="color:#ef4444">
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="m-cell">
+                                <select class="m-select"><option>自理</option></select>
+                            </div>
+                        </td>
+                    </tr>
+                    <!-- More rows... -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 3. HOTEL (Sub-Rooms) -->
+        <div id="view-hotel" class="view-layer">
+            <div class="hotel-flow">
+                <div class="h-segment">
+                    <div class="h-header">
+                        <div class="h-range">Day 1 - Day 3 <span class="h-badge">3 Nights</span></div>
+                        <button class="btn-add-track" style="margin:0">Split Segment</button>
+                    </div>
+                    <div class="h-body">
+                        <input class="h-main-input" value="园区专家公寓 A栋">
+                        
+                        <div class="room-list">
+                            <div class="room-row">
+                                <input class="room-qty" value="20间">
+                                <input class="room-type" value="标准双人间 (学生)">
+                            </div>
+                            <div class="room-row">
+                                <input class="room-qty" value="3间">
+                                <input class="room-type" value="大床房 (老师)">
+                            </div>
+                            <div class="btn-add-room">+ Add Room Type</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function switchView(id, el) {
+            document.querySelectorAll('.pivot-tab').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            document.querySelectorAll('.view-layer').forEach(v => v.classList.remove('active'));
+            document.getElementById('view-' + id).classList.add('active');
+        }
+    </script>
+
+</body>
+</html>

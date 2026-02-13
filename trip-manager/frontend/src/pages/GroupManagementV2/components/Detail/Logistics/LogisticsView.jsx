@@ -217,7 +217,7 @@ const rowsEqual = (left = [], right = []) => (
   JSON.stringify(left) === JSON.stringify(right)
 );
 
-const LogisticsView = ({ group, schedules = [], onUpdate }) => {
+const LogisticsView = ({ group, schedules = [], onUpdate, viewMode = 'full' }) => {
   const [rows, setRows] = useState([]);
   const [hkoWeather, setHkoWeather] = useState({ status: 'idle', data: null, error: '' });
   const [hkoForecast, setHkoForecast] = useState({
@@ -453,7 +453,7 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
 
   if (!group) {
     return (
-      <div className="logistics-layout">
+      <div className={`logistics-layout logistics-view-${viewMode}`}>
         <div className="view-container">
           <div className="empty-state">请选择团组</div>
         </div>
@@ -462,7 +462,7 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
   }
 
   return (
-    <div className="logistics-layout">
+    <div className={`logistics-layout logistics-view-${viewMode}`}>
       <div className="view-container">
         <div className="logistics-panel">
           <LogisticsMatrix
@@ -481,6 +481,7 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
             mealOptions={MEAL_OPTIONS}
             groupSize={groupSize}
             weatherData={weatherBundle}
+            viewMode={viewMode}
           />
         </div>
       </div>

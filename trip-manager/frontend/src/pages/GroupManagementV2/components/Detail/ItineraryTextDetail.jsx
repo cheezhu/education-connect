@@ -709,3 +709,10 @@ const ItineraryTextDetail = ({ group, schedules }) => {
 };
 
 export default ItineraryTextDetail;
+
+export {
+  buildExportModel,
+  buildManualMarkdown,
+  buildManualText,
+  sortSchedules
+};

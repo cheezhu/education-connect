@@ -799,6 +799,25 @@
   gap: 8px 12px;
 }
 
+.group-command-center .logistics-view-meals .transfer-strip {
+  display: none;
+}
+
+.group-command-center .logistics-view-transfer .day-card {
+  display: none;
+}
+
+.group-command-center .logistics-view-transfer .logistics-list {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.group-command-center .logistics-view-transfer .transfer-strip {
+  border-style: solid;
+  border-color: #dbeafe;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.1);
+}
+
 
 /* Smart input */
 .group-command-center .smart-input {

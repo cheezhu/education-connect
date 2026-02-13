@@ -8,7 +8,7 @@ import GroupCommandCenterSkeleton from './components/GroupCommandCenterSkeleton'
 import TabErrorBoundary from './components/TabErrorBoundary';
 import { useGroupData } from './hooks/useGroupData';
 import { useRealtimeSync } from './hooks/useRealtimeSync';
-import { GROUP_MESSAGES, TAB_KEYS } from './constants';
+import { GROUP_MESSAGES, TAB_KEYS, resolveTabKey } from './constants';
 import { isReadModeTab, renderTabView } from './tabViews';
 import './GroupCommandCenter.css';
 
@@ -28,7 +28,6 @@ const GroupManagementV2 = () => {
     itineraryPlans,
     locations,
     rightPanelWidth,
-    filters,
     bulkOpen,
     bulkSubmitting,
     bulkRows,
@@ -42,7 +41,6 @@ const GroupManagementV2 = () => {
     handleLogisticsChange,
     handleDeleteGroup,
     handleQuickCreateGroup,
-    updateSearch,
     addBulkRow,
     removeBulkRow,
     updateBulkRow,
@@ -74,8 +72,10 @@ const GroupManagementV2 = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
-    if (tab && TAB_KEYS.has(tab)) {
-      setActiveTab(tab);
+    if (!tab) return;
+    const resolvedTab = resolveTabKey(tab);
+    if (TAB_KEYS.has(resolvedTab)) {
+      setActiveTab(resolvedTab);
     }
   }, [location.search]);
 
@@ -114,8 +114,6 @@ const GroupManagementV2 = () => {
             onSelectGroup={handleSelectGroup}
             onCreateGroup={handleQuickCreateAndFocusProfile}
             onBulkCreate={() => setBulkOpen(true)}
-            filters={filters}
-            onSearchChange={updateSearch}
             isCollapsed={isSidebarCollapsed}
           />
 

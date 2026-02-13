@@ -117,7 +117,7 @@ const ProgressView = ({ group, schedules = [], onNavigateTab }) => {
               <button
                 type="button"
                 className="day-action"
-                onClick={() => onNavigateTab?.('logistics')}
+                onClick={() => onNavigateTab?.('meals')}
               >
                 查看全部
               </button>
@@ -230,4 +230,3 @@ const ProgressView = ({ group, schedules = [], onNavigateTab }) => {
 };
 
 export default ProgressView;
-

@@ -1,16 +1,16 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import PropertyGrid from './PropertyGrid';
+import MustVisitSection from './profile/MustVisitSection';
+import ProfileNotesSection from './profile/ProfileNotesSection';
 import {
   MAX_NOTE_IMAGE_COUNT,
   MAX_NOTE_IMAGE_SIZE,
   MAX_NOTE_IMAGE_TOTAL_CHARS,
   buildBaseProperties,
   buildDateValue,
-  extractPlanLocationIds,
   isDraftValid,
   mergeCustomProperties,
-  normalizeManualMustVisitLocationIds,
   normalizeNotes,
   normalizeNotesImages,
   parseDateRangeInput,
@@ -43,6 +43,7 @@ const ProfileView = ({
       setPreviewImage('');
       return;
     }
+
     hydrateRef.current = true;
     setDraft({
       ...group,
@@ -68,11 +69,13 @@ const ProfileView = ({
     if (!isDraftValid(draft)) {
       return;
     }
+
     clearTimeout(debounceRef.current);
     lastDraftRef.current = draft;
     debounceRef.current = setTimeout(() => {
       onUpdate({ ...draft, properties });
     }, 500);
+
     return () => clearTimeout(debounceRef.current);
   }, [draft, group?.id, onUpdate, properties]);
 
@@ -81,7 +84,7 @@ const ProfileView = ({
   if (!group || !draft) {
     return (
       <div className="profile-layout profile-doc">
-          <div className="profile-center">
+        <div className="profile-center">
           <div className="empty-state">{PROFILE_TEXT.emptyState}</div>
         </div>
       </div>
@@ -108,7 +111,6 @@ const ProfileView = ({
 
   const handleUploadImages = async (event) => {
     const files = Array.from(event.target?.files || []);
-    // Allow selecting the same file again.
     event.target.value = '';
     if (!files.length) return;
 
@@ -232,97 +234,15 @@ const ProfileView = ({
 
   const statusOptions = PROFILE_TEXT.statusOptions;
 
-  const locationMap = new Map(
-    (locations || []).map((location) => [Number(location.id), location])
-  );
-  const manualMustVisitIds = normalizeManualMustVisitLocationIds(draft.manual_must_visit_location_ids);
-  const activePlan = (itineraryPlans || []).find(
-    (plan) => Number(plan.id) === Number(draft.itinerary_plan_id)
-  ) || null;
-  const planMustVisitIds = extractPlanLocationIds(activePlan?.items || []);
-  const selectedMustVisitIds = manualMustVisitIds;
-  const resolvedMustVisit = selectedMustVisitIds.map((locationId, index) => {
-    const location = locationMap.get(locationId);
-    return {
-      location_id: locationId,
-      location_name: location?.name || ('#' + locationId),
-      sort_order: index,
-      source: 'manual'
-    };
-  });
-  const mustVisitConfigured = manualMustVisitIds.length > 0;
-
-  const handleMustVisitPlanChange = (value) => {
-    setDraft((prev) => {
-      if (!prev) return prev;
-      const planId = value ? Number(value) : null;
-      return {
-        ...prev,
-        itinerary_plan_id: Number.isFinite(planId) ? planId : null
-      };
-    });
-  };
-
-  const handleApplyCurrentPlan = () => {
-    if (manualMustVisitIds.length > 0) {
-      const confirmed = window.confirm(PROFILE_TEXT.replaceMustVisitConfirm);
-      if (!confirmed) return;
-    }
-    setDraft((prev) => {
-      if (!prev) return prev;
-      const planId = Number(prev.itinerary_plan_id);
-      if (!Number.isFinite(planId)) return prev;
-      const plan = (itineraryPlans || []).find((item) => Number(item.id) === planId);
-      const nextIds = extractPlanLocationIds(plan?.items || []);
-      if (!nextIds.length) return prev;
-      return {
-        ...prev,
-        manual_must_visit_location_ids: nextIds
-      };
-    });
-  };
-
-  const handleToggleManualMustVisit = (locationId) => {
-    const normalizedLocationId = Number(locationId);
-    if (!Number.isFinite(normalizedLocationId) || normalizedLocationId <= 0) {
-      return;
-    }
-    setDraft((prev) => {
-      if (!prev) return prev;
-      const currentIds = normalizeManualMustVisitLocationIds(prev.manual_must_visit_location_ids);
-      const nextSet = new Set(currentIds);
-      if (nextSet.has(normalizedLocationId)) {
-        nextSet.delete(normalizedLocationId);
-      } else {
-        nextSet.add(normalizedLocationId);
-      }
-      return {
-        ...prev,
-        manual_must_visit_location_ids: Array.from(nextSet)
-      };
-    });
-  };
-
-  const handleClearManualMustVisit = () => {
-    setDraft((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        manual_must_visit_location_ids: []
-      };
-    });
-  };
-
   return (
     <div className="profile-layout profile-doc">
       <div className="profile-center doc-container">
         <div className="doc-content">
           <div className="profile-headline">
-            {/* Default name stays in data, but title input shows placeholder-style empty state. */}
             <input
               className="doc-title"
               value={String(draft.name || '').trim() === UNNAMED_GROUP_NAME ? '' : (draft.name || '')}
-              placeholder="输入团组名称"
+              placeholder={'输入团组名称'}
               onChange={(event) => handleNameChange(event.target.value)}
               onBlur={handleNameBlur}
             />
@@ -359,148 +279,25 @@ const ProfileView = ({
             )}
           />
 
-          <div className="must-visit-module">
-            <div className="must-visit-head">
-              <div className="must-visit-title">必去行程点配置</div>
-              <span className={'must-visit-badge ' + (mustVisitConfigured ? 'ok' : 'warn')}>
-                {mustVisitConfigured ? ('已配置 ' + resolvedMustVisit.length + ' 项') : '未配置'}
-              </span>
-            </div>
+          <MustVisitSection
+            draft={draft}
+            itineraryPlans={itineraryPlans}
+            locations={locations}
+            setDraft={setDraft}
+          />
 
-            <div className="must-visit-edit-row">
-              <label className="must-visit-label">快捷方案</label>
-              <div className="must-visit-plan-row">
-                <div className="must-visit-plan-actions">
-                  <select
-                    className="prop-input"
-                    value={draft.itinerary_plan_id ? String(draft.itinerary_plan_id) : ''}
-                    onChange={(event) => handleMustVisitPlanChange(event.target.value)}
-                  >
-                    <option value="">不使用方案（仅手动）</option>
-                    {(itineraryPlans || []).map((plan) => (
-                      <option key={plan.id} value={plan.id}>
-                        {plan.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="must-visit-link-btn"
-                    onClick={handleApplyCurrentPlan}
-                    disabled={!draft.itinerary_plan_id}
-                  >
-                    套用当前方案
-                  </button>
-                </div>
-                <span className="must-visit-tip">
-                  方案仅用于快捷点选；点击“套用当前方案”才会把方案地点填充到必去点，之后可继续手动微调。
-                </span>
-              </div>
-            </div>
-
-            <div className="must-visit-edit-row">
-              <label className="must-visit-label">手动必去行程点</label>
-              <div className="must-visit-manual-panel">
-                <div className="must-visit-manual-tools">
-                  <span className="must-visit-tip">点击卡片即可多选，无需按住 Ctrl</span>
-                  <button
-                    type="button"
-                    className="must-visit-link-btn"
-                    onClick={handleClearManualMustVisit}
-                    disabled={selectedMustVisitIds.length === 0}
-                  >
-                    清空
-                  </button>
-                </div>
-                <div className="must-visit-option-grid">
-                  {(locations || []).length === 0 && (
-                    <span className="muted">暂无可选地点</span>
-                  )}
-                  {(locations || []).map((location) => {
-                    const locationId = Number(location.id);
-                    const isSelected = selectedMustVisitIds.includes(locationId);
-                    return (
-                      <button
-                        key={location.id}
-                        type="button"
-                        className={'must-visit-option ' + (isSelected ? 'active' : '')}
-                        onClick={() => handleToggleManualMustVisit(locationId)}
-                      >
-                          <span className="must-visit-option-check">{isSelected ? '✓' : '+'}</span>
-                          <span className="must-visit-option-name">{location.name || ('#' + location.id)}</span>
-                        </button>
-                      );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            <div className="must-visit-list">
-              {resolvedMustVisit.length === 0 ? (
-                <span className="muted">未配置必去行程点，行程设计器导出会被拦截。</span>
-              ) : (
-                resolvedMustVisit.map((item, index) => (
-                  <span className="schedule-chip" key={item.location_id + '-' + index}>
-                    {item.location_name}
-                  </span>
-                ))
-              )}
-            </div>
-          </div>
-          <div className="doc-body">
-            <div className="doc-section-title">备注说明</div>
-            <textarea
-              className="doc-textarea"
-              rows={5}
-              placeholder="点击输入详细备注..."
-              value={draft.notes || ''}
-              onChange={(event) => setDraft((prev) => ({ ...prev, notes: event.target.value }))}
-            />
-            <div className="notes-image-tools">
-              <button
-                type="button"
-                className="notes-image-upload-btn"
-                onClick={handleOpenImagePicker}
-              >
-                Upload Image
-              </button>
-              <span className="notes-image-counter">{noteImages.length}/{MAX_NOTE_IMAGE_COUNT}</span>
-              <input
-                ref={imageInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="notes-image-input"
-                onChange={handleUploadImages}
-              />
-            </div>
-            {uploadError ? (
-              <div className="notes-image-error">{uploadError}</div>
-            ) : null}
-            {noteImages.length > 0 ? (
-              <div className="notes-image-grid">
-                {noteImages.map((imageUrl, index) => (
-                  <div className="notes-image-item" key={index + '-' + imageUrl.slice(0, 24)}>
-                    <button
-                      type="button"
-                      className="notes-image-thumb"
-                      onClick={() => handlePreviewImage(imageUrl)}
-                      title="Preview"
-                    >
-                      <img src={imageUrl} alt={'note-' + (index + 1)} />
-                    </button>
-                    <button
-                      type="button"
-                      className="notes-image-remove"
-                      onClick={() => handleRemoveImage(index)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
+          <ProfileNotesSection
+            draft={draft}
+            setDraft={setDraft}
+            noteImages={noteImages}
+            uploadError={uploadError}
+            maxImageCount={MAX_NOTE_IMAGE_COUNT}
+            imageInputRef={imageInputRef}
+            onOpenImagePicker={handleOpenImagePicker}
+            onUploadImages={handleUploadImages}
+            onPreviewImage={handlePreviewImage}
+            onRemoveImage={handleRemoveImage}
+          />
         </div>
       </div>
 
@@ -518,11 +315,8 @@ const ProfileView = ({
           </div>
         </div>
       ) : null}
-
     </div>
   );
 };
 
 export default ProfileView;
-
-

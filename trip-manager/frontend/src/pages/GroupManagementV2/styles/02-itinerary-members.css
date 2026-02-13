@@ -719,45 +719,47 @@
   }
 }
 
-.group-command-center .expand-btn {
-  display: none;
-  padding: 0 10px;
-  height: 30px;
+.group-command-center .sidebar-toggle-btn {
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   background: #ffffff;
   border-radius: 8px;
   color: #334155;
   cursor: pointer;
   font-size: 12px;
   border: 1px solid #d9d9d9;
+  flex-shrink: 0;
+  transition: all 0.16s ease;
 }
 
-.group-command-center .expand-btn.visible {
-  display: inline-flex;
-}
-
-.group-command-center .collapse-btn {
-  display: none;
-  padding: 0 10px;
-  height: 30px;
-  align-items: center;
-  background: #ffffff;
-  border-radius: 8px;
-  color: #334155;
-  cursor: pointer;
-  font-size: 12px;
-  border: 1px solid #d9d9d9;
-}
-
-.group-command-center .collapse-btn.visible {
-  display: inline-flex;
-}
-
-.group-command-center .expand-btn:hover,
-.group-command-center .collapse-btn:hover {
+.group-command-center .sidebar-toggle-btn:hover {
   background: #f7faff;
   border-color: #c3d1e4;
   color: #1f2d3d;
+}
+
+.group-command-center .sidebar-toggle-btn:focus-visible {
+  outline: 2px solid rgba(24, 144, 255, 0.35);
+  outline-offset: 1px;
+}
+
+.group-command-center .sidebar-toggle-icon {
+  display: inline-block;
+  font-size: 12px;
+  line-height: 1;
+  transition: transform 0.16s ease;
+}
+
+.group-command-center .sidebar-toggle-btn.is-expanded .sidebar-toggle-icon {
+  transform: translateX(-1px);
+}
+
+.group-command-center .sidebar-toggle-btn.is-collapsed .sidebar-toggle-icon {
+  transform: translateX(1px);
 }
 
 .group-command-center .tab-item {
@@ -830,6 +832,245 @@
   min-height: 100%;
   overflow: visible;
   padding-bottom: 24px;
+}
+
+/* Points view */
+.group-command-center .points-view {
+  height: 100%;
+  overflow: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.group-command-center .points-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.group-command-center .points-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.group-command-center .points-link-btn {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #2563eb;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.group-command-center .points-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.group-command-center .points-panel {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 240px;
+}
+
+.group-command-center .points-panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.group-command-center .points-empty {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.group-command-center .points-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group-command-center .points-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+}
+
+.group-command-center .points-card.must {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.group-command-center .points-card.other {
+  border-color: #f3f4f6;
+  background: #f9fafb;
+}
+
+.group-command-center .points-card-tag {
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1;
+  padding: 4px 7px;
+  font-weight: 700;
+  color: #475569;
+  background: #e2e8f0;
+}
+
+.group-command-center .points-card.must .points-card-tag {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.group-command-center .points-card-name {
+  font-size: 12px;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.group-command-center .points-note {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Accommodation view */
+.group-command-center .accommodation-view {
+  height: 100%;
+  overflow: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.group-command-center .accommodation-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.group-command-center .accommodation-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.group-command-center .accommodation-subtitle {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.group-command-center .accommodation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 12px;
+}
+
+.group-command-center .accommodation-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 110px 1fr;
+}
+
+.group-command-center .accommodation-card-date {
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.group-command-center .accommodation-card-date .date-main {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.group-command-center .accommodation-card-date .date-sub {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.group-command-center .accommodation-card-body {
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.group-command-center .accommodation-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.group-command-center .accommodation-row.full {
+  grid-column: 1 / -1;
+}
+
+.group-command-center .accommodation-row label {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.group-command-center .accommodation-row input,
+.group-command-center .accommodation-row textarea {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 7px 8px;
+  font-size: 12px;
+  color: #1f2937;
+  background: #fff;
+  outline: none;
+}
+
+.group-command-center .accommodation-row input:focus,
+.group-command-center .accommodation-row textarea:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.12);
+}
+
+@media (max-width: 1024px) {
+  .group-command-center .points-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .group-command-center .accommodation-card {
+    grid-template-columns: 1fr;
+  }
+
+  .group-command-center .accommodation-card-date {
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 10px 0;
+  }
+
+  .group-command-center .accommodation-card-body {
+    grid-template-columns: 1fr;
+  }
 }
 
 

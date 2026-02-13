@@ -1,4 +1,5 @@
-﻿import React from 'react';
+import React from 'react';
+import { TAB_GROUPS } from '../../constants';
 
 const TabBar = ({
   activeTab,
@@ -8,64 +9,47 @@ const TabBar = ({
   onExpandSidebar,
   onCollapseSidebar
 }) => {
+  const isCollapsed = Boolean(isSidebarCollapsed);
+
+  const handleSidebarToggle = () => {
+    if (isCollapsed) {
+      onExpandSidebar?.();
+      return;
+    }
+    onCollapseSidebar?.();
+  };
+
+  const toggleLabel = isCollapsed ? '\u663e\u793a\u5217\u8868' : '\u9690\u85cf\u5217\u8868';
+  const toggleIcon = isCollapsed ? '\u25b6' : '\u25c0';
+
   return (
     <div className="tab-container">
-      <span
-        className={`expand-btn ${isSidebarCollapsed ? 'visible' : ''}`}
-        onClick={onExpandSidebar}
+      <button
+        type="button"
+        className={`sidebar-toggle-btn ${isCollapsed ? 'is-collapsed' : 'is-expanded'}`}
+        onClick={handleSidebarToggle}
+        title={toggleLabel}
+        aria-label={toggleLabel}
       >
-        ← 列表
-      </span>
-      <span
-        className={`collapse-btn ${!isSidebarCollapsed ? 'visible' : ''}`}
-        onClick={onCollapseSidebar}
-      >
-        隐藏列表 →
-      </span>
-      <div className={`tab-group tab-group-read ${mode === 'read' ? 'active' : ''}`}>
-        <div
-          className={`tab-item ${activeTab === 'profile' ? 'active' : ''}`}
-          onClick={() => onTabChange('profile')}
-        >
-          团组设置
-        </div>
-        <div
-          className={`tab-item ${activeTab === 'progress' ? 'active' : ''}`}
-          onClick={() => onTabChange('progress')}
-        >
-          准备进度
-        </div>
-        <div
-          className={`tab-item ${activeTab === 'itinerary' ? 'active' : ''}`}
-          onClick={() => onTabChange('itinerary')}
-        >
-          行程导出
-        </div>
-      </div>
+        <span className="sidebar-toggle-icon" aria-hidden="true">{toggleIcon}</span>
+      </button>
 
-      <div className="tab-group-divider" />
-
-      <div className={`tab-group tab-group-work ${mode === 'work' ? 'active' : ''}`}>
-        <div
-          className={`tab-item ${activeTab === 'logistics' ? 'active' : ''}`}
-          onClick={() => onTabChange('logistics')}
-        >
-          食行卡片
-        </div>
-        <div
-          className={`tab-item ${activeTab === 'schedule' ? 'active' : ''}`}
-          onClick={() => onTabChange('schedule')}
-        >
-          日历详情
-        </div>
-        <div
-          className={`tab-item ${activeTab === 'members' ? 'active' : ''}`}
-          onClick={() => onTabChange('members')}
-        >
-          人员信息
-        </div>
-      </div>
-
+      {TAB_GROUPS.map((group, index) => (
+        <React.Fragment key={group.id}>
+          <div className={`tab-group tab-group-${group.mode} ${mode === group.mode ? 'active' : ''}`}>
+            {group.tabs.map((tab) => (
+              <div
+                key={tab.key}
+                className={`tab-item ${activeTab === tab.key ? 'active' : ''}`}
+                onClick={() => onTabChange(tab.key)}
+              >
+                {tab.label}
+              </div>
+            ))}
+          </div>
+          {index < TAB_GROUPS.length - 1 && <div className="tab-group-divider" />}
+        </React.Fragment>
+      ))}
     </div>
   );
 };

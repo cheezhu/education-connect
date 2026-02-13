@@ -92,37 +92,6 @@
   font-weight: bold;
 }
 
-.group-command-center .sidebar-search {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  background: #fff;
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-  height: 45px;
-}
-
-.group-command-center .search-input {
-  flex: 1;
-  background: #f5f5f5;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 12px;
-  outline: none;
-}
-
-.group-command-center .btn-filter {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #d9d9d9;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
 .group-command-center .list-content {
   flex: 1;
   overflow-y: auto;
