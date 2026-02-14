@@ -694,7 +694,8 @@ const buildResourceId = (date, category, key) => {
   return `daily:${date}:${category}`;
 };
 
-const acquireAgentLock = (db) => {
+const acquireAgentLock = (db, options = {}) => {
+  const force = options && options.force === true;
   const now = new Date();
   const expiresAt = new Date(now.getTime() + LOCK_TTL_MS).toISOString();
 
@@ -711,7 +712,9 @@ const acquireAgentLock = (db) => {
     const hasLock = Boolean(lock?.locked_by);
     const isExpired = lock?.expires_at ? (new Date(lock.expires_at) <= now) : false;
 
-    if (hasLock && lock.locked_by !== AGENT_LOCK_USER && !isExpired) {
+    // 默认：如果锁被真人(admin/editor)持有且未过期，agent 写入会被阻断。
+    // force=true：允许 OpenClaw agent 请求“抢占”锁（无视当前持有人）。
+    if (!force && hasLock && lock.locked_by !== AGENT_LOCK_USER && !isExpired) {
       return {
         ok: false,
         lockedBy: lock.locked_by,
@@ -1235,7 +1238,7 @@ router.post('/inject-one-shot', (req, res) => {
     });
   }
 
-  const lockResult = acquireAgentLock(req.db);
+  const lockResult = acquireAgentLock(req.db, { force: Boolean(req.isAgent) });
   if (!lockResult.ok) {
     return res.status(409).json({
       error: 'edit_lock_conflict',
@@ -1290,7 +1293,7 @@ router.post('/members/upsert', (req, res) => {
     });
   }
 
-  const lockResult = acquireAgentLock(req.db);
+  const lockResult = acquireAgentLock(req.db, { force: Boolean(req.isAgent) });
   if (!lockResult.ok) {
     return res.status(409).json({
       error: 'edit_lock_conflict',
