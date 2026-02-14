@@ -6,11 +6,17 @@ const path = require('path');
 const bcrypt = require('bcrypt');
 const dotenv = require('dotenv');
 const { requireRole, requireAccess } = require('./src/middleware/permission');
+const { startAutoSnapshotScheduler } = require('./src/services/versionSnapshots');
+const { publishChange } = require('./src/realtime/hub');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const LAST_LOGIN_TOUCH_INTERVAL_MS = 60 * 1000;
+const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '25mb';
+const lastLoginTouchMap = new Map();
+let autoSnapshotTimer = null;
 
 // 初始化数据库
 const db = new Database(path.join(__dirname, 'db/trip.db'));
@@ -221,6 +227,46 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS feedback_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    module_key TEXT NOT NULL DEFAULT 'other',
+    status TEXT NOT NULL DEFAULT 'open',
+    is_pinned BOOLEAN DEFAULT 0,
+    created_by TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    resolved_at DATETIME
+  );
+
+  CREATE TABLE IF NOT EXISTS feedback_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES feedback_posts(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    is_admin_reply BOOLEAN DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS feedback_reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES feedback_posts(id) ON DELETE CASCADE,
+    username TEXT NOT NULL,
+    reaction_type TEXT NOT NULL DEFAULT 'like',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(post_id, username, reaction_type)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_feedback_posts_status ON feedback_posts(status);
+  CREATE INDEX IF NOT EXISTS idx_feedback_posts_module ON feedback_posts(module_key);
+  CREATE INDEX IF NOT EXISTS idx_feedback_posts_pinned ON feedback_posts(is_pinned, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_feedback_comments_post ON feedback_comments(post_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_feedback_reactions_post ON feedback_reactions(post_id, reaction_type);
+`);
+
 const activityColumns = db.prepare("PRAGMA table_info(activities)").all().map(col => col.name);
 if (!activityColumns.includes('schedule_id')) {
   db.exec('ALTER TABLE activities ADD COLUMN schedule_id INTEGER');
@@ -261,9 +307,34 @@ if (!groupColumns.includes('must_visit_mode')) {
 if (!groupColumns.includes('manual_must_visit_location_ids')) {
   db.exec('ALTER TABLE groups ADD COLUMN manual_must_visit_location_ids TEXT');
 }
+if (!groupColumns.includes('notes_images')) {
+  db.exec("ALTER TABLE groups ADD COLUMN notes_images TEXT DEFAULT '[]'");
+}
+if (!groupColumns.includes('group_code')) {
+  db.exec('ALTER TABLE groups ADD COLUMN group_code VARCHAR(32)');
+}
 db.exec("UPDATE groups SET must_visit_mode = 'plan' WHERE must_visit_mode IS NULL OR TRIM(must_visit_mode) = ''");
 db.exec("UPDATE groups SET must_visit_mode = 'plan' WHERE must_visit_mode NOT IN ('plan', 'manual')");
 db.exec("UPDATE groups SET manual_must_visit_location_ids = '[]' WHERE manual_must_visit_location_ids IS NULL OR TRIM(manual_must_visit_location_ids) = ''");
+db.exec("UPDATE groups SET notes_images = '[]' WHERE notes_images IS NULL OR TRIM(notes_images) = ''");
+db.exec("UPDATE groups SET group_code = 'TG' || printf('%06d', id) WHERE group_code IS NULL OR TRIM(group_code) = ''");
+// Normalize historical/non-canonical type values to avoid mojibake in UI.
+db.exec("UPDATE groups SET type = 'primary' WHERE type IN ('小学', '小學', '灏忓', 'å°å­¦')");
+db.exec("UPDATE groups SET type = 'secondary' WHERE type IN ('中学', '中學', '涓', 'ä¸­å­¦')");
+db.exec("UPDATE groups SET type = 'vip' WHERE lower(trim(type)) = 'vip'");
+db.exec(`
+  WITH duplicate_codes AS (
+    SELECT group_code
+    FROM groups
+    WHERE group_code IS NOT NULL AND TRIM(group_code) <> ''
+    GROUP BY group_code
+    HAVING COUNT(*) > 1
+  )
+  UPDATE groups
+  SET group_code = 'TG' || printf('%06d', id)
+  WHERE group_code IN (SELECT group_code FROM duplicate_codes)
+`);
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_groups_group_code ON groups(group_code)');
 
 const locationColumns = db.prepare("PRAGMA table_info(locations)").all().map(col => col.name);
 if (!locationColumns.includes('open_hours')) {
@@ -371,9 +442,72 @@ const ensureUserRoleConstraint = () => {
 
 ensureUserRoleConstraint();
 
+const ensureGroupTypeConstraint = () => {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'groups'").get();
+  if (!row?.sql) return;
+  if (row.sql.includes("'vip'")) return;
+
+  // SQLite does not support altering CHECK constraints in-place. Rebuild the table while preserving
+  // all existing columns/constraints from the current schema, and only extend the type CHECK list.
+  const tableSql = String(row.sql);
+  const checkRegex = /CHECK\s*\(\s*type\s+IN\s*\(\s*([^)]+?)\s*\)\s*\)/i;
+
+  let createSql = tableSql.replace(
+    /CREATE TABLE\s+(?:IF NOT EXISTS\s+)?("?groups"?)/i,
+    'CREATE TABLE groups_new'
+  );
+  createSql = createSql.replace(checkRegex, (match, listRaw) => {
+    const listText = String(listRaw || '');
+    if (listText.toLowerCase().includes("'vip'")) return match;
+    const trimmed = listText.trim().replace(/,\s*$/, '');
+    return `CHECK(type IN (${trimmed}, 'vip'))`;
+  });
+
+  if (!createSql.includes("'vip'")) {
+    console.error('[db] Failed to rewrite groups.type CHECK constraint, skipping migration.');
+    return;
+  }
+
+  const createStmt = `${createSql.trim().replace(/;\s*$/, '')};`;
+
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.exec('BEGIN TRANSACTION;');
+    db.exec('DROP TABLE IF EXISTS groups_new;');
+    db.exec(createStmt);
+    db.exec('INSERT INTO groups_new SELECT * FROM groups;');
+    db.exec('DROP TABLE groups;');
+    db.exec('ALTER TABLE groups_new RENAME TO groups;');
+    db.exec('COMMIT;');
+  } catch (error) {
+    try {
+      db.exec('ROLLBACK;');
+    } catch (rollbackError) {
+      // ignore rollback errors
+    }
+    console.error('[db] Failed to migrate groups.type CHECK constraint:', error);
+    return;
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+
+  const maxId = db.prepare('SELECT MAX(id) as maxId FROM groups').get();
+  if (maxId && Number.isFinite(maxId.maxId)) {
+    db.prepare('UPDATE sqlite_sequence SET seq = ? WHERE name = ?')
+      .run(maxId.maxId, 'groups');
+  }
+
+  // Recreate indexes that were defined on the old table.
+  db.exec('CREATE INDEX IF NOT EXISTS idx_groups_date_range ON groups(start_date, end_date)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_groups_itinerary_plan ON groups(itinerary_plan_id)');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_groups_group_code ON groups(group_code)');
+};
+
+ensureGroupTypeConstraint();
+
 // 中间件
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
 app.use(express.static('public'));
 
 // 基础认证
@@ -393,7 +527,9 @@ const authenticator = (username, password, cb) => {
 const basicAuthMiddleware = basicAuth({
   authorizer: authenticator,
   authorizeAsync: true,
-  challenge: true,
+  // Frontend already handles login and sends Authorization header.
+  // Disable browser-native basic-auth popup to avoid secondary credential prompts.
+  challenge: false,
   realm: 'Trip Manager'
 });
 
@@ -422,6 +558,43 @@ app.use((req, res, next) => {
   if (!req.user) {
     req.user = req.auth?.user;
   }
+
+  if (req.user) {
+    const now = Date.now();
+    const lastTouchedAt = Number(lastLoginTouchMap.get(req.user) || 0);
+    if (!Number.isFinite(lastTouchedAt) || now - lastTouchedAt >= LAST_LOGIN_TOUCH_INTERVAL_MS) {
+      lastLoginTouchMap.set(req.user, now);
+      try {
+        db.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE username = ?').run(req.user);
+      } catch (error) {
+        console.error('Failed to update last_login:', error);
+      }
+    }
+  }
+
+  next();
+});
+
+// Broadcast successful write operations for frontend realtime refresh.
+app.use((req, res, next) => {
+  const method = String(req.method || '').toUpperCase();
+  const shouldWatch = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+  if (!shouldWatch || !String(req.path || '').startsWith('/api')) {
+    next();
+    return;
+  }
+  const startedAt = Date.now();
+  res.on('finish', () => {
+    if (res.statusCode >= 400) return;
+    if (String(req.path || '').startsWith('/api/realtime')) return;
+    publishChange({
+      method,
+      path: req.path,
+      status: res.statusCode,
+      user: req.user || null,
+      durationMs: Date.now() - startedAt
+    });
+  });
   next();
 });
 
@@ -438,7 +611,10 @@ app.use('/api/agent', requireRole(['admin', 'editor']), require('./src/routes/ag
 app.use('/api/c2', requireRole(['admin', 'editor']), require('./src/routes/c2'));
 
 app.use('/api/users', require('./src/routes/users'));
+app.use('/api/feedback', requireAccess({ read: readAllRoles, write: readAllRoles }), require('./src/routes/feedback'));
 app.use('/api/statistics', requireAccess({ read: readAllRoles }), require('./src/routes/statistics'));
+app.use('/api/realtime', requireAccess({ read: readAllRoles }), require('./src/routes/realtime'));
+app.use('/api/group-ui', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/groupUiPrefs'));
 app.use('/api/groups', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/groups'));
 app.use('/api/locations', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/locations'));
 app.use('/api/itinerary-plans', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/itineraryPlans'));
@@ -446,15 +622,25 @@ app.use('/api', requireAccess({ read: readAllRoles, write: writeEditorRoles }), 
 app.use('/api', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/logistics'));
 app.use('/api', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/resources'));
 app.use('/api', requireAccess({ read: readAllRoles, write: writeEditorRoles }), require('./src/routes/members'));
+app.use('/api/ai', require('./src/routes/aiImport'));
 
 // 错误处理
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ 
+  const status = Number(err?.status || err?.statusCode || 500);
+  if (status === 413) {
+    return res.status(413).json({
+      error: 'request_too_large',
+      message: 'Request payload is too large. Please upload fewer/smaller images.'
+    });
+  }
+  res.status(Number.isFinite(status) ? status : 500).json({ 
     error: '服务器错误',
     message: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
+
+autoSnapshotTimer = startAutoSnapshotScheduler(db);
 
 // 启动服务器
 app.listen(PORT, () => {
@@ -463,8 +649,15 @@ app.listen(PORT, () => {
 });
 
 // 优雅关闭
-process.on('SIGINT', () => {
-  console.log('\n正在关闭服务器...');
+const shutdown = () => {
+  console.log('\nShutting down server...');
+  if (autoSnapshotTimer) {
+    clearInterval(autoSnapshotTimer);
+    autoSnapshotTimer = null;
+  }
   db.close();
   process.exit(0);
-});
+};
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

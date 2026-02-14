@@ -442,7 +442,7 @@ router.post('/import', requireEditLock, (req, res) => {
       }
 
       const targetGroups = location.target_groups || 'all';
-      if (targetGroups !== 'all' && group && targetGroups !== group.type) {
+      if (targetGroups !== 'all' && group && group.type !== 'vip' && targetGroups !== group.type) {
         reasons.push('GROUP_TYPE');
       }
 

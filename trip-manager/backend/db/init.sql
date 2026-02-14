@@ -15,13 +15,14 @@ CREATE TABLE users (
 CREATE TABLE groups (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name VARCHAR(200) NOT NULL,
-    type VARCHAR(20) CHECK(type IN ('primary', 'secondary')) NOT NULL,
+    type VARCHAR(20) CHECK(type IN ('primary', 'secondary', 'vip')) NOT NULL,
     student_count INTEGER DEFAULT 40,
     teacher_count INTEGER DEFAULT 4,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
     duration INTEGER CHECK(duration > 0) DEFAULT 5,
     color VARCHAR(7) DEFAULT '#1890ff',
+    group_code VARCHAR(32) UNIQUE,
     itinerary_plan_id INTEGER,
     status VARCHAR(20),
     contact_person VARCHAR(100),
@@ -31,6 +32,7 @@ CREATE TABLE groups (
     accommodation TEXT,
     tags TEXT,
     notes TEXT,
+    notes_images TEXT DEFAULT '[]',
     must_visit_mode TEXT DEFAULT 'plan',
     manual_must_visit_location_ids TEXT DEFAULT '[]',
     schedule_revision INTEGER DEFAULT 0,
@@ -246,6 +248,41 @@ CREATE TABLE group_members (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 4.8 意见反馈主表
+CREATE TABLE feedback_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    module_key TEXT NOT NULL DEFAULT 'other',
+    status TEXT NOT NULL DEFAULT 'open',
+    is_pinned BOOLEAN DEFAULT 0,
+    created_by TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    resolved_at DATETIME
+);
+
+-- 4.9 意见反馈评论
+CREATE TABLE feedback_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES feedback_posts(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    is_admin_reply BOOLEAN DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4.10 意见反馈点赞
+CREATE TABLE feedback_reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES feedback_posts(id) ON DELETE CASCADE,
+    username TEXT NOT NULL,
+    reaction_type TEXT NOT NULL DEFAULT 'like',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(post_id, username, reaction_type)
+);
+
 -- 5. 编辑锁表
 CREATE TABLE edit_lock (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -285,6 +322,11 @@ CREATE INDEX idx_resource_people_name ON resource_people(name);
 CREATE INDEX idx_resource_hotels_city ON resource_hotels(city);
 CREATE INDEX idx_resource_hotels_name ON resource_hotels(name);
 CREATE INDEX idx_resource_vehicles_plate ON resource_vehicles(plate);
+CREATE INDEX idx_feedback_posts_status ON feedback_posts(status);
+CREATE INDEX idx_feedback_posts_module ON feedback_posts(module_key);
+CREATE INDEX idx_feedback_posts_pinned ON feedback_posts(is_pinned, created_at DESC);
+CREATE INDEX idx_feedback_comments_post ON feedback_comments(post_id, created_at);
+CREATE INDEX idx_feedback_reactions_post ON feedback_reactions(post_id, reaction_type);
 
 -- 创建视图简化查询
 CREATE VIEW calendar_view AS

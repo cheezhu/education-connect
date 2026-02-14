@@ -2,6 +2,8 @@ import React from 'react';
 
 import { resolveSourceMeta } from '../../../../domain/resourceSource';
 
+const LEGACY_MEAL_TITLES = new Set(['早餐', '午餐', '晚餐', '早饭', '午饭', '晚饭']);
+
 const typeLabel = (type) => {
   switch (type) {
     case 'visit':
@@ -38,16 +40,17 @@ const CalendarDetailEventChip = ({
 
   const rawTitle = (activity?.title || '').trim();
   const rawLocation = (activity?.location || '').trim();
+  const rawDescription = (activity?.description || '').trim();
 
-  // If title is missing or equals location, show a "name" line as type label.
-  // This avoids the "grid only shows location" feeling.
-  const titleText = (() => {
-    if (rawTitle && rawTitle !== rawLocation) return rawTitle;
-    if (rawTitle && !rawLocation) return rawTitle;
-    return typeLabel(activity?.type);
-  })();
-
-  const locationText = rawLocation || (rawTitle && rawTitle !== titleText ? rawTitle : '');
+  // Keep line-2 aligned with popover title: always prefer `title`, fallback to type label.
+  const titleText = (
+    activity?.type === 'meal'
+    && rawDescription
+    && (!rawTitle || LEGACY_MEAL_TITLES.has(rawTitle))
+  )
+    ? rawDescription
+    : (rawTitle || typeLabel(activity?.type));
+  const locationText = rawLocation && rawLocation !== titleText ? rawLocation : '';
 
   const handleClick = (event) => {
     if (onClick) {
@@ -99,4 +102,3 @@ const CalendarDetailEventChip = ({
 };
 
 export default CalendarDetailEventChip;
-

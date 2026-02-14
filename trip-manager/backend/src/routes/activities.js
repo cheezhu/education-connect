@@ -550,10 +550,14 @@ function checkConflicts(db, params) {
       
       // 检查团组类型限制
       const group = db.prepare('SELECT type FROM groups WHERE id = ?').get(groupId);
-      if (location.target_groups !== 'all' && location.target_groups !== group.type) {
+      const groupType = group?.type;
+      const labelByType = { primary: '小学', secondary: '中学', vip: 'VIP' };
+      const typeLabel = labelByType[groupType] || String(groupType || '');
+
+      if (groupType !== 'vip' && location.target_groups !== 'all' && location.target_groups !== groupType) {
         conflicts.push({
           type: 'group_type',
-          message: `${location.name} 不接待${group.type === 'primary' ? '小学' : '中学'}团组`
+          message: `${location.name} 不接待${typeLabel}团组`
         });
       }
     }

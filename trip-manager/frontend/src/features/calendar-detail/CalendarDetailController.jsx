@@ -5,11 +5,18 @@ import CalendarDetail from './CalendarDetail';
 import api from '../../services/api';
 import './CalendarDetailController.css';
 
+const getRequestErrorMessage = (error, fallback) => (
+  error?.response?.data?.message
+  || error?.response?.data?.error
+  || fallback
+);
+
 const CalendarDetailController = ({
   groupId,
   groupData,
   schedules,
   onUpdate,
+  onLogisticsUpdate,
   onPlanChange,
   onCustomResourcesChange,
   loading = false,
@@ -81,7 +88,7 @@ const CalendarDetailController = ({
           onRevisionConflict?.();
           return;
         }
-        message.error('保存失败，请稍后重试');
+        message.error(getRequestErrorMessage(error, '保存失败，请稍后重试'));
       }
     }, 500);
   };
@@ -113,6 +120,7 @@ const CalendarDetailController = ({
             groupData={groupData}
             schedules={localSchedules}
             onUpdate={handleScheduleUpdate}
+            onLogisticsUpdate={onLogisticsUpdate}
             onPlanChange={onPlanChange}
             onCustomResourcesChange={onCustomResourcesChange}
             loading={loading}

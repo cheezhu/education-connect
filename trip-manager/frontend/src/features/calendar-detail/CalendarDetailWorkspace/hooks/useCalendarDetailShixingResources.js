@@ -7,13 +7,15 @@ const isMealFilled = (meals, key) => {
   return Boolean(meals[key] || meals[`${key}_place`]);
 };
 
-const buildFlightDescription = (pickup) => (
-  [
-    pickup?.flight_no && `航班 ${pickup.flight_no}`,
-    pickup?.airline && pickup.airline,
-    pickup?.terminal && pickup.terminal
-  ].filter(Boolean).join(' / ')
-);
+const buildTransferDescription = (transfer = {}) => {
+  const note = typeof transfer.note === 'string' ? transfer.note.trim() : '';
+  if (note) return note;
+  return [
+    transfer.flight_no && `航班 ${transfer.flight_no}`,
+    transfer.airline,
+    transfer.terminal
+  ].filter(Boolean).join(' / ');
+};
 
 const useCalendarDetailShixingResources = ({ groupData, activities }) => useMemo(() => {
   const logistics = Array.isArray(groupData?.logistics) ? groupData.logistics : [];
@@ -56,9 +58,9 @@ const useCalendarDetailShixingResources = ({ groupData, activities }) => useMemo
       resources.push({
         id: resourceId,
         type: 'meal',
-        title: defaults.label || key,
+        title: meals[key] || defaults.label || key,
         duration,
-        description: meals[key] || '',
+        description: '',
         locationName: meals[`${key}_place`] || defaults.label || '',
         fixedDate: date
       });
@@ -73,7 +75,7 @@ const useCalendarDetailShixingResources = ({ groupData, activities }) => useMemo
           type: 'transport',
           title: '接站',
           duration: calcDurationHours(pickup.time, pickup.end_time, 60),
-          description: buildFlightDescription(pickup),
+          description: buildTransferDescription(pickup),
           locationName: pickup.location || '接站',
           fixedDate: date
         });
@@ -89,7 +91,7 @@ const useCalendarDetailShixingResources = ({ groupData, activities }) => useMemo
           type: 'transport',
           title: '送站',
           duration: calcDurationHours(dropoff.time, dropoff.end_time, 60),
-          description: buildFlightDescription(dropoff),
+          description: buildTransferDescription(dropoff),
           locationName: dropoff.location || '送站',
           fixedDate: date
         });

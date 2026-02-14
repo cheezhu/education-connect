@@ -1,14 +1,74 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Form, Input, Modal, Select, Table, message } from 'antd';
+import { Button, Card, Form, Input, Modal, Select, Table, Tag, Typography, message } from 'antd';
 import api from '../services/api';
 
-const { Option } = Select;
+const { Text } = Typography;
 
 const ROLE_OPTIONS = [
-  { label: '管理员', value: 'admin' },
-  { label: '编辑者', value: 'editor' },
-  { label: '查看者', value: 'viewer' }
+  {
+    label: '管理员',
+    value: 'admin',
+    color: 'red',
+    description: '可管理用户与系统配置，并可新增、编辑、删除全部业务数据。'
+  },
+  {
+    label: '编辑者',
+    value: 'editor',
+    color: 'blue',
+    description: '可新增和编辑团组、日历、资源等业务数据；不可使用行程设计器、系统配置与用户管理。'
+  },
+  {
+    label: '查看者',
+    value: 'viewer',
+    color: 'default',
+    description: '仅可查看数据，不可新增、编辑或删除。'
+  }
 ];
+
+const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
+const BEIJING_TIMEZONE = 'Asia/Shanghai';
+const BEIJING_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: BEIJING_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false
+});
+
+const toUtcDate = (value) => {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  // SQLite CURRENT_TIMESTAMP format is "YYYY-MM-DD HH:mm:ss" in UTC.
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)
+    ? `${raw.replace(' ', 'T')}Z`
+    : raw;
+
+  const date = new Date(normalized);
+  return Number.isFinite(date.getTime()) ? date : null;
+};
+
+const parseDateMs = (value) => {
+  const date = toUtcDate(value);
+  if (!date) return NaN;
+  return date.getTime();
+};
+
+const formatDateTime = (value) => {
+  const date = toUtcDate(value);
+  if (!date) return value ? String(value) : '从未登录';
+  return `${BEIJING_FORMATTER.format(date)} GMT+8`;
+};
+
+const isOnlineRecently = (value) => {
+  const parsed = parseDateMs(value);
+  if (!Number.isFinite(parsed)) return false;
+  return Date.now() - parsed <= ONLINE_THRESHOLD_MS;
+};
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -16,6 +76,10 @@ const UserManagement = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [form] = Form.useForm();
+
+  const selectedRole = Form.useWatch('role', form);
+
+  const getRoleMeta = (role) => ROLE_OPTIONS.find((item) => item.value === role);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -117,7 +181,29 @@ const UserManagement = () => {
       title: '角色',
       dataIndex: 'role',
       key: 'role',
-      render: (role) => ROLE_OPTIONS.find(item => item.value === role)?.label || role
+      render: (role) => {
+        const roleMeta = getRoleMeta(role);
+        if (!roleMeta) return role;
+        return <Tag color={roleMeta.color}>{roleMeta.label}</Tag>;
+      }
+    },
+    {
+      title: '登录状态',
+      key: 'loginStatus',
+      width: 180,
+      render: (_, record) => {
+        const online = isOnlineRecently(record.lastLogin);
+        return (
+          <div style={{ display: 'grid', gap: 2 }}>
+            <Tag color={online ? 'green' : 'default'} style={{ width: 'fit-content', marginRight: 0 }}>
+              {online ? '在线' : '离线'}
+            </Tag>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              最近登录：{formatDateTime(record.lastLogin)}
+            </Text>
+          </div>
+        );
+      }
     },
     {
       title: '操作',
@@ -144,6 +230,28 @@ const UserManagement = () => {
           新建用户
         </Button>
       </div>
+
+      <Card
+        size="small"
+        title="权限说明"
+        style={{ marginBottom: 12 }}
+        bodyStyle={{ paddingTop: 8, paddingBottom: 8 }}
+      >
+        <div style={{ display: 'grid', gap: 8 }}>
+          {ROLE_OPTIONS.map((role) => (
+            <div
+              key={role.value}
+              style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}
+            >
+              <Tag color={role.color} style={{ marginTop: 2 }}>
+                {role.label}
+              </Tag>
+              <Text type="secondary">{role.description}</Text>
+            </div>
+          ))}
+        </div>
+      </Card>
+
       <Table
         rowKey="id"
         columns={columns}
@@ -174,6 +282,7 @@ const UserManagement = () => {
             label="角色"
             name="role"
             rules={[{ required: true, message: '请选择角色' }]}
+            extra={getRoleMeta(selectedRole)?.description || '请选择角色以查看权限范围'}
           >
             <Select options={ROLE_OPTIONS} />
           </Form.Item>

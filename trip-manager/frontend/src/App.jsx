@@ -9,6 +9,8 @@ import SolverPreview from './pages/SolverPreview';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import UserManagement from './pages/UserManagement';
+import HelpCenter from './pages/HelpCenter';
+import FeedbackCenter from './pages/FeedbackCenter';
 import UnifiedNavbar from './components/UnifiedNavbar';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import './App.css';
@@ -17,7 +19,7 @@ const { Content } = Layout;
 
 function App() {
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <AppLayout />
       </AuthProvider>
@@ -96,7 +98,7 @@ function AppLayout() {
             <Route
               path="/designer"
               element={(
-                <ProtectedRoute permission="designer">
+                <ProtectedRoute permission="designer" action="write">
                   <ItineraryDesigner />
                 </ProtectedRoute>
               )}
@@ -120,7 +122,7 @@ function AppLayout() {
             <Route
               path="/settings"
               element={(
-                <ProtectedRoute permission="settings">
+                <ProtectedRoute permission="settings" action="write">
                   <Settings />
                 </ProtectedRoute>
               )}
@@ -130,6 +132,22 @@ function AppLayout() {
               element={(
                 <ProtectedRoute permission="groups">
                   <GroupManagementV2 />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="/help"
+              element={(
+                <ProtectedRoute>
+                  <HelpCenter />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="/feedback"
+              element={(
+                <ProtectedRoute permission="feedback">
+                  <FeedbackCenter />
                 </ProtectedRoute>
               )}
             />

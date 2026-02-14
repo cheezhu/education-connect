@@ -2,6 +2,8 @@
 import dayjs from 'dayjs';
 import DayLogisticsCard from './DayLogisticsCard';
 
+const EMPTY_SCHEDULE_ITEMS = [];
+
 const TransferStrip = ({ type, day, onUpdateDay }) => {
   const isPickup = type === 'pickup';
   const transfer = isPickup ? (day.pickup || {}) : (day.dropoff || {});
@@ -11,7 +13,7 @@ const TransferStrip = ({ type, day, onUpdateDay }) => {
 
   const handleChange = (field, value) => {
     onUpdateDay?.(day.date, {
-      [type]: { ...transfer, [field]: value }
+      [type]: { ...transfer, [field]: value, detached: false }
     });
   };
 
@@ -30,7 +32,7 @@ const TransferStrip = ({ type, day, onUpdateDay }) => {
             detached: false,
             disabled: true
           }
-        : { ...transfer, disabled: false }
+        : { ...transfer, disabled: false, detached: false }
     });
   };
 
@@ -74,7 +76,7 @@ const TransferStrip = ({ type, day, onUpdateDay }) => {
             />
           </div>
           <div className="input-group">
-            <label className="label">地点</label>
+            <label className="label">地址</label>
             <input
               className="input-box"
               value={transfer.location || ''}
@@ -123,6 +125,16 @@ const TransferStrip = ({ type, day, onUpdateDay }) => {
               disabled={disabled}
             />
           </div>
+          <div className="input-group">
+            <label className="label">备注</label>
+            <input
+              className="input-box"
+              value={transfer.note || ''}
+              placeholder={disabled ? '已标记不安排' : '补充说明（可选）'}
+              onChange={(event) => handleChange('note', event.target.value)}
+              disabled={disabled}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -134,43 +146,68 @@ const LogisticsMatrix = ({
   scheduleMap,
   onUpdateDay,
   onCopyPrevDay,
+  onFocusCapture,
+  onBlurCapture,
+  onCompositionStartCapture,
+  onCompositionEndCapture,
   hotelOptions,
   vehicleOptions,
   guideOptions,
   securityOptions,
   mealOptions,
   groupSize = 0,
-  weatherData
+  weatherData,
+  viewMode = 'full'
 }) => {
   if (!rows.length) {
     return <div className="empty-state">暂无资源安排</div>;
   }
 
   return (
-    <div className="logistics-list">
+    <div
+      className="logistics-list"
+      onFocusCapture={onFocusCapture}
+      onBlurCapture={onBlurCapture}
+      onCompositionStartCapture={onCompositionStartCapture}
+      onCompositionEndCapture={onCompositionEndCapture}
+    >
       {rows.map((day, index) => (
         <React.Fragment key={day.date}>
-          {index === 0 && (
-            <TransferStrip type="pickup" day={day} onUpdateDay={onUpdateDay} />
-          )}
-          <DayLogisticsCard
-            index={index}
-            day={day}
-            scheduleItems={scheduleMap?.get(day.date) || []}
-            onUpdateDay={onUpdateDay}
-            onCopyPrevDay={onCopyPrevDay}
-            hotelOptions={hotelOptions}
-            vehicleOptions={vehicleOptions}
-            guideOptions={guideOptions}
-            securityOptions={securityOptions}
-            mealOptions={mealOptions}
-            groupSize={groupSize}
-            weatherData={weatherData}
-            isFirstDay={index === 0}
-            isLastDay={index === rows.length - 1}
-          />
-          {index === rows.length - 1 && (
-            <TransferStrip type="dropoff" day={day} onUpdateDay={onUpdateDay} />
+          {viewMode === 'transfer' ? (
+            <>
+              {index === 0 && (
+                <TransferStrip type="pickup" day={day} onUpdateDay={onUpdateDay} />
+              )}
+              {index === rows.length - 1 && (
+                <TransferStrip type="dropoff" day={day} onUpdateDay={onUpdateDay} />
+              )}
+            </>
+          ) : (
+            <>
+              {viewMode === 'full' && index === 0 && (
+                <TransferStrip type="pickup" day={day} onUpdateDay={onUpdateDay} />
+              )}
+              <DayLogisticsCard
+                index={index}
+                day={day}
+                scheduleItems={scheduleMap?.get(day.date) || EMPTY_SCHEDULE_ITEMS}
+                onUpdateDay={onUpdateDay}
+                onCopyPrevDay={onCopyPrevDay}
+                hotelOptions={hotelOptions}
+                vehicleOptions={vehicleOptions}
+                guideOptions={guideOptions}
+                securityOptions={securityOptions}
+                mealOptions={mealOptions}
+                groupSize={groupSize}
+                weatherData={weatherData}
+                isFirstDay={index === 0}
+                isLastDay={index === rows.length - 1}
+                viewMode={viewMode}
+              />
+              {viewMode === 'full' && index === rows.length - 1 && (
+                <TransferStrip type="dropoff" day={day} onUpdateDay={onUpdateDay} />
+              )}
+            </>
           )}
         </React.Fragment>
       ))}

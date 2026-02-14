@@ -1,5 +1,6 @@
 import dayjs from 'dayjs';
 import { useMemo } from 'react';
+import { getGroupTypeLabel } from '../../../domain/group';
 
 export default function useTimelineSlotConflictMap({
   activities,
@@ -101,14 +102,15 @@ export default function useTimelineSlotConflictMap({
         }
 
         const targetGroups = String(location.target_groups || 'all').trim();
-        if (targetGroups !== 'all' && targetGroups !== group.type) {
+        if (group.type !== 'vip' && targetGroups !== 'all' && targetGroups !== group.type) {
+          const typeLabel = getGroupTypeLabel(group.type) || String(group.type || '');
           pushConflict({
             type: 'GROUP_TYPE',
             groupId,
             groupName: group.name || `#${groupId}`,
             locationId,
             locationName: location.name || `#${locationId}`,
-            message: `${location.name || `#${locationId}`} 不适用于${group.type === 'primary' ? '小学' : '中学'}团组`
+            message: `${location.name || `#${locationId}`} 不适用于${typeLabel}团组`
           });
         }
       });
@@ -142,4 +144,3 @@ export default function useTimelineSlotConflictMap({
     return result;
   }, [activities, selectedGroups, groupsById, locationsById]);
 }
-

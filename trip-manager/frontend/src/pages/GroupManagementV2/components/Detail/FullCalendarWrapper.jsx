@@ -5,6 +5,7 @@ const FullCalendarWrapper = ({
   group,
   schedules,
   onSchedulesUpdate,
+  onLogisticsUpdate,
   onCustomResourcesChange,
   resourceWidth,
   scheduleRevision = 0,
@@ -21,6 +22,7 @@ const FullCalendarWrapper = ({
       groupData={group}
       schedules={schedules}
       onUpdate={onSchedulesUpdate}
+      onLogisticsUpdate={onLogisticsUpdate}
       onCustomResourcesChange={onCustomResourcesChange}
       resourceWidth={resourceWidth}
       scheduleRevision={scheduleRevision}

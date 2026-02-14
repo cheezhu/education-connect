@@ -21,7 +21,14 @@ import { buildClientId } from './utils/clientId';
 import { hashString } from './utils/hash';
 import { isDailyActivity, parseDailyDate } from './utils/calendarDetailResourceId';
 import { calcDurationHours, calcDurationMinutes } from './utils/time';
-import { getResourceId, isCustomResourceId, isPlanResourceId, isShixingResourceId } from '../../../domain/resourceId';
+import {
+  buildShixingResourceId,
+  getResourceId,
+  isCustomResourceId,
+  isPlanResourceId,
+  isShixingResourceId,
+  parseShixingResourceId
+} from '../../../domain/resourceId';
 import { resolveSourceMeta, resolveSourceMetaByKind } from '../../../domain/resourceSource';
 
 const START_HOUR = 6;
@@ -35,11 +42,36 @@ const SLOTS_PER_HOUR = Math.max(1, Math.round(60 / SLOT_MINUTES));
 const DEFAULT_PLAN_DURATION = 2;
 const MAX_FULL_DAYS = 9;
 const DEFAULT_WINDOW_DAYS = 7;
+const SHIXING_MEAL_KEYS = ['breakfast', 'lunch', 'dinner'];
+const SHIXING_MEAL_LABELS = {
+  breakfast: '早餐',
+  lunch: '午餐',
+  dinner: '晚餐'
+};
+const SHIXING_TRANSFER_LABELS = {
+  pickup: '接站',
+  dropoff: '送站'
+};
+const LEGACY_MEAL_TITLES = new Set([
+  '早餐',
+  '午餐',
+  '晚餐',
+  '早饭',
+  '午饭',
+  '晚饭'
+]);
+const SHIXING_MEAL_DEFAULTS = {
+  breakfast: { start: '07:30', end: '08:30' },
+  lunch: { start: '12:00', end: '13:00' },
+  dinner: { start: '18:00', end: '19:00' }
+};
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const CalendarDetailWorkspace = ({
   groupData,
   schedules = [],
   onUpdate,
+  onLogisticsUpdate,
   onPlanChange,
   onPushedToDesigner,
   onCustomResourcesChange,
@@ -163,6 +195,8 @@ const CalendarDetailWorkspace = ({
     selectedPlanId,
     itineraryPlans,
     designerSourceList: designerSourceState.list,
+    manualMustVisitLocationIds: groupData?.manual_must_visit_location_ids,
+    locations,
     activities,
     schedules
   });
@@ -449,6 +483,89 @@ const CalendarDetailWorkspace = ({
 
     return groups;
   }, []);
+
+  const buildShixingMealDrafts = useCallback((targetDate) => {
+    const drafts = {};
+    const logisticsRows = Array.isArray(groupData?.logistics) ? groupData.logistics : [];
+    const logisticsRow = logisticsRows.find((row) => row?.date === targetDate) || null;
+    const meals = logisticsRow?.meals || {};
+
+    const activityByMealKey = new Map();
+    (activities || []).forEach((activity) => {
+      const parsed = parseShixingResourceId(getResourceId(activity));
+      if (!parsed || parsed.category !== 'meal' || !parsed.key) return;
+      if (parsed.date !== targetDate) return;
+      activityByMealKey.set(parsed.key, activity);
+    });
+
+    SHIXING_MEAL_KEYS.forEach((key) => {
+      const matchedActivity = activityByMealKey.get(key);
+      const defaults = SHIXING_MEAL_DEFAULTS[key] || {};
+      const title = matchedActivity?.title || '';
+      const description = matchedActivity?.description || '';
+      const normalizedTitle = typeof title === 'string' ? title.trim() : '';
+      const normalizedDescription = typeof description === 'string' ? description.trim() : '';
+      const planText = (
+        normalizedTitle && !LEGACY_MEAL_TITLES.has(normalizedTitle)
+      )
+        ? normalizedTitle
+        : (normalizedDescription || normalizedTitle || meals[key] || '');
+      drafts[key] = {
+        disabled: matchedActivity ? false : Boolean(meals[`${key}_disabled`]),
+        plan: planText,
+        place: matchedActivity?.location || meals[`${key}_place`] || '',
+        startTime: matchedActivity?.startTime || meals[`${key}_time`] || defaults.start || '',
+        endTime: matchedActivity?.endTime || meals[`${key}_end`] || defaults.end || ''
+      };
+    });
+
+    return drafts;
+  }, [activities, groupData?.logistics]);
+
+  const buildShixingTransferDrafts = useCallback((targetDate) => {
+    const logisticsRows = Array.isArray(groupData?.logistics) ? groupData.logistics : [];
+    const logisticsRow = logisticsRows.find((row) => row?.date === targetDate) || null;
+    const pickup = logisticsRow?.pickup || {};
+    const dropoff = logisticsRow?.dropoff || {};
+    const activityByCategory = new Map();
+
+    (activities || []).forEach((item) => {
+      const parsed = parseShixingResourceId(getResourceId(item));
+      if (!parsed) return;
+      if ((parsed.category !== 'pickup' && parsed.category !== 'dropoff') || parsed.date !== targetDate) return;
+      activityByCategory.set(parsed.category, item);
+    });
+
+    const buildDraft = (category, base) => {
+      const event = activityByCategory.get(category);
+      const fallbackFlightSummary = [
+        base?.flight_no && `航班 ${base.flight_no}`,
+        base?.airline,
+        base?.terminal
+      ].filter(Boolean).join(' / ');
+      const eventDescription = (event?.description || '').trim();
+      const note = event
+        ? (eventDescription && eventDescription !== fallbackFlightSummary ? eventDescription : (base?.note || ''))
+        : (base?.note || '');
+      return {
+        disabled: Boolean(base?.disabled),
+        startTime: event?.startTime || base?.time || '',
+        endTime: event?.endTime || base?.end_time || '',
+        location: event?.location || base?.location || '',
+        contact: base?.contact || '',
+        flightNo: base?.flight_no || '',
+        airline: base?.airline || '',
+        terminal: base?.terminal || '',
+        note
+      };
+    };
+
+    return {
+      pickup: buildDraft('pickup', pickup),
+      dropoff: buildDraft('dropoff', dropoff)
+    };
+  }, [activities, groupData?.logistics]);
+
   const handleSlotClick = (date, time, anchorRect) => {
     if (isDragging || isResizing) return;
 
@@ -465,11 +582,16 @@ const CalendarDetailWorkspace = ({
       anchorRect,
       activity: null,
       initialValues: {
+        date,
         startTime,
         endTime,
         type: 'visit',
         title: '',
-        location: ''
+        location: '',
+        mealDrafts: buildShixingMealDrafts(date),
+        transferDrafts: buildShixingTransferDrafts(date),
+        shixingCardType: 'meal',
+        shixingTransferType: 'pickup'
       }
     });
   };
@@ -484,7 +606,11 @@ const CalendarDetailWorkspace = ({
       mode: 'edit',
       anchorRect,
       activity,
-      initialValues: null
+      initialValues: {
+        date: activity.date,
+        mealDrafts: buildShixingMealDrafts(activity.date),
+        transferDrafts: buildShixingTransferDrafts(activity.date)
+      }
     });
   };
 
@@ -622,6 +748,10 @@ const CalendarDetailWorkspace = ({
       const startRow = constrainedIndex + 2;
       const endRow = Math.min(startRow + durationSlots, timeSlots.length + 1);
       const endTime = gridRowToTime(endRow);
+      const isMealResource = draggedResource.type === 'meal';
+      const resourceTitle = isMealResource
+        ? (draggedResource.title || draggedResource.description || '用餐安排')
+        : draggedResource.title;
       const newActivity = {
         id: null,
         clientId: buildClientId(),
@@ -630,12 +760,12 @@ const CalendarDetailWorkspace = ({
         startTime: adjustedStartTime,
         endTime,
         type: draggedResource.type,
-        title: draggedResource.title,
+        title: resourceTitle,
         location: draggedResource.locationName || draggedResource.title || '',
         locationId: draggedResource.locationId || null,
         locationColor: draggedResource.locationColor || null,
-        description: draggedResource.description,
-        color: resolveActivityColor({
+        description: isMealResource ? '' : draggedResource.description,
+        color: draggedResource.color || resolveActivityColor({
           type: draggedResource.type,
           locationId: draggedResource.locationId,
           locationColor: draggedResource.locationColor
@@ -652,7 +782,7 @@ const CalendarDetailWorkspace = ({
       setDraggedResource(null);
       setIsDragging(false);
 
-      message.success(`已添加活动：${draggedResource.title}`, 1);
+      message.success(`已添加活动：${resourceTitle || draggedResource.title}`, 1);
       return;
     }
 
@@ -829,6 +959,116 @@ const CalendarDetailWorkspace = ({
     return { startTime: normalizedStart, endTime: normalizedEnd };
   };
 
+  const hasTransferDraftContent = (transfer = {}) => (
+    Boolean(
+      transfer.location
+      || transfer.contact
+      || transfer.flightNo
+      || transfer.flight_no
+      || transfer.airline
+      || transfer.terminal
+      || transfer.startTime
+      || transfer.time
+      || transfer.endTime
+      || transfer.end_time
+    )
+  );
+
+  const buildTransferDescription = (transfer = {}) => {
+    const note = (transfer.note || transfer.remark || '').trim();
+    if (note) return note;
+    return [
+      transfer.flightNo && `航班 ${transfer.flightNo}`,
+      transfer.airline,
+      transfer.terminal
+    ].filter(Boolean).join(' / ');
+  };
+
+  const resolveTransferTypeForDate = (date, fallback = 'pickup') => {
+    if (!date) return null;
+    const startDate = groupData?.start_date || '';
+    const endDate = groupData?.end_date || '';
+    const isStart = Boolean(startDate && date === startDate);
+    const isEnd = Boolean(endDate && date === endDate);
+    if (isStart && !isEnd) return 'pickup';
+    if (isEnd && !isStart) return 'dropoff';
+    if (isStart && isEnd) {
+      return fallback === 'dropoff' ? 'dropoff' : 'pickup';
+    }
+    return null;
+  };
+
+  const applyMealDraftsToLogistics = useCallback((targetDate, mealDrafts) => {
+    if (!targetDate || !mealDrafts || typeof mealDrafts !== 'object') return;
+    const logisticsRows = Array.isArray(groupData?.logistics) ? groupData.logistics : [];
+    const existingIndex = logisticsRows.findIndex((row) => row?.date === targetDate);
+    const baseRow = existingIndex >= 0 ? logisticsRows[existingIndex] : { date: targetDate };
+    const nextMeals = { ...(baseRow.meals || {}) };
+
+    SHIXING_MEAL_KEYS.forEach((key) => {
+      const row = mealDrafts[key] || {};
+      const defaults = SHIXING_MEAL_DEFAULTS[key] || {};
+      const disabled = Boolean(row.disabled);
+      const plan = (row.plan || '').trim();
+      const place = (row.place || '').trim();
+      nextMeals[key] = disabled ? '' : plan;
+      nextMeals[`${key}_place`] = disabled ? '' : place;
+      nextMeals[`${key}_disabled`] = disabled;
+      nextMeals[`${key}_time`] = disabled ? '' : (row.startTime || defaults.start || '');
+      nextMeals[`${key}_end`] = disabled ? '' : (row.endTime || defaults.end || '');
+      nextMeals[`${key}_detached`] = false;
+    });
+
+    const nextRow = {
+      ...baseRow,
+      date: targetDate,
+      meals: nextMeals
+    };
+    const nextLogistics = [...logisticsRows];
+    if (existingIndex >= 0) {
+      nextLogistics[existingIndex] = nextRow;
+    } else {
+      nextLogistics.push(nextRow);
+    }
+    onLogisticsUpdate?.(nextLogistics);
+  }, [groupData?.logistics, onLogisticsUpdate]);
+
+  const applyTransferDraftToLogistics = useCallback((targetDate, transferType, transferDraft) => {
+    if (!targetDate || !transferType || !transferDraft) return;
+    const key = transferType === 'dropoff' ? 'dropoff' : 'pickup';
+    const logisticsRows = Array.isArray(groupData?.logistics) ? groupData.logistics : [];
+    const existingIndex = logisticsRows.findIndex((row) => row?.date === targetDate);
+    const baseRow = existingIndex >= 0 ? logisticsRows[existingIndex] : { date: targetDate };
+    const current = baseRow[key] || {};
+    const nextTransfer = {
+      ...current,
+      time: transferDraft.startTime || '',
+      end_time: transferDraft.endTime || '',
+      location: transferDraft.location || '',
+      contact: transferDraft.contact || '',
+      flight_no: transferDraft.flightNo || '',
+      airline: transferDraft.airline || '',
+      terminal: transferDraft.terminal || '',
+      note: transferDraft.note || '',
+      disabled: Boolean(transferDraft.disabled),
+      detached: false
+    };
+
+    const nextRow = {
+      ...baseRow,
+      date: targetDate,
+      [key]: nextTransfer
+    };
+
+    const nextLogistics = [...logisticsRows];
+    if (existingIndex >= 0) {
+      nextLogistics[existingIndex] = nextRow;
+    } else {
+      nextLogistics.push(nextRow);
+    }
+    onLogisticsUpdate?.(nextLogistics);
+  }, [groupData?.logistics, onLogisticsUpdate]);
+
   const handleSaveFromPopover = (baseActivity, payload) => {
     if (!payload) return false;
 
@@ -845,8 +1085,159 @@ const CalendarDetailWorkspace = ({
       return false;
     }
 
+    if (payload.sourceCategory === 'meal' && payload.shixingMeals) {
+      const effectiveDate = payload.date || targetDate;
+      if (!effectiveDate) {
+        message.error('请选择日期');
+        return false;
+      }
+
+      const mealResourceIds = SHIXING_MEAL_KEYS.map((key) => (
+        buildShixingResourceId(effectiveDate, 'meal', key)
+      ));
+      const existingMealsByResource = new Map(
+        (activities || [])
+          .filter((activity) => mealResourceIds.includes(getResourceId(activity)))
+          .map((activity) => [getResourceId(activity), activity])
+      );
+      const baseActivityIdentity = getActivityIdentity(baseActivity);
+      const baseActivities = (activities || []).filter((activity) => {
+        const identity = getActivityIdentity(activity);
+        if (baseActivityIdentity && identity === baseActivityIdentity) return false;
+        return !mealResourceIds.includes(getResourceId(activity));
+      });
+
+      const createdMeals = [];
+      for (const key of SHIXING_MEAL_KEYS) {
+        const draft = payload.shixingMeals[key] || {};
+        const isDisabled = Boolean(draft.disabled);
+        const plan = (draft.plan || '').trim();
+        const place = (draft.place || '').trim();
+        if (isDisabled || (!plan && !place)) {
+          continue;
+        }
+        const defaults = SHIXING_MEAL_DEFAULTS[key] || {};
+        const rowStart = draft.startTime || defaults.start;
+        const rowEnd = draft.endTime || defaults.end;
+        if (!rowStart || !rowEnd || timeToGridRow(rowEnd) <= timeToGridRow(rowStart)) {
+          message.error(`${SHIXING_MEAL_LABELS[key]}时间范围无效`);
+          return false;
+        }
+        const resourceId = buildShixingResourceId(effectiveDate, 'meal', key);
+        const existingMeal = existingMealsByResource.get(resourceId);
+        createdMeals.push({
+          ...existingMeal,
+          id: existingMeal?.id ?? null,
+          clientId: existingMeal?.clientId ?? buildClientId(),
+          groupId: groupData.id,
+          date: effectiveDate,
+          startTime: rowStart,
+          endTime: rowEnd,
+          type: 'meal',
+          title: plan || SHIXING_MEAL_LABELS[key],
+          location: place,
+          description: '',
+          locationId: null,
+          locationColor: null,
+          color: payload.color || activityTypes.meal?.color || '#52c41a',
+          resourceId,
+          planItemId: null,
+          isFromResource: true
+        });
+      }
+
+      const updatedActivities = [...baseActivities, ...createdMeals];
+      setActivities(updatedActivities);
+      setSaveStatus('saving');
+      onUpdate?.(updatedActivities);
+      applyMealDraftsToLogistics(effectiveDate, payload.shixingMeals);
+
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        setSaveStatus('saved');
+        message.success('三餐已同步到日历和每日卡片', 1);
+      }, 500);
+      return true;
+    }
+
+    if (payload.sourceCategory === 'transfer' && payload.shixingTransfer) {
+      const effectiveDate = payload.date || targetDate;
+      if (!effectiveDate) {
+        message.error('请选择日期');
+        return false;
+      }
+      const requestedType = payload.shixingTransferType === 'dropoff' ? 'dropoff' : 'pickup';
+      const transferType = resolveTransferTypeForDate(effectiveDate, requestedType);
+      if (!transferType) {
+        message.warning('接送站仅支持首日和末日：首日为接站，末日为送站');
+        return false;
+      }
+      const transferLabel = SHIXING_TRANSFER_LABELS[transferType];
+      const transferDraft = payload.shixingTransfer || {};
+      const resourceId = buildShixingResourceId(effectiveDate, transferType);
+      const baseActivityIdentity = getActivityIdentity(baseActivity);
+      const start = transferDraft.startTime || transferDraft.time || '';
+      let end = transferDraft.endTime || transferDraft.end_time || '';
+      if (start && !end) {
+        end = dayjs(`2025-01-01 ${start}`, 'YYYY-MM-DD HH:mm').add(1, 'hour').format('HH:mm');
+      }
+      if (!transferDraft.disabled && start && end && timeToGridRow(end) <= timeToGridRow(start)) {
+        message.error('结束时间需晚于开始时间');
+        return false;
+      }
+
+      const baseActivities = (activities || []).filter((item) => {
+        if (getResourceId(item) === resourceId) return false;
+        if (baseActivityIdentity && getActivityIdentity(item) === baseActivityIdentity) return false;
+        return true;
+      });
+
+      let updatedActivities = baseActivities;
+      if (!transferDraft.disabled && hasTransferDraftContent(transferDraft)) {
+        const transferDescription = buildTransferDescription(transferDraft);
+        const nextActivity = {
+          ...baseActivity,
+          id: baseActivity?.id ?? null,
+          clientId: baseActivity?.clientId ?? buildClientId(),
+          groupId: groupData.id,
+          date: effectiveDate,
+          startTime: start || selectedSlot?.time || '09:00',
+          endTime: end || dayjs(`2025-01-01 ${start || '09:00'}`, 'YYYY-MM-DD HH:mm').add(1, 'hour').format('HH:mm'),
+          type: 'transport',
+          title: transferLabel,
+          location: transferDraft.location || transferLabel,
+          description: transferDescription || '',
+          locationId: null,
+          locationColor: null,
+          color: payload.color || baseActivity?.color || activityTypes.transport?.color || '#fa8c16',
+          resourceId,
+          planItemId: null,
+          isFromResource: true
+        };
+        updatedActivities = [...baseActivities, nextActivity];
+      }
+
+      setActivities(updatedActivities);
+      setSaveStatus('saving');
+      onUpdate?.(updatedActivities);
+      applyTransferDraftToLogistics(effectiveDate, transferType, {
+        ...transferDraft,
+        startTime: start,
+        endTime: end
+      });
+
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        setSaveStatus('saved');
+        message.success(`${transferLabel}已同步到日历和每日卡片`, 1);
+      }, 500);
+      return true;
+    }
+
     let resolvedTitle = payload.title || baseActivity?.title || '';
     let resolvedLocation = payload.location || baseActivity?.location || '';
+    let resolvedDescription = payload.description ?? baseActivity?.description ?? '';
+    let resolvedColor = payload.color || baseActivity?.color || '';
     let resolvedLocationId = baseActivity?.locationId ?? null;
     let resolvedLocationColor = baseActivity?.locationColor ?? null;
     let resolvedResourceId = baseActivity?.resourceId ?? baseActivity?.resource_id ?? null;
@@ -893,6 +1284,15 @@ const CalendarDetailWorkspace = ({
       }
     }
 
+    const computedColor = resolveActivityColor({
+      type: payload.type || baseActivity?.type || 'visit',
+      locationId: resolvedLocationId,
+      locationColor: resolvedLocationColor
+    });
+    if (!resolvedColor) {
+      resolvedColor = computedColor;
+    }
+
     const activityData = {
       ...baseActivity,
       id: baseActivity?.id ?? null,
@@ -904,13 +1304,10 @@ const CalendarDetailWorkspace = ({
       type: payload.type || baseActivity?.type || 'visit',
       title: resolvedTitle,
       location: resolvedLocation,
+      description: resolvedDescription,
       locationId: resolvedLocationId,
       locationColor: resolvedLocationColor,
-      color: resolveActivityColor({
-        type: payload.type || baseActivity?.type || 'visit',
-        locationId: resolvedLocationId,
-        locationColor: resolvedLocationColor
-      }),
+      color: resolvedColor,
       resourceId: resolvedResourceId,
       planItemId: resolvedPlanItemId,
       isFromResource
@@ -1225,6 +1622,8 @@ const CalendarDetailWorkspace = ({
           isOpen={popoverState.isOpen}
           mode={popoverState.mode}
           activity={popoverState.activity}
+          groupStartDate={groupData?.start_date}
+          groupEndDate={groupData?.end_date}
           planItems={planResources}
           initialValues={popoverState.initialValues}
           onSave={(payload) => {

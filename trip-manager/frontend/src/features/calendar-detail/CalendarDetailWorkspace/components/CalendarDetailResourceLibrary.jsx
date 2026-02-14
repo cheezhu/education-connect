@@ -117,7 +117,7 @@ const CalendarDetailResourceLibrary = ({
                 onResourceDragEnd?.();
               }}
               style={{
-                background: activityTypes[resource.type]?.color || '#1890ff',
+                background: resource.color || activityTypes[resource.type]?.color || '#1890ff',
                 cursor: 'grab'
               }}
               title={resource.description}
@@ -151,7 +151,7 @@ const CalendarDetailResourceLibrary = ({
                 onResourceDragEnd?.();
               }}
               style={{
-                background: activityTypes[resource.type]?.color || '#1890ff',
+                background: resource.color || activityTypes[resource.type]?.color || '#1890ff',
                 cursor: 'grab'
               }}
               title={resource.description}
@@ -185,7 +185,7 @@ const CalendarDetailResourceLibrary = ({
                 onResourceDragEnd?.();
               }}
               style={{
-                background: activityTypes[resource.type]?.color || '#1890ff',
+                background: resource.color || activityTypes[resource.type]?.color || '#1890ff',
                 cursor: 'grab'
               }}
               title={resource.description}

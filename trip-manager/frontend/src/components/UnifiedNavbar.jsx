@@ -1,5 +1,5 @@
 import React from 'react';
-import { Dropdown, Tooltip } from 'antd';
+import { Dropdown } from 'antd';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChartOutlined,
@@ -9,6 +9,8 @@ import {
   ExperimentOutlined,
   ExportOutlined,
   LogoutOutlined,
+  MessageOutlined,
+  QuestionCircleOutlined,
   SearchOutlined,
   SettingOutlined,
   TeamOutlined,
@@ -36,20 +38,21 @@ const UnifiedNavbar = () => {
   };
 
   const navItems = [
-    { path: '/designer', icon: <CompassOutlined />, label: '行程设计器', permission: 'designer' },
-    { path: '/solver-preview', icon: <ExperimentOutlined />, label: 'Solver 预览台', permission: 'designer' },
-    { path: '/groups', icon: <TeamOutlined />, label: '团组管理', permission: 'groups' },
-    { path: '/locations', icon: <EnvironmentOutlined />, label: '资源管理', permission: 'locations' },
-    { path: '/statistics', icon: <BarChartOutlined />, label: '统计报表', permission: 'statistics' },
-    { path: '/users', icon: <UserOutlined />, label: '用户管理', permission: 'users' }
+    { key: 'designer', path: '/designer', icon: <CompassOutlined />, label: '行程设计器', permission: 'designer' },
+    { key: 'solver-preview', path: '/solver-preview', icon: <ExperimentOutlined />, label: 'Solver 预览台', permission: 'designer' },
+    { key: 'groups', path: '/groups', icon: <TeamOutlined />, label: '团组管理', permission: 'groups' },
+    { key: 'locations', path: '/locations', icon: <EnvironmentOutlined />, label: '资源管理', permission: 'locations' },
+    { key: 'statistics', path: '/statistics', icon: <BarChartOutlined />, label: '统计报表', permission: 'statistics' },
+    { key: 'users', path: '/users', icon: <UserOutlined />, label: '用户管理', permission: 'users' }
   ];
 
-  const visibleItems = navItems.filter(item => !item.permission || canAccess(item.permission));
+  const visibleItems = navItems.filter((item) => !item.permission || canAccess(item.permission));
 
   const roleLabel = ROLE_LABELS[user?.role] || '未知角色';
   const userName = user?.displayName || user?.username || '用户';
 
   const menuItems = [
+    { key: 'username', label: `用户名：${userName}`, disabled: true },
     { key: 'role', label: `角色：${roleLabel}`, disabled: true },
     { type: 'divider' },
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> }
@@ -68,53 +71,65 @@ const UnifiedNavbar = () => {
   return (
     <nav className="unified-navbar">
       <div className="logo-section">
-        <div className="mini-logo">TM</div>
+        <img src="/favicon.svg" alt="HKEIU" className="mini-logo-image" />
       </div>
 
       <div className="nav-menu">
-        {visibleItems.map(item => (
-          <Tooltip key={item.path} title={item.label} placement="right">
-            <div
-              className={`nav-icon-btn ${isActivePath(item.path) ? 'active' : ''}`}
-              onClick={() => navigate(item.path)}
-            >
-              {item.icon}
-            </div>
-          </Tooltip>
+        {visibleItems.map((item) => (
+          <div
+            key={item.key}
+            className={`nav-icon-btn ${isActivePath(item.path) ? 'active' : ''}`}
+            onClick={() => navigate(item.path)}
+            title={item.label}
+          >
+            {item.icon}
+          </div>
         ))}
       </div>
 
       <div className="nav-spacer"></div>
 
       <div className="quick-actions">
-        <Tooltip title="搜索" placement="right">
-          <div className="action-icon">
-            <SearchOutlined />
-          </div>
-        </Tooltip>
-        <Tooltip title="导出" placement="right">
-          <div className="action-icon">
-            <ExportOutlined />
-          </div>
-        </Tooltip>
-        <Tooltip title="通知" placement="right">
-          <div className="action-icon">
-            <BellOutlined />
-            <span className="badge-dot"></span>
-          </div>
-        </Tooltip>
+        <div className="action-icon" title="搜索">
+          <SearchOutlined />
+        </div>
+        <div className="action-icon" title="导出">
+          <ExportOutlined />
+        </div>
+        <div className="action-icon" title="通知">
+          <BellOutlined />
+          <span className="badge-dot"></span>
+        </div>
         {canAccess('settings') && (
-          <Tooltip title="设置" placement="right">
-            <div className="action-icon" onClick={() => navigate('/settings')}>
-              <SettingOutlined />
-            </div>
-          </Tooltip>
+          <div className="action-icon" onClick={() => navigate('/settings')} title="设置">
+            <SettingOutlined />
+          </div>
         )}
       </div>
 
+      <div className="global-help-entry">
+        <div
+          className={`action-icon ${isActivePath('/feedback') ? 'active' : ''}`}
+          onClick={() => navigate('/feedback')}
+          title="意见反馈"
+        >
+          <MessageOutlined />
+        </div>
+      </div>
+
+      <div className="global-help-entry">
+        <div
+          className={`action-icon ${isActivePath('/help') ? 'active' : ''}`}
+          onClick={() => navigate('/help')}
+          title="系统帮助"
+        >
+          <QuestionCircleOutlined />
+        </div>
+      </div>
+
       <Dropdown menu={userMenuProps} placement="bottomRight">
-        <div className="user-section">
-          <div className="user-avatar">{userName?.slice(0, 1) || '用'}</div>
+        <div className="user-section" title={`${userName}（${roleLabel}）`}>
+          <div className="user-avatar">{userName?.slice(0, 1) || 'U'}</div>
           <span className="user-name">{userName}</span>
         </div>
       </Dropdown>

@@ -15,7 +15,7 @@
 ### groups
 - id (PK)
 - name
-- type: primary/secondary
+- type: primary/secondary/vip
 - student_count, teacher_count
 - start_date, end_date, duration
 - color
@@ -39,7 +39,7 @@
 - blocked_weekdays (如 "3,4")
 - open_hours (JSON 字符串)
 - closed_dates (JSON 数组字符串)
-- target_groups: primary/secondary/all
+- target_groups: primary/secondary/all（注：VIP 团组在冲突校验中会忽略该限制，等同 all）
 - notes
 - is_active
 - created_at

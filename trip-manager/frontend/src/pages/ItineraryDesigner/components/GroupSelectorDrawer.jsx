@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button, Card, Checkbox, Drawer } from 'antd';
 import dayjs from 'dayjs';
+import { getGroupTypeLabel } from '../../../domain/group';
 
 function GroupSelectorDrawer({
   open,
@@ -88,7 +89,7 @@ function GroupSelectorDrawer({
                       📅 {dayjs(group.start_date).format('MM-DD')} ~ {dayjs(group.end_date).format('MM-DD')}
                     </div>
                     <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                      👥 {group.student_count + group.teacher_count}人 🏫 {group.type === 'primary' ? '小学' : '中学'}
+                      👥 {group.student_count + group.teacher_count}人 🏫 {getGroupTypeLabel(group.type)}
                     </div>
                   </div>
                 </div>

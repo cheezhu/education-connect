@@ -6,6 +6,12 @@ const {
   maskApiKey,
   resolveAiSettings
 } = require('../utils/aiConfig');
+const {
+  AUTO_SNAPSHOT_INTERVAL_MS,
+  createSnapshot,
+  listSnapshots,
+  restoreSnapshot
+} = require('../services/versionSnapshots');
 
 const router = express.Router();
 
@@ -14,10 +20,17 @@ const TIME_SLOTS_KEY = 'itinerary_time_slots';
 const DAILY_FOCUS_KEY = 'itinerary_daily_focus';
 const GROUP_ROW_ALIGN_KEY = 'itinerary_group_row_align';
 const GROUP_CALENDAR_HEIGHT_KEY = 'itinerary_group_calendar_height';
+const AUTO_BACKUP_KEY = 'auto_backup';
+const LOGISTICS_SHEET_COL_WIDTHS_KEY = 'group_management_logistics_sheet_col_widths';
 const DEFAULT_TIME_SLOTS = ['MORNING', 'AFTERNOON', 'EVENING'];
 const DEFAULT_GROUP_CALENDAR_HEIGHT = 30;
 const GROUP_CALENDAR_HEIGHT_MIN = 20;
 const GROUP_CALENDAR_HEIGHT_MAX = 70;
+const LOGISTICS_SHEET_WIDTH_DEFAULTS = {
+  basic: [170, 180, 210, 250],
+  transport: [170, 120, 130, 140, 130, 140, 130, 140],
+  meals: [170, 170, 170, 170, 170, 170, 170]
+};
 
 const isValidDate = (value) => {
   if (typeof value !== 'string') return false;
@@ -43,6 +56,53 @@ const normalizeHeight = (value) => {
   if (!Number.isFinite(parsed)) return null;
   const clamped = Math.min(GROUP_CALENDAR_HEIGHT_MAX, Math.max(GROUP_CALENDAR_HEIGHT_MIN, parsed));
   return Math.round(clamped * 10) / 10;
+};
+
+const sanitizeWidthArray = (candidate, fallback) => {
+  if (!Array.isArray(candidate) || candidate.length !== fallback.length) return null;
+  const next = [];
+  for (let i = 0; i < fallback.length; i += 1) {
+    const raw = Number(candidate[i]);
+    if (!Number.isFinite(raw)) return null;
+    if (raw < 40 || raw > 2000) return null;
+    next.push(Math.round(raw));
+  }
+  return next;
+};
+
+const normalizeLogisticsSheetColWidths = (value, fallback = LOGISTICS_SHEET_WIDTH_DEFAULTS) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const normalized = {};
+  const sectionKeys = Object.keys(LOGISTICS_SHEET_WIDTH_DEFAULTS);
+  for (const key of sectionKeys) {
+    const defaults = LOGISTICS_SHEET_WIDTH_DEFAULTS[key];
+    const maybe = Object.prototype.hasOwnProperty.call(value, key) ? value[key] : (fallback?.[key] || defaults);
+    const parsed = sanitizeWidthArray(maybe, defaults);
+    if (!parsed) return null;
+    normalized[key] = parsed;
+  }
+  return normalized;
+};
+
+const resolveLogisticsSheetColWidths = (db) => {
+  const row = getConfigRow(db, LOGISTICS_SHEET_COL_WIDTHS_KEY);
+  if (!row || typeof row.value !== 'string' || !row.value.trim()) {
+    return LOGISTICS_SHEET_WIDTH_DEFAULTS;
+  }
+  try {
+    const parsed = JSON.parse(row.value);
+    const normalized = normalizeLogisticsSheetColWidths(parsed, LOGISTICS_SHEET_WIDTH_DEFAULTS);
+    return normalized || LOGISTICS_SHEET_WIDTH_DEFAULTS;
+  } catch (error) {
+    return LOGISTICS_SHEET_WIDTH_DEFAULTS;
+  }
+};
+
+const resolveAutoBackupEnabled = (db) => {
+  const row = getConfigRow(db, AUTO_BACKUP_KEY);
+  if (!row || typeof row.value !== 'string') return true;
+  const normalized = normalizeBoolean(row.value);
+  return normalized ?? true;
 };
 
 router.get('/itinerary-week-start', (req, res) => {
@@ -153,6 +213,62 @@ router.put('/itinerary-group-calendar-height', (req, res) => {
   res.json({ height: normalized });
 });
 
+router.get('/group-management-logistics-sheet-col-widths', (req, res) => {
+  res.json({ widths: resolveLogisticsSheetColWidths(req.db) });
+});
+
+router.put('/group-management-logistics-sheet-col-widths', (req, res) => {
+  const normalized = normalizeLogisticsSheetColWidths(req.body?.widths, LOGISTICS_SHEET_WIDTH_DEFAULTS);
+  if (!normalized) {
+    return res.status(400).json({ error: '无效配置' });
+  }
+  upsertConfig(
+    req.db,
+    LOGISTICS_SHEET_COL_WIDTHS_KEY,
+    JSON.stringify(normalized),
+    '团组管理每日资源表列宽'
+  );
+  return res.json({ widths: normalized });
+});
+
+router.get('/group-versions', (req, res) => {
+  const limit = Math.max(1, Math.min(200, Number(req.query?.limit) || 30));
+  const items = listSnapshots(req.db, limit);
+  return res.json({
+    items,
+    autoBackupEnabled: resolveAutoBackupEnabled(req.db),
+    snapshotIntervalHours: AUTO_SNAPSHOT_INTERVAL_MS / (60 * 60 * 1000)
+  });
+});
+
+router.post('/group-versions/create', (req, res, next) => {
+  try {
+    const snapshotType = String(req.body?.snapshotType || 'manual').trim() || 'manual';
+    const skipIfUnchanged = snapshotType === 'auto' || Boolean(req.body?.skipIfUnchanged);
+    const result = createSnapshot(req.db, {
+      snapshotType,
+      createdBy: req.user || null,
+      skipIfUnchanged
+    });
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/group-versions/restore', (req, res, next) => {
+  try {
+    const snapshotToken = String(req.body?.snapshotToken || '').trim();
+    if (!snapshotToken) {
+      return res.status(400).json({ error: 'Missing snapshotToken' });
+    }
+    const result = restoreSnapshot(req.db, snapshotToken);
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+});
+
 const buildAllConfig = (db) => {
   const weekRow = getConfigRow(db, WEEK_START_KEY);
   const weekStartDate = weekRow && isValidDate(weekRow.value) ? weekRow.value : null;
@@ -193,6 +309,10 @@ const buildAllConfig = (db) => {
       dailyFocus,
       groupRowAlign,
       groupCalendarHeight
+    },
+    versioning: {
+      autoBackupEnabled: resolveAutoBackupEnabled(db),
+      snapshotIntervalHours: AUTO_SNAPSHOT_INTERVAL_MS / (60 * 60 * 1000)
     },
     ai: {
       provider: aiSettings.provider,

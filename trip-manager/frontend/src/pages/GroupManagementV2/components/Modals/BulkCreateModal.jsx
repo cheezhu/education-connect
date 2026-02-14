@@ -50,6 +50,7 @@ const BulkCreateModal = ({
                         onChange={(event) => onChangeRow(row.id, { type: event.target.value })}
                       >
                         <option value="">请选择</option>
+                        <option value="vip">VIP</option>
                         <option value="secondary">中学</option>
                         <option value="primary">小学</option>
                       </select>

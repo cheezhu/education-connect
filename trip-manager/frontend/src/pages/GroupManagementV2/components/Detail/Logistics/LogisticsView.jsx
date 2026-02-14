@@ -51,6 +51,7 @@ const normalizeLogisticsRow = (date, source = {}) => ({
     flight_no: toText(source.pickup?.flight_no || source.pickup?.flightNo || source.pickup_flight_no),
     airline: toText(source.pickup?.airline || source.pickup_airline),
     terminal: toText(source.pickup?.terminal || source.pickup_terminal),
+    note: toText(source.pickup?.note || source.pickup_note),
     detached: source.pickup?.detached || false,
     disabled: source.pickup?.disabled || source.pickup_disabled || false
   },
@@ -62,6 +63,7 @@ const normalizeLogisticsRow = (date, source = {}) => ({
     flight_no: toText(source.dropoff?.flight_no || source.dropoff?.flightNo || source.dropoff_flight_no),
     airline: toText(source.dropoff?.airline || source.dropoff_airline),
     terminal: toText(source.dropoff?.terminal || source.dropoff_terminal),
+    note: toText(source.dropoff?.note || source.dropoff_note),
     detached: source.dropoff?.detached || false,
     disabled: source.dropoff?.disabled || source.dropoff_disabled || false
   },
@@ -104,24 +106,17 @@ const normalizeLogisticsRow = (date, source = {}) => ({
   note: toText(source.note)
 });
 
-const cloneRowValues = (date, source) => ({
-  date,
-  city: source.city || '',
-  departure_city: source.departure_city || source.departureCity || '',
-  arrival_city: source.arrival_city || source.arrivalCity || '',
+const copyPrevTravelFields = (target, source) => ({
+  ...target,
   hotel: source.hotel || '',
   hotel_address: source.hotel_address || source.hotelAddress || '',
   hotel_disabled: source.hotel_disabled || false,
-  pickup: { ...(source.pickup || {}) },
-  dropoff: { ...(source.dropoff || {}) },
-  meals: { ...(source.meals || {}) },
   vehicle: { ...(source.vehicle || {}) },
   vehicle_disabled: source.vehicle_disabled || false,
   guide: { ...(source.guide || {}) },
   guide_disabled: source.guide_disabled || false,
   security: { ...(source.security || {}) },
-  security_disabled: source.security_disabled || false,
-  note: source.note || ''
+  security_disabled: source.security_disabled || false
 });
 
 const buildScheduleMap = (schedules = []) => {
@@ -212,7 +207,17 @@ const normalizeHkoForecast = (payload) => {
   };
 };
 
-const LogisticsView = ({ group, schedules = [], onUpdate }) => {
+const HOTEL_OPTIONS = ['专家公寓A楼', '维也纳酒店', '锦江之星', '希尔顿花园'];
+const VEHICLE_OPTIONS = ['王师傅', '李师傅', '陈师傅'];
+const GUIDE_OPTIONS = ['张导', '李导', '赵导'];
+const SECURITY_OPTIONS = ['赵安保', '陈安保'];
+const MEAL_OPTIONS = ['酒店自带', '基地团餐', '自理', '特色餐', '路餐'];
+
+const rowsEqual = (left = [], right = []) => (
+  JSON.stringify(left) === JSON.stringify(right)
+);
+
+const LogisticsView = ({ group, schedules = [], onUpdate, viewMode = 'full' }) => {
   const [rows, setRows] = useState([]);
   const [hkoWeather, setHkoWeather] = useState({ status: 'idle', data: null, error: '' });
   const [hkoForecast, setHkoForecast] = useState({
@@ -222,10 +227,22 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
     error: ''
   });
   const saveTimeoutRef = useRef(null);
+  const isComposingRef = useRef(false);
+  const isEditingRef = useRef(false);
+  const pendingHydrateRef = useRef(null);
+  const pendingSaveRef = useRef(null);
 
   const dateRange = useMemo(() => (
     buildDateRange(group?.start_date, group?.end_date)
   ), [group?.start_date, group?.end_date]);
+
+  useEffect(() => {
+    isComposingRef.current = false;
+    isEditingRef.current = false;
+    pendingHydrateRef.current = null;
+    pendingSaveRef.current = null;
+    clearTimeout(saveTimeoutRef.current);
+  }, [group?.id]);
 
   useEffect(() => {
     if (!group) {
@@ -237,7 +254,23 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
       const match = existing.find((item) => item.date === date) || {};
       return normalizeLogisticsRow(date, match);
     });
-    setRows(nextRows);
+    setRows((prev) => {
+      if (isComposingRef.current || isEditingRef.current) {
+        pendingHydrateRef.current = nextRows;
+        return prev;
+      }
+      if (pendingSaveRef.current) {
+        if (rowsEqual(nextRows, pendingSaveRef.current)) {
+          pendingSaveRef.current = null;
+          pendingHydrateRef.current = null;
+          return prev;
+        }
+        pendingHydrateRef.current = nextRows;
+        return prev;
+      }
+      pendingHydrateRef.current = null;
+      return rowsEqual(prev, nextRows) ? prev : nextRows;
+    });
   }, [group?.id, group?.logistics, dateRange]);
 
   useEffect(() => {
@@ -331,11 +364,64 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
 
   const queueSave = useCallback((nextRows) => {
     if (!group) return;
+    pendingSaveRef.current = nextRows;
+    if (isComposingRef.current) {
+      return;
+    }
     clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
       onUpdate?.({ ...group, logistics: nextRows });
     }, 300);
   }, [group, onUpdate]);
+
+  const handleCompositionStart = useCallback(() => {
+    isComposingRef.current = true;
+    clearTimeout(saveTimeoutRef.current);
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    isComposingRef.current = false;
+
+    const pendingSaveRows = pendingSaveRef.current;
+    if (pendingSaveRows) {
+      // During IME, server/parent may push an older snapshot. Keep local typed value first.
+      pendingHydrateRef.current = null;
+      queueSave(pendingSaveRows);
+      return;
+    }
+
+    const pendingHydrateRows = pendingHydrateRef.current;
+    if (pendingHydrateRows) {
+      setRows((prev) => (rowsEqual(prev, pendingHydrateRows) ? prev : pendingHydrateRows));
+      pendingHydrateRef.current = null;
+    }
+  }, [queueSave]);
+
+  const handleMatrixFocusCapture = useCallback(() => {
+    isEditingRef.current = true;
+  }, []);
+
+  const handleMatrixBlurCapture = useCallback((event) => {
+    const current = event.currentTarget;
+    const nextTarget = event.relatedTarget;
+    if (nextTarget && current.contains(nextTarget)) {
+      return;
+    }
+
+    isEditingRef.current = false;
+
+    const pendingSaveRows = pendingSaveRef.current;
+    if (pendingSaveRows) {
+      queueSave(pendingSaveRows);
+      return;
+    }
+
+    const pendingHydrateRows = pendingHydrateRef.current;
+    if (pendingHydrateRows) {
+      setRows((prev) => (rowsEqual(prev, pendingHydrateRows) ? prev : pendingHydrateRows));
+      pendingHydrateRef.current = null;
+    }
+  }, [queueSave]);
 
   const handleUpdateDay = useCallback((date, updates) => {
     setRows((prev) => {
@@ -353,22 +439,21 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
       const source = prev[index - 1];
       if (!source) return prev;
       const next = prev.map((row, idx) => (
-        idx === index ? cloneRowValues(row.date, source) : row
+        idx === index ? copyPrevTravelFields(row, source) : row
       ));
       queueSave(next);
       return next;
     });
   }, [queueSave]);
 
-  const hotelOptions = ['专家公寓A楼', '维也纳酒店', '锦江之星', '希尔顿花园'];
-  const vehicleOptions = ['王师傅', '李师傅', '陈师傅'];
-  const guideOptions = ['张导', '李导', '赵导'];
-  const securityOptions = ['赵安保', '陈安保'];
-  const mealOptions = ['酒店自带', '基地团餐', '自理', '特色餐', '路餐'];
+  const weatherBundle = useMemo(() => ({
+    current: hkoWeather,
+    forecast: hkoForecast
+  }), [hkoWeather, hkoForecast]);
 
   if (!group) {
     return (
-      <div className="logistics-layout">
+      <div className={`logistics-layout logistics-view-${viewMode}`}>
         <div className="view-container">
           <div className="empty-state">请选择团组</div>
         </div>
@@ -377,7 +462,7 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
   }
 
   return (
-    <div className="logistics-layout">
+    <div className={`logistics-layout logistics-view-${viewMode}`}>
       <div className="view-container">
         <div className="logistics-panel">
           <LogisticsMatrix
@@ -385,13 +470,18 @@ const LogisticsView = ({ group, schedules = [], onUpdate }) => {
             scheduleMap={scheduleMap}
             onUpdateDay={handleUpdateDay}
             onCopyPrevDay={handleCopyPrevDay}
-            hotelOptions={hotelOptions}
-            vehicleOptions={vehicleOptions}
-            guideOptions={guideOptions}
-            securityOptions={securityOptions}
-            mealOptions={mealOptions}
+            onFocusCapture={handleMatrixFocusCapture}
+            onBlurCapture={handleMatrixBlurCapture}
+            onCompositionStartCapture={handleCompositionStart}
+            onCompositionEndCapture={handleCompositionEnd}
+            hotelOptions={HOTEL_OPTIONS}
+            vehicleOptions={VEHICLE_OPTIONS}
+            guideOptions={GUIDE_OPTIONS}
+            securityOptions={SECURITY_OPTIONS}
+            mealOptions={MEAL_OPTIONS}
             groupSize={groupSize}
-            weatherData={{ current: hkoWeather, forecast: hkoForecast }}
+            weatherData={weatherBundle}
+            viewMode={viewMode}
           />
         </div>
       </div>

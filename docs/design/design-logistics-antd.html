@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EC Logistics - Ant Design Style</title>
+    <style>
+        :root {
+            --bg-app: #f0f2f5;
+            --bg-card: #ffffff;
+            --border: #d9d9d9;
+            --primary: #1890ff;
+            --text-main: #262626;
+            --text-sec: #8c8c8c;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-app);
+            color: var(--text-main);
+            margin: 0; padding: 24px;
+            font-size: 14px;
+        }
+
+        /* --- AntD-like Toolbar --- */
+        .toolbar {
+            background: #fff; padding: 16px 24px; border: 1px solid #f0f0f0; border-radius: 2px;
+            margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;
+        }
+        .toolbar-title { font-weight: 500; font-size: 16px; color: #1f1f1f; }
+        .ant-btn {
+            background: #fff; border: 1px solid var(--border); color: rgba(0,0,0,0.85);
+            padding: 4px 15px; font-size: 14px; border-radius: 2px; cursor: pointer; transition: all 0.3s;
+        }
+        .ant-btn:hover { color: var(--primary); border-color: var(--primary); }
+        .ant-btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .ant-btn-primary:hover { background: #40a9ff; border-color: #40a9ff; color: #fff; }
+
+        /* --- Logistics List --- */
+        .list-container { display: flex; flex-direction: column; gap: 16px; }
+
+        /* Day Card (AntD Card Style) */
+        .ant-card {
+            background: #fff; border: 1px solid #f0f0f0; border-radius: 2px; font-size: 14px;
+            position: relative; transition: all 0.3s;
+        }
+        .ant-card:hover { box-shadow: 0 1px 2px -2px rgba(0, 0, 0, 0.16), 0 3px 6px 0 rgba(0, 0, 0, 0.12), 0 5px 12px 4px rgba(0, 0, 0, 0.09); border-color: transparent; }
+
+        /* Layout: Left Sidebar + Right Form */
+        .card-layout { display: flex; min-height: 180px; }
+        
+        /* Left: Date Context */
+        .card-sider {
+            width: 140px; background: #fafafa; border-right: 1px solid #f0f0f0; padding: 24px;
+            display: flex; flex-direction: column; align-items: center; text-align: center; flex-shrink: 0;
+        }
+        .date-day { font-size: 28px; color: var(--text-main); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1; }
+        .date-meta { color: var(--text-sec); font-size: 12px; margin-top: 4px; }
+        
+        .city-tag {
+            margin-top: 16px; background: #fff; border: 1px solid #d9d9d9; padding: 2px 8px; font-size: 12px; color: #666; border-radius: 2px;
+        }
+
+        /* Right: Form */
+        .card-content { flex: 1; padding: 24px; }
+        
+        /* Grid */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+        .form-item { display: flex; flex-direction: column; gap: 8px; }
+        .form-label { font-size: 12px; color: var(--text-sec); display: flex; justify-content: space-between; }
+        
+        /* AntD Input */
+        .ant-input {
+            box-sizing: border-box; margin: 0; font-variant: tabular-nums; list-style: none; font-feature-settings: 'tnum';
+            position: relative; display: inline-block; width: 100%; min-width: 0; padding: 4px 11px;
+            color: rgba(0, 0, 0, 0.85); font-size: 14px; line-height: 1.5715; background-color: #fff;
+            background-image: none; border: 1px solid #d9d9d9; border-radius: 2px; transition: all 0.3s;
+        }
+        .ant-input:focus { border-color: #40a9ff; box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2); outline: 0; }
+
+        /* The "Copy" Action Link */
+        .action-link { font-size: 12px; color: var(--primary); cursor: pointer; visibility: hidden; }
+        .form-item:hover .action-link { visibility: visible; }
+
+        /* Meal Section (Clean Table Style) */
+        .meal-table {
+            width: 100%; border: 1px solid #f0f0f0; border-radius: 2px; border-collapse: separate; border-spacing: 0;
+        }
+        .meal-table td { padding: 0; border-right: 1px solid #f0f0f0; background: #fafafa; }
+        .meal-table td:last-child { border-right: none; }
+        
+        .meal-cell-inner { display: flex; align-items: center; }
+        .meal-label { width: 40px; text-align: center; color: #999; font-size: 16px; }
+        .meal-input-ghost {
+            border: none; background: #fff; padding: 8px 12px; width: 100%; outline: none; height: 36px;
+        }
+        .meal-input-ghost:focus { box-shadow: inset 0 0 0 2px rgba(24,144,255,0.2); }
+
+    </style>
+</head>
+<body>
+
+    <div class="toolbar">
+        <div class="toolbar-title">每日资源分配</div>
+        <div style="display:flex; gap:8px">
+            <button class="ant-btn">复制 Day 1 到全部</button>
+            <button class="ant-btn ant-btn-primary">保存修改</button>
+        </div>
+    </div>
+
+    <div class="list-container">
+        
+        <!-- Day 1 -->
+        <div class="ant-card">
+            <div class="card-layout">
+                <div class="card-sider">
+                    <div class="date-day">12</div>
+                    <div class="date-meta">周一 (09月)</div>
+                    <div class="city-tag">📍 香港</div>
+                </div>
+                <div class="card-content">
+                    <div class="form-grid">
+                        <div class="form-item">
+                            <div class="form-label">
+                                <span>住宿安排</span>
+                                <span class="action-link">复制上一天</span>
+                            </div>
+                            <input class="ant-input" value="专家公寓 A栋">
+                        </div>
+                        <div class="form-item">
+                            <div class="form-label">
+                                <span>车辆调度</span>
+                                <span class="action-link">复制上一天</span>
+                            </div>
+                            <input class="ant-input" value="王师傅 (粤B·12345)">
+                        </div>
+                    </div>
+
+                    <!-- Meal Table -->
+                    <table class="meal-table">
+                        <tr>
+                            <td width="33%">
+                                <div class="meal-cell-inner">
+                                    <span class="meal-label">🌅</span>
+                                    <input class="meal-input-ghost" value="自理">
+                                </div>
+                            </td>
+                            <td width="33%">
+                                <div class="meal-cell-inner">
+                                    <span class="meal-label">☀️</span>
+                                    <input class="meal-input-ghost" value="基地围餐">
+                                </div>
+                            </td>
+                            <td width="33%">
+                                <div class="meal-cell-inner">
+                                    <span class="meal-label">🌙</span>
+                                    <input class="meal-input-ghost" value="酒店自助">
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Day 2 -->
+        <div class="ant-card">
+            <div class="card-layout">
+                <div class="card-sider">
+                    <div class="date-day">13</div>
+                    <div class="date-meta">周二 (09月)</div>
+                    <div class="city-tag">📍 香港</div>
+                </div>
+                <div class="card-content">
+                    <div class="form-grid">
+                        <div class="form-item">
+                            <div class="form-label">住宿安排 <span class="action-link">复制上一天</span></div>
+                            <input class="ant-input" value="专家公寓 A栋">
+                        </div>
+                        <div class="form-item">
+                            <div class="form-label">车辆调度 <span class="action-link">复制上一天</span></div>
+                            <input class="ant-input" placeholder="输入...">
+                        </div>
+                    </div>
+                    
+                    <table class="meal-table">
+                        <tr>
+                            <td width="33%"><div class="meal-cell-inner"><span class="meal-label">🌅</span><input class="meal-input-ghost" value="酒店自助"></div></td>
+                            <td width="33%"><div class="meal-cell-inner"><span class="meal-label">☀️</span><input class="meal-input-ghost"></div></td>
+                            <td width="33%"><div class="meal-cell-inner"><span class="meal-label">🌙</span><input class="meal-input-ghost"></div></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>
