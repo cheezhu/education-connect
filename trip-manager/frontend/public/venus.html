@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Venus</title>
+    <style>
+      :root {
+        --fg: rgba(255, 255, 255, 0.95);
+        --shadow: rgba(0, 0, 0, 0.55);
+      }
+      html, body {
+        height: 100%;
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        background: #000;
+      }
+      .bg {
+        position: fixed;
+        inset: 0;
+        background: url("/venus-bg.jpg") center/cover no-repeat;
+        filter: saturate(1.05) contrast(1.05) brightness(0.8);
+        transform: scale(1.03);
+      }
+      .vignette {
+        position: fixed;
+        inset: 0;
+        background:
+          radial-gradient(ellipse at center, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.85) 100%),
+          linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 45%, rgba(0,0,0,0.70) 100%);
+      }
+      .wrap {
+        position: relative;
+        height: 100%;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      .card {
+        max-width: 920px;
+        width: min(920px, 100%);
+        padding: 28px 28px;
+        border-radius: 18px;
+        color: var(--fg);
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255,255,255,0.12);
+        box-shadow: 0 12px 60px rgba(0,0,0,0.45);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+      }
+      .title {
+        margin: 0 0 14px 0;
+        font-size: clamp(28px, 4vw, 46px);
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        text-shadow: 0 10px 30px var(--shadow);
+      }
+      .subtitle {
+        margin: 0 0 22px 0;
+        opacity: 0.85;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .big {
+        margin: 0;
+        font-size: clamp(30px, 5.2vw, 72px);
+        font-weight: 900;
+        line-height: 1.05;
+        text-shadow: 0 14px 40px var(--shadow);
+        word-break: break-word;
+      }
+      .foot {
+        margin-top: 18px;
+        opacity: 0.65;
+        font-size: 12px;
+      }
+      .pill {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.16);
+        background: rgba(0,0,0,0.25);
+      }
+      a { color: inherit; }
+    </style>
+  </head>
+  <body>
+    <div class="bg" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+
+    <main class="wrap">
+      <section class="card">
+        <h1 class="title">Venus（金星）</h1>
+        <p class="subtitle">
+          <span class="pill">静态页面</span>
+          <span class="pill">背景：金星</span>
+        </p>
+
+        <p class="big">venus你个蠢货</p>
+
+        <div class="foot">
+          图像来源：Wikimedia Commons（Venus real color）。
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
