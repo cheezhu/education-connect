@@ -55,6 +55,8 @@ const AiDock = ({ open, onToggle, activeGroup, activeTabLabel }) => {
         context: {
           activeTabLabel: activeTabLabel || ''
         }
+      }, {
+        timeout: 120000
       });
 
       const data = response?.data || {};
@@ -62,7 +64,11 @@ const AiDock = ({ open, onToggle, activeGroup, activeTabLabel }) => {
       pushMessage('assistant', replyText || '助手暂未返回文本。');
     } catch (error) {
       const data = error?.response?.data || {};
-      pushMessage('assistant', data.message || data.error || '请求失败，请稍后重试。');
+      if (error?.code === 'ECONNABORTED') {
+        pushMessage('assistant', 'AI 回复较慢（超时），请稍后重试或简化指令。');
+      } else {
+        pushMessage('assistant', data.message || data.error || '请求失败，请稍后重试。');
+      }
     } finally {
       setSending(false);
     }
