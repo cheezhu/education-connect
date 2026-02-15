@@ -7,7 +7,8 @@ const LOGISTICS_SHEET_COL_WIDTHS_KEY = 'group_management_logistics_sheet_col_wid
 const LOGISTICS_SHEET_WIDTH_DEFAULTS = {
   basic: [170, 180, 210, 250],
   transport: [170, 120, 130, 140, 130, 140, 130, 140],
-  meals: [170, 170, 170, 170, 170, 170, 170]
+  meals: [170, 170, 170, 170, 170, 170, 170],
+  transfer: [170, 180, 150, 260, 180, 220, 92]
 };
 
 const sanitizeWidthArray = (candidate, fallback) => {

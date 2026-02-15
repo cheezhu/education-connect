@@ -1,19 +1,28 @@
-const CANCELLED_STATUS = '\u5df2\u53d6\u6d88';
-const ALLOWED_GROUP_TYPES = new Set(['primary', 'secondary', 'vip']);
+const {
+  GROUP_CANCELLED_STATUS,
+  GROUP_TYPE_DISPLAY_ALIASES,
+  GROUP_TYPE_VALUES
+} = require('../../../../shared/domain/groupMeta.cjs');
+
+const CANCELLED_STATUS = GROUP_CANCELLED_STATUS;
+const ALLOWED_GROUP_TYPES = new Set(GROUP_TYPE_VALUES);
 const GROUP_CODE_PREFIX = 'TG';
 
 const GROUP_TYPE_ALIASES = new Map([
   ['primary', 'primary'],
-  ['\u5c0f\u5b66', 'primary'],
-  ['\u5c0f\u5b78', 'primary'],
-  ['灏忓', 'primary'], // mojibake variant
+  ...GROUP_TYPE_DISPLAY_ALIASES.primary.map((label) => [label, 'primary']),
+  ['\u704f\u5fd3\ue11f', 'primary'], // mojibake variant
+  ['\u704f\u5fd3\ue131', 'primary'], // mojibake variant
+  ['\u707f\u5fcc\u5a40\u285f', 'primary'], // mojibake variant
   ['\u00e5\u00b0\u008f\u00e5\u00ad\u00a6', 'primary'], // mojibake variant
   ['secondary', 'secondary'],
-  ['\u4e2d\u5b66', 'secondary'],
-  ['\u4e2d\u5b78', 'secondary'],
-  ['涓', 'secondary'], // mojibake variant
+  ...GROUP_TYPE_DISPLAY_ALIASES.secondary.map((label) => [label, 'secondary']),
+  ['\u6d93\ue15e\ue11f', 'secondary'], // mojibake variant
+  ['\u6d93\ue15e\ue131', 'secondary'], // mojibake variant
+  ['\u5a11\u64c3\u538c\u9852\u285f', 'secondary'], // mojibake variant
   ['\u00e4\u00b8\u00ad\u00e5\u00ad\u00a6', 'secondary'], // mojibake variant
-  ['vip', 'vip']
+  ['vip', 'vip'],
+  ...GROUP_TYPE_DISPLAY_ALIASES.vip.map((label) => [label, 'vip'])
 ]);
 
 const GROUP_COLOR_PALETTE = [
@@ -180,12 +189,15 @@ const serializeManualMustVisitLocationIds = (value) => (
 
 const hydrateGroup = (group) => {
   if (!group) return group;
+  const normalizedType = normalizeGroupType(group.type);
+  const safeType = ALLOWED_GROUP_TYPES.has(normalizedType) ? normalizedType : 'primary';
   const manualMustVisitLocationIds = normalizeManualMustVisitLocationIds(
     group.manual_must_visit_location_ids
   );
   const fallbackMode = manualMustVisitLocationIds.length > 0 ? 'manual' : 'plan';
   return {
     ...group,
+    type: safeType,
     tags: normalizeTags(group.tags),
     notes_images: normalizeNotesImages(group.notes_images),
     must_visit_mode: normalizeMustVisitMode(group.must_visit_mode, fallbackMode),
@@ -291,9 +303,13 @@ const buildGroupUpdateMutation = (payload = {}) => {
 
 module.exports = {
   CANCELLED_STATUS,
+  GROUP_TYPE_VALUES,
   assignGroupCodeById,
   hydrateGroup,
+  normalizeGroupType,
   normalizeGroupPayload,
   isValidGroupType,
   buildGroupUpdateMutation
 };
+
+

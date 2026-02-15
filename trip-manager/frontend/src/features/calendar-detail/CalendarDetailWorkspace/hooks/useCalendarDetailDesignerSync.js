@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, message } from 'antd';
+import Modal from 'antd/es/modal';
+import message from 'antd/es/message';
 import api from '../../../../services/api';
+import { CALENDAR_DETAIL_DESIGNER_SYNC_TEXT } from '../../messages';
 
 const normalizeDesignerPayload = (payload) => {
   const list = Array.isArray(payload?.scheduleList) ? payload.scheduleList : [];
@@ -79,7 +81,7 @@ const useCalendarDetailDesignerSync = ({
   const pullFromDesigner = useCallback(async () => {
     if (!groupId) return;
     if (!canSyncDesigner) {
-      message.warning('需要管理员权限才能拉取行程');
+      message.warning(CALENDAR_DETAIL_DESIGNER_SYNC_TEXT.pullNoPermission);
       return;
     }
 
@@ -95,7 +97,7 @@ const useCalendarDetailDesignerSync = ({
       });
 
       if (!normalized.available || normalized.list.length === 0) {
-        message.warning('行程设计器暂无可拉取的行程点');
+        message.warning(CALENDAR_DETAIL_DESIGNER_SYNC_TEXT.pullNoData);
         return;
       }
 
@@ -104,9 +106,9 @@ const useCalendarDetailDesignerSync = ({
       const merged = [...retained, ...normalized.list];
       setActivities(merged);
       onUpdateRef.current?.(merged);
-      message.success(`已拉取 ${normalized.list.length} 条行程点`);
+      message.success(CALENDAR_DETAIL_DESIGNER_SYNC_TEXT.pullSuccess(normalized.list.length));
     } catch (error) {
-      message.error('拉取失败，请稍后重试');
+      message.error(CALENDAR_DETAIL_DESIGNER_SYNC_TEXT.pullFailed);
     } finally {
       setPullingFromDesigner(false);
     }
@@ -115,21 +117,21 @@ const useCalendarDetailDesignerSync = ({
   const pushToDesigner = useCallback(() => {
     if (!groupId) return;
     if (!canSyncDesigner) {
-      message.warning('需要管理员权限才能推送行程');
+      message.warning(CALENDAR_DETAIL_DESIGNER_SYNC_TEXT.pushNoPermission);
       return;
     }
 
     const toPush = activitiesRef.current.filter((item) => isLocationRef.current?.(item));
     if (toPush.length === 0) {
-      message.warning('当前日历暂无可推送的行程点');
+      message.warning(CALENDAR_DETAIL_DESIGNER_SYNC_TEXT.pushNoData);
       return;
     }
 
     Modal.confirm({
-      title: '推送到行程设计器',
-      content: `将覆盖行程设计器中该团组的行程点（共 ${toPush.length} 条）。确认推送？`,
-      okText: '推送',
-      cancelText: '取消',
+      title: CALENDAR_DETAIL_DESIGNER_SYNC_TEXT.confirmTitle,
+      content: CALENDAR_DETAIL_DESIGNER_SYNC_TEXT.confirmContent(toPush.length),
+      okText: CALENDAR_DETAIL_DESIGNER_SYNC_TEXT.confirmOkText,
+      cancelText: CALENDAR_DETAIL_DESIGNER_SYNC_TEXT.confirmCancelText,
       okButtonProps: { danger: true },
       onOk: async () => {
         setPushingToDesigner(true);
@@ -139,17 +141,17 @@ const useCalendarDetailDesignerSync = ({
           });
           const inserted = Number(response?.data?.inserted);
           const insertedCount = Number.isFinite(inserted) ? inserted : toPush.length;
-          message.success(`已推送 ${insertedCount} 条行程点到行程设计器`);
+          message.success(CALENDAR_DETAIL_DESIGNER_SYNC_TEXT.pushSuccess(insertedCount));
           onPushedRef.current?.({
             groupId,
             inserted: insertedCount
           });
         } catch (error) {
           if (error?.response?.status === 403) {
-            message.error('无权限或编辑锁被占用，推送失败');
+            message.error(CALENDAR_DETAIL_DESIGNER_SYNC_TEXT.pushForbidden);
             return;
           }
-          message.error('推送失败，请稍后重试');
+          message.error(CALENDAR_DETAIL_DESIGNER_SYNC_TEXT.pushFailed);
         } finally {
           setPushingToDesigner(false);
         }

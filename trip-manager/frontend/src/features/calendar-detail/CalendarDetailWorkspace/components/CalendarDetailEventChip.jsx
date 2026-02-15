@@ -1,27 +1,8 @@
 import React from 'react';
 
 import { resolveSourceMeta } from '../../../../domain/resourceSource';
-
-const LEGACY_MEAL_TITLES = new Set(['早餐', '午餐', '晚餐', '早饭', '午饭', '晚饭']);
-
-const typeLabel = (type) => {
-  switch (type) {
-    case 'visit':
-      return '参观';
-    case 'meal':
-      return '用餐';
-    case 'transport':
-      return '交通';
-    case 'rest':
-      return '休息';
-    case 'activity':
-      return '活动';
-    case 'free':
-      return '自由';
-    default:
-      return '活动';
-  }
-};
+import { LEGACY_MEAL_TITLES } from '../../../../domain/shixingConfig';
+import { getActivityTypeLabel } from '../../constants';
 
 const CalendarDetailEventChip = ({
   activity,
@@ -49,7 +30,7 @@ const CalendarDetailEventChip = ({
     && (!rawTitle || LEGACY_MEAL_TITLES.has(rawTitle))
   )
     ? rawDescription
-    : (rawTitle || typeLabel(activity?.type));
+    : (rawTitle || getActivityTypeLabel(activity?.type));
   const locationText = rawLocation && rawLocation !== titleText ? rawLocation : '';
 
   const handleClick = (event) => {

@@ -80,6 +80,7 @@ export const renderTabView = ({
         <LogisticsSpreadsheet
           group={activeGroup}
           onUpdate={onLogisticsChange}
+          locations={locations}
         />
       );
     case 'points':

@@ -29,7 +29,8 @@ const GROUP_CALENDAR_HEIGHT_MAX = 70;
 const LOGISTICS_SHEET_WIDTH_DEFAULTS = {
   basic: [170, 180, 210, 250],
   transport: [170, 120, 130, 140, 130, 140, 130, 140],
-  meals: [170, 170, 170, 170, 170, 170, 170]
+  meals: [170, 170, 170, 170, 170, 170, 170],
+  transfer: [170, 180, 150, 260, 180, 220, 92]
 };
 
 const isValidDate = (value) => {
@@ -200,14 +201,14 @@ router.get('/itinerary-group-calendar-height', (req, res) => {
 router.put('/itinerary-group-calendar-height', (req, res) => {
   const normalized = normalizeHeight(req.body?.height);
   if (normalized === null) {
-    return res.status(400).json({ error: '\u65e0\u6548\u914d\u7f6e' });
+    return res.status(400).json({ error: '无效配置' });
   }
 
   upsertConfig(
     req.db,
     GROUP_CALENDAR_HEIGHT_KEY,
     String(normalized),
-    '\u884c\u7a0b\u8bbe\u8ba1\u5668\u56e2\u7ec4\u65e5\u5386\u53ef\u8c03\u9ad8\u5ea6'
+    '行程设计器团组日历可调高度'
   );
 
   res.json({ height: normalized });
@@ -373,13 +374,13 @@ router.put('/all', (req, res) => {
   if (Object.prototype.hasOwnProperty.call(itinerary, 'groupCalendarHeight')) {
     const normalized = normalizeHeight(itinerary.groupCalendarHeight);
     if (normalized === null) {
-      return res.status(400).json({ error: '\u65e0\u6548\u914d\u7f6e' });
+      return res.status(400).json({ error: '无效配置' });
     }
     upsertConfig(
       req.db,
       GROUP_CALENDAR_HEIGHT_KEY,
       String(normalized),
-      '\u884c\u7a0b\u8bbe\u8ba1\u5668\u56e2\u7ec4\u65e5\u5386\u53ef\u8c03\u9ad8\u5ea6'
+      '行程设计器团组日历可调高度'
     );
   }
 

@@ -1,4 +1,4 @@
-import { message } from 'antd';
+﻿import message from 'antd/es/message';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export default function useGroupCalendarDetail({ api, onBeforeOpen }) {
@@ -11,6 +11,7 @@ export default function useGroupCalendarDetail({ api, onBeforeOpen }) {
 
   const saveTimeoutRef = useRef(null);
   const saveTokenRef = useRef(0);
+  const lastServerSchedulesRef = useRef([]);
 
   const loadSchedules = useCallback(async (targetGroupId) => {
     if (!targetGroupId) return;
@@ -21,11 +22,13 @@ export default function useGroupCalendarDetail({ api, onBeforeOpen }) {
       const revisionHeader = response.headers?.['x-schedule-revision'];
       const nextRevision = Number(revisionHeader);
       setRevision(Number.isFinite(nextRevision) ? nextRevision : 0);
+      lastServerSchedulesRef.current = loaded;
       setSchedules(loaded);
     } catch (error) {
       message.error('加载日程失败');
       setSchedules([]);
       setRevision(0);
+      lastServerSchedulesRef.current = [];
     } finally {
       setLoading(false);
     }
@@ -50,6 +53,7 @@ export default function useGroupCalendarDetail({ api, onBeforeOpen }) {
     const alreadyOpen = visible && isSameGroup;
     if (!isSameGroup) {
       setSchedules([]);
+      lastServerSchedulesRef.current = [];
       setGroupId(nextGroupId);
       setResourcesVisible(true);
       setRevision(0);
@@ -83,6 +87,7 @@ export default function useGroupCalendarDetail({ api, onBeforeOpen }) {
         if (Number.isFinite(nextRevision)) {
           setRevision(nextRevision);
         }
+        lastServerSchedulesRef.current = saved;
         setSchedules(saved);
       } catch (error) {
         if (error?.response?.status === 409) {
@@ -94,6 +99,9 @@ export default function useGroupCalendarDetail({ api, onBeforeOpen }) {
           message.warning('日程已被其他人修改，请刷新后再试');
           loadSchedules(groupId);
           return;
+        }
+        if (Array.isArray(lastServerSchedulesRef.current)) {
+          setSchedules(lastServerSchedulesRef.current);
         }
         message.error('保存日程失败');
       }

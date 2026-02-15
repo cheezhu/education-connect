@@ -1,4 +1,4 @@
-import { message } from 'antd';
+import message from 'antd/es/message';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import useDataSync from '../../../hooks/useDataSync';
@@ -87,4 +87,3 @@ export default function useItineraryDesignerData({ api }) {
     refreshActivitiesOnly
   };
 }
-

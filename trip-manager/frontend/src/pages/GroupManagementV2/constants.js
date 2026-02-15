@@ -1,34 +1,35 @@
 import dayjs from 'dayjs';
+import { GROUP_STATUS_OPTIONS } from '../../../../shared/domain/groupMeta.mjs';
 
-export const UNNAMED_GROUP_NAME = '\u672a\u547d\u540d\u56e2\u7ec4';
+export const UNNAMED_GROUP_NAME = '未命名团组';
 
 export const TAB_GROUPS = [
   {
     id: 'read',
     mode: 'read',
     tabs: [
-      { key: 'profile', label: '\u56e2\u7ec4\u8bbe\u7f6e' },
-      { key: 'progress', label: '\u51c6\u5907\u8fdb\u5ea6' },
-      { key: 'itinerary', label: '\u884c\u7a0b\u5bfc\u51fa' }
+      { key: 'profile', label: '团组设置' },
+      { key: 'progress', label: '准备进度' },
+      { key: 'itinerary', label: '行程导出' }
     ]
   },
   {
     id: 'planning',
     mode: 'work',
     tabs: [
-      { key: 'schedule', label: '\u65e5\u5386\u89c4\u5212' },
-      { key: 'points', label: '\u884c\u7a0b\u70b9' },
-      { key: 'meals', label: '\u9910\u996e' },
-      { key: 'transfer', label: '\u63a5\u9001\u7ad9' },
-      { key: 'logistics_sheet', label: '\u6bcf\u65e5\u8d44\u6e90\u8868' }
+      { key: 'schedule', label: '日历规划' },
+      { key: 'points', label: '行程点' },
+      { key: 'meals', label: '餐饮' },
+      { key: 'transfer', label: '接送站' },
+      { key: 'logistics_sheet', label: '每日资源表' }
     ]
   },
   {
     id: 'operations',
     mode: 'work',
     tabs: [
-      { key: 'members', label: '\u56e2\u5458\u540d\u5355' },
-      { key: 'accommodation', label: '\u4f4f\u5bbf\u5b89\u6392' }
+      { key: 'members', label: '团员名单' },
+      { key: 'accommodation', label: '住宿安排' }
     ]
   }
 ];
@@ -68,35 +69,29 @@ export const DEBOUNCE_MS = {
 };
 
 export const GROUP_MESSAGES = {
-  loading: '\u52a0\u8f7d\u4e2d...',
-  tabRenderFailed: '\u5f53\u524d\u6807\u7b7e\u9875\u6e32\u67d3\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u63a7\u5236\u53f0\u9519\u8bef\u3002',
-  loadGroupsFailed: '\u52a0\u8f7d\u56e2\u7ec4\u6570\u636e\u5931\u8d25',
-  loadSchedulesFailed: '\u52a0\u8f7d\u65e5\u7a0b\u5931\u8d25',
-  loadLogisticsFailed: '\u52a0\u8f7d\u6bcf\u65e5\u5361\u7247\u5931\u8d25',
-  groupDeleted: '\u56e2\u7ec4\u5df2\u5220\u9664',
-  groupDeleteFailed: '\u5220\u9664\u5931\u8d25',
-  groupCreated: '\u5df2\u65b0\u5efa\u56e2\u7ec4',
-  groupCreateFailed: '\u65b0\u5efa\u56e2\u7ec4\u5931\u8d25',
-  batchCreateRowMissing: '\u8bf7\u5148\u6dfb\u52a0\u56e2\u7ec4',
-  batchCreateFailed: '\u6279\u91cf\u521b\u5efa\u5931\u8d25',
-  saveFailed: '\u4fdd\u5b58\u5931\u8d25',
-  saveScheduleFailed: '\u4fdd\u5b58\u65e5\u7a0b\u5931\u8d25',
-  saveLogisticsFailed: '\u4fdd\u5b58\u6bcf\u65e5\u5361\u7247\u5931\u8d25',
-  scheduleConflict: '\u65e5\u7a0b\u5df2\u88ab\u5176\u4ed6\u4eba\u4fee\u6539\uff0c\u8bf7\u5237\u65b0\u540e\u518d\u8bd5'
+  loading: '加载中...',
+  tabRenderFailed: '当前标签页渲染失败，请检查控制台错误。',
+  loadGroupsFailed: '加载团组数据失败',
+  loadSchedulesFailed: '加载日程失败',
+  loadLogisticsFailed: '加载每日卡片失败',
+  groupDeleted: '团组已删除',
+  groupDeleteFailed: '删除失败',
+  groupCreated: '已新建团组',
+  groupCreateFailed: '新建团组失败',
+  batchCreateRowMissing: '请先添加团组',
+  batchCreateFailed: '批量创建失败',
+  saveFailed: '保存失败',
+  saveScheduleFailed: '保存日程失败',
+  saveLogisticsFailed: '保存每日卡片失败',
+  scheduleConflict: '日程已被其他人修改，请刷新后再试'
 };
 
 export const PROFILE_TEXT = {
-  emptyState: '\u8bf7\u9009\u62e9\u56e2\u7ec4\u4ee5\u67e5\u770b\u8be6\u60c5',
-  deleteGroup: '\u5220\u9664\u56e2\u7ec4',
-  replaceMustVisitConfirm: '\u5c06\u4f7f\u7528\u65b9\u6848\u5730\u70b9\u66ff\u6362\u5f53\u524d\u5fc5\u53bb\u70b9\uff0c\u662f\u5426\u7ee7\u7eed\uff1f',
-  deleteGroupConfirm: (name) => `\u786e\u5b9a\u5220\u9664\u56e2\u7ec4\u300c${name}\u300d\uff1f\u6b64\u64cd\u4f5c\u4e0d\u53ef\u64a4\u9500\u3002`,
-  statusOptions: [
-    { value: null, label: '\u81ea\u52a8' },
-    { value: '\u51c6\u5907\u4e2d', label: '\u51c6\u5907\u4e2d' },
-    { value: '\u8fdb\u884c\u4e2d', label: '\u8fdb\u884c\u4e2d' },
-    { value: '\u5df2\u5b8c\u6210', label: '\u5df2\u5b8c\u6210' },
-    { value: '\u5df2\u53d6\u6d88', label: '\u5df2\u53d6\u6d88' }
-  ]
+  emptyState: '请选择团组以查看详情',
+  deleteGroup: '删除团组',
+  replaceMustVisitConfirm: '将使用方案地点替换当前必去点，是否继续？',
+  deleteGroupConfirm: (name) => `确定删除团组「${name}」？此操作不可撤销。`,
+  statusOptions: GROUP_STATUS_OPTIONS
 };
 
 export const toGroupIdKey = (value) => String(value ?? '');
@@ -118,3 +113,4 @@ export const toTimestamp = (value) => {
   if (!parsed.isValid()) return null;
   return parsed.valueOf();
 };
+

@@ -1,36 +1,32 @@
 import { getResourceId, resolveResourceKind, type ResourceKind } from './resourceId';
+import { RESOURCE_SOURCE_META } from '../../../shared/domain/groupMeta.mjs';
 
 export type ResourceSourceMeta = {
   kind: ResourceKind;
-  tag: string; // 2 chars in UI: 必去/食行/其他
+  tag: string;
   title: string;
-  className: string; // used by CSS: source-plan/source-shixing/source-custom
+  className: string;
 };
+
+const SOURCE_META = RESOURCE_SOURCE_META as Record<ResourceKind, ResourceSourceMeta>;
 
 export const resolveSourceMetaByKind = (kind: ResourceKind): ResourceSourceMeta => {
-  switch (kind) {
-    case 'plan':
-      return { kind, tag: '必去', title: '必去行程点', className: 'source-plan' };
-    case 'shixing':
-      return { kind, tag: '食行', title: '食行卡片', className: 'source-shixing' };
-    case 'custom':
-    case 'unknown':
-    default:
-      return { kind: 'custom', tag: '其他', title: '其他', className: 'source-custom' };
+  if (kind === 'unknown') {
+    return { ...SOURCE_META.custom };
   }
+  return { ...SOURCE_META[kind] };
 };
 
-// Accepts either a resourceId string or an activity-like object.
-// `planItemId` is treated as plan when the resourceId is missing (backward compat).
 export const resolveSourceMeta = (input: unknown): ResourceSourceMeta => {
   const resourceId = typeof input === 'string' ? input : getResourceId(input);
   let kind = resolveResourceKind(resourceId);
 
   if (kind === 'unknown' && input && typeof input === 'object') {
-    const anyInput = input as any;
-    if (anyInput.planItemId) kind = 'plan';
+    const maybeActivity = input as { planItemId?: unknown };
+    if (maybeActivity.planItemId) {
+      kind = 'plan';
+    }
   }
 
   return resolveSourceMetaByKind(kind);
 };
-

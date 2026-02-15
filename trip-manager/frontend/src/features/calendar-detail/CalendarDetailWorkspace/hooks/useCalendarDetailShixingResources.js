@@ -1,6 +1,12 @@
 import { useMemo } from 'react';
 import { calcDurationHours } from '../utils/time';
 import { buildShixingResourceId } from '../../../../domain/resourceId';
+import {
+  SHIXING_MEAL_DEFAULTS,
+  SHIXING_MEAL_KEYS,
+  SHIXING_MEAL_LABELS,
+  SHIXING_TRANSFER_LABELS
+} from '../../../../domain/shixingConfig';
 
 const isMealFilled = (meals, key) => {
   if (!meals || meals[`${key}_disabled`]) return false;
@@ -28,11 +34,6 @@ const useCalendarDetailShixingResources = ({ groupData, activities }) => useMemo
       .map((activity) => activity?.resourceId ?? activity?.resource_id)
       .filter((id) => typeof id === 'string')
   );
-  const mealDefaults = {
-    breakfast: { start: '07:30', end: '08:30', label: '早餐' },
-    lunch: { start: '12:00', end: '13:00', label: '午餐' },
-    dinner: { start: '18:00', end: '19:00', label: '晚餐' }
-  };
   const resources = [];
 
   logistics.forEach((row) => {
@@ -43,25 +44,26 @@ const useCalendarDetailShixingResources = ({ groupData, activities }) => useMemo
     const isEndDay = Boolean(endDate && date === endDate);
     const meals = row.meals || {};
 
-    ['breakfast', 'lunch', 'dinner'].forEach((key) => {
+    SHIXING_MEAL_KEYS.forEach((key) => {
       if (!isMealFilled(meals, key)) return;
       const resourceId = buildShixingResourceId(date, 'meal', key);
       if (scheduledResources.has(resourceId)) return;
 
-      const defaults = mealDefaults[key] || {};
+      const defaults = SHIXING_MEAL_DEFAULTS[key] || {};
       const duration = calcDurationHours(
         meals[`${key}_time`] || defaults.start,
         meals[`${key}_end`] || defaults.end,
         60
       );
+      const fallbackLabel = SHIXING_MEAL_LABELS[key] || key;
 
       resources.push({
         id: resourceId,
         type: 'meal',
-        title: meals[key] || defaults.label || key,
+        title: meals[key] || fallbackLabel,
         duration,
         description: '',
-        locationName: meals[`${key}_place`] || defaults.label || '',
+        locationName: meals[`${key}_place`] || fallbackLabel,
         fixedDate: date
       });
     });
@@ -73,10 +75,10 @@ const useCalendarDetailShixingResources = ({ groupData, activities }) => useMemo
         resources.push({
           id: resourceId,
           type: 'transport',
-          title: '接站',
+          title: SHIXING_TRANSFER_LABELS.pickup,
           duration: calcDurationHours(pickup.time, pickup.end_time, 60),
           description: buildTransferDescription(pickup),
-          locationName: pickup.location || '接站',
+          locationName: pickup.location || SHIXING_TRANSFER_LABELS.pickup,
           fixedDate: date
         });
       }
@@ -89,10 +91,10 @@ const useCalendarDetailShixingResources = ({ groupData, activities }) => useMemo
         resources.push({
           id: resourceId,
           type: 'transport',
-          title: '送站',
+          title: SHIXING_TRANSFER_LABELS.dropoff,
           duration: calcDurationHours(dropoff.time, dropoff.end_time, 60),
           description: buildTransferDescription(dropoff),
-          locationName: dropoff.location || '送站',
+          locationName: dropoff.location || SHIXING_TRANSFER_LABELS.dropoff,
           fixedDate: date
         });
       }

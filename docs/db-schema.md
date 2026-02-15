@@ -141,6 +141,23 @@
 - is_active
 - created_at, updated_at
 
+### resource_restaurants
+- id (PK)
+- name
+- address
+- city
+- notes
+- is_active
+- created_at, updated_at
+
+### resource_flights
+- id (PK)
+- flight_no
+- airline
+- notes
+- is_active
+- created_at, updated_at
+
 ### itinerary_plans
 - id (PK)
 - name, description

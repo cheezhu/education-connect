@@ -1,4 +1,5 @@
-import { Form, message } from 'antd';
+import Form from 'antd/es/form';
+import message from 'antd/es/message';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 

@@ -1,17 +1,15 @@
 import React from 'react';
-import {
-  Alert,
-  Card,
-  Col,
-  Collapse,
-  Divider,
-  Row,
-  Space,
-  Steps,
-  Table,
-  Tag,
-  Typography
-} from 'antd';
+import Alert from 'antd/es/alert';
+import Card from 'antd/es/card';
+import Col from 'antd/es/col';
+import Collapse from 'antd/es/collapse';
+import Divider from 'antd/es/divider';
+import Row from 'antd/es/row';
+import Space from 'antd/es/space';
+import Steps from 'antd/es/steps';
+import Table from 'antd/es/table';
+import Tag from 'antd/es/tag';
+import Typography from 'antd/es/typography';
 
 const { Paragraph, Text, Title } = Typography;
 

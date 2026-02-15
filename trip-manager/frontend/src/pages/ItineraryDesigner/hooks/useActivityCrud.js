@@ -1,4 +1,4 @@
-import { message } from 'antd';
+import message from 'antd/es/message';
 import { useCallback } from 'react';
 
 import checkConflicts from '../conflicts/checkConflicts';
@@ -124,4 +124,3 @@ export default function useActivityCrud({
     handleUpdateActivity
   };
 }
-

@@ -7,6 +7,7 @@
 > 更新（2026-02-08）：已落地 `trip-manager/shared/domain`（`time`、`resourceId`）并在前后端复用，减少“时间段/资源类型”重复定义引发的不一致；同时修复了 Calendar Detail 的 `EventChip` 乱码与语法损坏问题（会影响网格卡片显示）。
 > 更新（2026-02-08）：修复 Vite 从 `shared/` 导入时的 403 与模块格式问题（前端只引 ESM `.mjs`；Vite `server.fs.allow` 放行 `../shared`），并补齐 `trip-manager/scripts/verify.ps1` 自检脚本（含前端 build）。
 > 更新（2026-02-08）：行程设计器（ItineraryDesigner）继续拆分：抽离数据加载（hook）、活动 CRUD（hook）、调控台拖拽/清空（hook）、调控台高度拖拽（hook）、并保留时间轴冲突/拖拽的拆分结构；`index.jsx` 约 640 行。
+> 更新（2026-02-14）：已完成后端第一批硬化：`schedules` 批量保存新增时间与日期校验、仅允许复用本团组既有 `schedule.id`（防跨团组注入）、`locations` 新增 `open_hours/closed_dates` JSON 校验、`lock` 路由补齐用户判空与角色约束。
 
 ---
 
@@ -78,18 +79,18 @@
 
 ## 2) 中优先级问题（数据一致性 / 可维护性）
 
-### M1. 仍允许客户端传入 `schedule.id`（中）
+### M1. 仍允许客户端传入 `schedule.id`（中，已部分修复）
 **现象**：后端仍会使用客户端传入的 `id` 写入数据库。虽然前端已改成 `clientId`，但**仍存在“恶意/旧客户端”注入冲突 ID 的可能**。
 
 **相关位置**：
 - `trip-manager/backend/src/routes/schedules.js:219`
 
-**建议修法**：
-- 服务端插入时 **忽略客户端 id**，只在“确实属于该团组且存在”的情况下允许复用。
+**当前状态（2026-02-14）**：
+- 已改为仅允许复用“当前团组里已存在的 id”，不再接受跨团组注入 id。
 
 ---
 
-### M2. 时间格式/范围校验不足（中）
+### M2. 时间格式/范围校验不足（中，已修复）
 **现象**：只检查 `startTime/endTime` 是否存在，不验证格式、范围或 start < end。
 
 **相关位置**：
@@ -98,8 +99,8 @@
 **风险**：
 - 会出现“时间非法、越界、显示异常”的数据，后续 UI 渲染易出错。
 
-**建议修法**：
-- 服务端加入时间格式校验（HH:mm），并强制 `start < end`。
+**当前状态（2026-02-14）**：
+- `schedules/batch` 已加入 `date` 与 `HH:mm` 格式校验，并强制 `start < end`。
 
 ---
 
@@ -144,7 +145,7 @@
 
 ---
 
-### M6. `open_hours/closed_dates` 未校验（中）
+### M6. `open_hours/closed_dates` 未校验（中，已修复）
 **现象**：地点的 `open_hours/closed_dates` 直接写入 DB，不校验格式。
 
 **相关位置**：
@@ -153,8 +154,8 @@
 **风险**：
 - 数据格式出错时，规划/校验逻辑会报错或产生错判。
 
-**建议修法**：
-- 保存前校验 JSON 结构；非法则拒绝。
+**当前状态（2026-02-14）**：
+- `locations` 的创建与更新接口已校验 JSON 结构，非法输入返回 400。
 
 ---
 
@@ -183,15 +184,15 @@
 
 ## 3) 低优先级问题（稳定性/质量）
 
-### L1. 编辑锁接口未做用户判空（低）
+### L1. 编辑锁接口未做用户判空（低，已修复）
 **现象**：当 `req.user` 不存在时，直接访问 `user.role` 可能报错。
 
 **相关位置**：
 - `trip-manager/backend/src/routes/lock.js:7`
 - `trip-manager/backend/src/routes/lock.js:38`
 
-**建议修法**：
-- `if (!user) return 403`。
+**当前状态（2026-02-14）**：
+- 已补齐用户判空；并统一 `canEdit` 计算逻辑为“角色可写 + 锁可用”。
 
 ---
 

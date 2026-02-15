@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import api from '../../../services/api';
+import { decodeEscapedUnicode } from '../../../domain/text';
 import {
   diffGroupUpdatePayload,
   getRequestErrorMessage,
@@ -23,13 +24,14 @@ import { useScheduleSync } from './useScheduleSync';
 export const sortAndFilterGroups = (groups = [], searchText = '') => {
   let filtered = [...groups];
   const normalizedSearch = String(searchText || '').trim().toLowerCase();
+  const normalizeSearchField = (value) => decodeEscapedUnicode(value ?? '').toLowerCase();
 
   if (normalizedSearch) {
     filtered = filtered.filter((group) => (
-      (group.name || '').toLowerCase().includes(normalizedSearch)
-      || (group.group_code || '').toLowerCase().includes(normalizedSearch)
-      || (group.contact_person || '').toLowerCase().includes(normalizedSearch)
-      || (group.contact_phone || '').toLowerCase().includes(normalizedSearch)
+      normalizeSearchField(group.name).includes(normalizedSearch)
+      || normalizeSearchField(group.group_code).includes(normalizedSearch)
+      || normalizeSearchField(group.contact_person).includes(normalizedSearch)
+      || normalizeSearchField(group.contact_phone).includes(normalizedSearch)
     ));
   }
 
@@ -80,13 +82,13 @@ export const useGroupData = ({ apiClient = api, notify = null } = {}) => {
   }, [notify]);
 
   const calculateStatus = useCallback((group) => {
-    if (group.status === '\u5df2\u53d6\u6d88') return '\u5df2\u53d6\u6d88';
+    if (group.status === '已取消') return '已取消';
     const today = dayjs();
     const startDate = dayjs(group.start_date);
     const endDate = dayjs(group.end_date);
-    if (today.isBefore(startDate)) return '\u51c6\u5907\u4e2d';
-    if (today.isAfter(endDate)) return '\u5df2\u5b8c\u6210';
-    return '\u8fdb\u884c\u4e2d';
+    if (today.isBefore(startDate)) return '准备中';
+    if (today.isAfter(endDate)) return '已完成';
+    return '进行中';
   }, []);
 
   const queueLogisticsSave = useCallback((groupId, logisticsList) => {

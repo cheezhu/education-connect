@@ -2,6 +2,7 @@
 import dayjs from 'dayjs';
 import SidebarFooter from './SidebarFooter';
 import { getGroupTypeLabel } from '../../../../domain/group';
+import { toTrimmedDisplayText } from '../../../../domain/text';
 import { UNNAMED_GROUP_NAME } from '../../constants';
 
 const GroupList = ({
@@ -26,7 +27,7 @@ const GroupList = ({
   };
 
   const resolveDisplayName = (group) => {
-    const value = String(group?.name || '').trim();
+    const value = toTrimmedDisplayText(group?.name);
     return value || UNNAMED_GROUP_NAME;
   };
 

@@ -16,6 +16,7 @@ export const useScheduleSync = ({
   const scheduleSaveTokenRef = useRef(0);
   const scheduleSignatureRef = useRef('');
   const scheduleRevisionRef = useRef({});
+  const lastServerSchedulesRef = useRef({});
 
   const applyScheduleSync = useCallback((groupId, schedules) => {
     const nextSchedules = Array.isArray(schedules) ? schedules : [];
@@ -38,12 +39,14 @@ export const useScheduleSync = ({
       const revisionHeader = response.headers?.['x-schedule-revision'];
       const nextRevision = Number(revisionHeader);
       scheduleRevisionRef.current[groupId] = Number.isFinite(nextRevision) ? nextRevision : 0;
+      lastServerSchedulesRef.current[groupId] = nextSchedules;
       applyScheduleSync(groupId, nextSchedules);
     } catch (error) {
       showError(GROUP_MESSAGES.loadSchedulesFailed);
       setGroupSchedules([]);
       scheduleSignatureRef.current = '';
       scheduleRevisionRef.current[groupId] = 0;
+      lastServerSchedulesRef.current[groupId] = [];
     }
   }, [apiClient, applyScheduleSync, showError]);
 
@@ -64,6 +67,7 @@ export const useScheduleSync = ({
         if (Number.isFinite(nextRevision)) {
           scheduleRevisionRef.current[groupId] = nextRevision;
         }
+        lastServerSchedulesRef.current[groupId] = saved;
         if (isSameGroupId(activeGroupIdRef.current, groupId)) {
           applyScheduleSync(groupId, saved);
         }
@@ -77,6 +81,10 @@ export const useScheduleSync = ({
           showWarning(GROUP_MESSAGES.scheduleConflict);
           fetchSchedules(groupId);
           return;
+        }
+        const rollbackSchedules = lastServerSchedulesRef.current[groupId];
+        if (isSameGroupId(activeGroupIdRef.current, groupId) && Array.isArray(rollbackSchedules)) {
+          applyScheduleSync(groupId, rollbackSchedules);
         }
         showError(getRequestErrorMessage(error, GROUP_MESSAGES.saveScheduleFailed));
       }

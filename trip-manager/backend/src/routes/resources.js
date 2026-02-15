@@ -253,4 +253,154 @@ router.delete('/resources/vehicles/:id', requireEditLock, (req, res) => {
   }
 });
 
+// 餐厅资源
+router.get('/resources/restaurants', (req, res) => {
+  const rows = req.db.prepare(`
+    SELECT * FROM resource_restaurants
+    WHERE is_active = 1
+      AND (
+        (name IS NOT NULL AND TRIM(name) <> '' AND TRIM(name) <> '[object Object]')
+        OR (address IS NOT NULL AND TRIM(address) <> '' AND TRIM(address) <> '[object Object]')
+      )
+    ORDER BY name, address
+  `).all();
+  res.json(rows);
+});
+
+router.post('/resources/restaurants', requireEditLock, (req, res) => {
+  const { name = '', address = '', city = '', notes = '' } = req.body;
+  if (!String(name || '').trim() && !String(address || '').trim()) {
+    return res.status(400).json({ error: '缺少必需字段: name 或 address' });
+  }
+
+  try {
+    const result = req.db.prepare(`
+      INSERT INTO resource_restaurants (name, address, city, notes)
+      VALUES (?, ?, ?, ?)
+    `).run(name, address, city, notes);
+    const row = req.db.prepare('SELECT * FROM resource_restaurants WHERE id = ?').get(result.lastInsertRowid);
+    res.json({ success: true, restaurant: row });
+  } catch (error) {
+    console.error('创建餐厅资源失败:', error);
+    res.status(500).json({ error: '创建餐厅资源失败' });
+  }
+});
+
+router.put('/resources/restaurants/:id', requireEditLock, (req, res) => {
+  const { id } = req.params;
+  const allowed = ['name', 'address', 'city', 'notes', 'is_active'];
+  const { updates, values } = buildUpdate(req.body, allowed);
+  if (updates.length === 0) {
+    return res.status(400).json({ error: '没有需要更新的字段' });
+  }
+  updates.push('updated_at = CURRENT_TIMESTAMP');
+  values.push(id);
+
+  try {
+    const result = req.db.prepare(`
+      UPDATE resource_restaurants
+      SET ${updates.join(', ')}
+      WHERE id = ?
+    `).run(...values);
+    if (result.changes === 0) {
+      return res.status(404).json({ error: '餐厅资源不存在' });
+    }
+    const row = req.db.prepare('SELECT * FROM resource_restaurants WHERE id = ?').get(id);
+    res.json({ success: true, restaurant: row });
+  } catch (error) {
+    console.error('更新餐厅资源失败:', error);
+    res.status(500).json({ error: '更新餐厅资源失败' });
+  }
+});
+
+router.delete('/resources/restaurants/:id', requireEditLock, (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = req.db.prepare(`
+      UPDATE resource_restaurants
+      SET is_active = 0, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(id);
+    res.json({ success: result.changes > 0 });
+  } catch (error) {
+    console.error('删除餐厅资源失败:', error);
+    res.status(500).json({ error: '删除餐厅资源失败' });
+  }
+});
+
+// 航班/航司资源
+router.get('/resources/flights', (req, res) => {
+  const rows = req.db.prepare(`
+    SELECT * FROM resource_flights
+    WHERE is_active = 1
+      AND (
+        (flight_no IS NOT NULL AND TRIM(flight_no) <> '' AND TRIM(flight_no) <> '[object Object]')
+        OR (airline IS NOT NULL AND TRIM(airline) <> '' AND TRIM(airline) <> '[object Object]')
+      )
+    ORDER BY flight_no, airline
+  `).all();
+  res.json(rows);
+});
+
+router.post('/resources/flights', requireEditLock, (req, res) => {
+  const { flight_no = '', airline = '', notes = '' } = req.body;
+  if (!String(flight_no || '').trim() && !String(airline || '').trim()) {
+    return res.status(400).json({ error: '缺少必需字段: flight_no 或 airline' });
+  }
+
+  try {
+    const result = req.db.prepare(`
+      INSERT INTO resource_flights (flight_no, airline, notes)
+      VALUES (?, ?, ?)
+    `).run(flight_no, airline, notes);
+    const row = req.db.prepare('SELECT * FROM resource_flights WHERE id = ?').get(result.lastInsertRowid);
+    res.json({ success: true, flight: row });
+  } catch (error) {
+    console.error('创建航班资源失败:', error);
+    res.status(500).json({ error: '创建航班资源失败' });
+  }
+});
+
+router.put('/resources/flights/:id', requireEditLock, (req, res) => {
+  const { id } = req.params;
+  const allowed = ['flight_no', 'airline', 'notes', 'is_active'];
+  const { updates, values } = buildUpdate(req.body, allowed);
+  if (updates.length === 0) {
+    return res.status(400).json({ error: '没有需要更新的字段' });
+  }
+  updates.push('updated_at = CURRENT_TIMESTAMP');
+  values.push(id);
+
+  try {
+    const result = req.db.prepare(`
+      UPDATE resource_flights
+      SET ${updates.join(', ')}
+      WHERE id = ?
+    `).run(...values);
+    if (result.changes === 0) {
+      return res.status(404).json({ error: '航班资源不存在' });
+    }
+    const row = req.db.prepare('SELECT * FROM resource_flights WHERE id = ?').get(id);
+    res.json({ success: true, flight: row });
+  } catch (error) {
+    console.error('更新航班资源失败:', error);
+    res.status(500).json({ error: '更新航班资源失败' });
+  }
+});
+
+router.delete('/resources/flights/:id', requireEditLock, (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = req.db.prepare(`
+      UPDATE resource_flights
+      SET is_active = 0, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(id);
+    res.json({ success: result.changes > 0 });
+  } catch (error) {
+    console.error('删除航班资源失败:', error);
+    res.status(500).json({ error: '删除航班资源失败' });
+  }
+});
+
 module.exports = router;

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Button, Modal } from 'antd';
+import Button from 'antd/es/button';
+import Modal from 'antd/es/modal';
 import { getPlanningConflictHandlingTip, getPlanningConflictReasonLabel } from './conflictLabels';
 
 function SlotConflictModal({
@@ -79,4 +80,3 @@ function SlotConflictModal({
 }
 
 export default SlotConflictModal;
-

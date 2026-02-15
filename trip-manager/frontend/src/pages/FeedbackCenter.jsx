@@ -1,16 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Badge,
-  Button,
-  Empty,
-  Form,
-  Input,
-  List,
-  Popconfirm,
-  Select,
-  Typography,
-  message
-} from 'antd';
+import Badge from 'antd/es/badge';
+import Button from 'antd/es/button';
+import Empty from 'antd/es/empty';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import List from 'antd/es/list';
+import message from 'antd/es/message';
+import Popconfirm from 'antd/es/popconfirm';
+import Select from 'antd/es/select';
+import Typography from 'antd/es/typography';
 import {
   DeleteOutlined,
   LikeFilled,

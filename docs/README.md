@@ -11,6 +11,7 @@
 - 运行说明：`docs/ops-runbook.md`
 - 架构概览：`docs/arch-overview.md`
 - 数据库：`docs/db-schema.md`
+- 每日资源数据治理手册（先录入后清洗）：`docs/data-cleaning-playbook.md`
 - API：`docs/api/api-reference.md`、`docs/api/sample-payloads.md`
 - 配置/认证/编辑锁：`docs/config-auth.md`
 - 账号与权限：`docs/account-admin.md`

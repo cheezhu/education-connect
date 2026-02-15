@@ -1,5 +1,12 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Table, Button, DatePicker, message, Statistic } from 'antd';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Col from 'antd/es/col';
+import DatePicker from 'antd/es/date-picker';
+import message from 'antd/es/message';
+import Row from 'antd/es/row';
+import Statistic from 'antd/es/statistic';
+import Table from 'antd/es/table';
 import { DownloadOutlined, BarChartOutlined } from '@ant-design/icons';
 import api from '../services/api';
 import dayjs from 'dayjs';

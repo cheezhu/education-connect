@@ -1,20 +1,35 @@
-﻿import React from 'react';
-import { Layout, Result, Spin } from 'antd';
+import React, { Suspense, lazy } from 'react';
+import Layout from 'antd/es/layout';
+import Result from 'antd/es/result';
+import Spin from 'antd/es/spin';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
-import GroupManagementV2 from './pages/GroupManagementV2';
-import LocationManagement from './pages/LocationManagement';
-import Statistics from './pages/Statistics';
-import ItineraryDesigner from './pages/ItineraryDesigner';
-import Settings from './pages/Settings';
-import Login from './pages/Login';
-import UserManagement from './pages/UserManagement';
-import HelpCenter from './pages/HelpCenter';
-import FeedbackCenter from './pages/FeedbackCenter';
 import UnifiedNavbar from './components/UnifiedNavbar';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import './App.css';
 
+const GroupManagementV2 = lazy(() => import('./pages/GroupManagementV2'));
+const LocationManagement = lazy(() => import('./pages/LocationManagement'));
+const Statistics = lazy(() => import('./pages/Statistics'));
+const ItineraryDesigner = lazy(() => import('./pages/ItineraryDesigner'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Login = lazy(() => import('./pages/Login'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
+const HelpCenter = lazy(() => import('./pages/HelpCenter'));
+const FeedbackCenter = lazy(() => import('./pages/FeedbackCenter'));
+
 const { Content } = Layout;
+
+const RouteFallback = () => (
+  <div className="loading-container">
+    <Spin />
+  </div>
+);
+
+const LoginPage = () => (
+  <Suspense fallback={<RouteFallback />}>
+    <Login />
+  </Suspense>
+);
 
 function App() {
   return (
@@ -30,11 +45,7 @@ function ProtectedRoute({ permission, action = 'read', children }) {
   const { user, loading, canAccess } = useAuth();
 
   if (loading) {
-    return (
-      <div className="loading-container">
-        <Spin />
-      </div>
-    );
+    return <RouteFallback />;
   }
 
   if (!user) {
@@ -51,7 +62,7 @@ function ProtectedRoute({ permission, action = 'read', children }) {
     );
   }
 
-  return children;
+  return <Suspense fallback={<RouteFallback />}>{children}</Suspense>;
 }
 
 function AppLayout() {
@@ -68,7 +79,7 @@ function AppLayout() {
       <Layout className="app-main">
         <Content className={`app-content${isFullBleed ? ' app-content--full' : ''}`}>
           <Routes>
-            <Route path="/login" element={<Login />} />
+            <Route path="/login" element={<LoginPage />} />
             <Route
               path="/groups"
               element={(

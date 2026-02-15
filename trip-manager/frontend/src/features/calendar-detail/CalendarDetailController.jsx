@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Alert, Space, message } from 'antd';
+import Alert from 'antd/es/alert';
+import Space from 'antd/es/space';
+import message from 'antd/es/message';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import CalendarDetail from './CalendarDetail';
 import api from '../../services/api';
+import {
+  CALENDAR_DETAIL_ALERT_TEXT,
+  CALENDAR_DETAIL_MESSAGES
+} from './messages';
 import './CalendarDetailController.css';
 
 const getRequestErrorMessage = (error, fallback) => (
@@ -84,11 +90,11 @@ const CalendarDetailController = ({
             scheduleRevisionRef.current = nextRevision;
             onRevisionChange?.(nextRevision);
           }
-          message.warning('检测到排期冲突，已刷新版本，请重试');
+          message.warning(CALENDAR_DETAIL_MESSAGES.saveConflictDetected);
           onRevisionConflict?.();
           return;
         }
-        message.error(getRequestErrorMessage(error, '保存失败，请稍后重试'));
+        message.error(getRequestErrorMessage(error, CALENDAR_DETAIL_MESSAGES.saveFailedFallback));
       }
     }, 500);
   };
@@ -97,8 +103,8 @@ const CalendarDetailController = ({
     <div className="schedule-management">
       {viewMode === 'demo' && (
         <Alert
-          message="Google Calendar 风格日程管理"
-          description="V2 版本核心功能已实现，支持拖拽创建活动、调整时间、冲突检测等。"
+          message={CALENDAR_DETAIL_ALERT_TEXT.featureMessage}
+          description={CALENDAR_DETAIL_ALERT_TEXT.featureDescription}
           type="success"
           icon={<InfoCircleOutlined />}
           showIcon
@@ -129,8 +135,8 @@ const CalendarDetailController = ({
         ) : (
           <>
             <Alert
-              message="演示模式"
-              description="切换到日历视图查看完整的 Google Calendar 风格界面"
+              message={CALENDAR_DETAIL_ALERT_TEXT.demoMessage}
+              description={CALENDAR_DETAIL_ALERT_TEXT.demoDescription}
               type="info"
               style={{ marginBottom: 16 }}
             />

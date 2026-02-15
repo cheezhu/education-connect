@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Button, Checkbox, DatePicker } from 'antd';
+import Button from 'antd/es/button';
+import Checkbox from 'antd/es/checkbox';
+import DatePicker from 'antd/es/date-picker';
 import {
   CalendarOutlined,
   ExportOutlined,

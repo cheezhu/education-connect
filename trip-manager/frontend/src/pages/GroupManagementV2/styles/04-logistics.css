@@ -1015,6 +1015,15 @@
   background: #fcfdfd;
 }
 
+.group-command-center .logistics-handsontable-wrap td.hot-transfer-cell {
+  background: #f7faff;
+}
+
+.group-command-center .logistics-handsontable-wrap td.hot-transfer-cell-disabled {
+  background: #f2f5fa;
+  color: #98a2b3;
+}
+
 .group-command-center .logistics-handsontable-wrap td.hot-cell-placeholder {
   color: #98a2b3 !important;
 }

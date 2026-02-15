@@ -1,5 +1,11 @@
 import React from 'react';
-import { Button, Checkbox, DatePicker, Form, Modal, Select, Upload } from 'antd';
+import Button from 'antd/es/button';
+import Checkbox from 'antd/es/checkbox';
+import DatePicker from 'antd/es/date-picker';
+import Form from 'antd/es/form';
+import Modal from 'antd/es/modal';
+import Select from 'antd/es/select';
+import Upload from 'antd/es/upload';
 import { InboxOutlined } from '@ant-design/icons';
 
 const { Option } = Select;

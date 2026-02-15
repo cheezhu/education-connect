@@ -72,6 +72,17 @@ function findMatches(text) {
     if (matches.length >= 50) break;
   }
 
+  // Heuristic mojibake detection:
+  // If a file contains many suspicious CJK symbols plus typical mojibake punctuation,
+  // it is usually UTF-8/GBK decoding corruption.
+  const suspiciousChars = /[鍍鍋鍑鍒鍓鍙鍚鍛鍜鍝鍥鍧鍩鍪鍭鍮鍯鎴鎵鎸鏂鏃鏉鏋鏍鏂闂闃闄锛銆鈥]/g;
+  const punctuationHint = /[锛銆鈥]/;
+  const hits = text.match(suspiciousChars) || [];
+  if (hits.length >= 20 && punctuationHint.test(text)) {
+    const idx = text.search(suspiciousChars);
+    matches.push({ kind: 'mojibake_pattern', index: idx === -1 ? 0 : idx });
+  }
+
   return matches;
 }
 
@@ -126,4 +137,3 @@ for (const f of findings) {
 }
 
 process.exit(1);
-

@@ -1,5 +1,5 @@
 ﻿import React, { useMemo, useState } from 'react';
-import { message } from 'antd';
+import message from 'antd/es/message';
 import {
   CopyOutlined,
   FileTextOutlined,
@@ -9,10 +9,10 @@ import dayjs from 'dayjs';
 import ItineraryEventRow from './ItineraryEventRow';
 import { resolveSourceMeta } from '../../../../domain/resourceSource';
 import { toMinutes, timeSlotWindows } from '../../../../domain/time';
+import { LEGACY_MEAL_TITLES } from '../../../../domain/shixingConfig';
 
 const safeText = (value) => (value === undefined || value === null ? '' : String(value));
 const normalizeInlineText = (value) => safeText(value).replace(/\s+/g, ' ').trim();
-const LEGACY_MEAL_TITLES = new Set(['早餐', '午餐', '晚餐', '早饭', '午饭', '晚饭']);
 const EMPTY_NOTE_MARKERS = new Set(['-', '--', '---', '—', '——']);
 
 const resolveScheduleNote = (schedule, options = {}) => {

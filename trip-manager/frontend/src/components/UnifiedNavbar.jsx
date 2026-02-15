@@ -1,5 +1,5 @@
 import React from 'react';
-import { Dropdown } from 'antd';
+import Dropdown from 'antd/es/dropdown';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChartOutlined,

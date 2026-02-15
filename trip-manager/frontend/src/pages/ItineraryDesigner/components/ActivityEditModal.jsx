@@ -1,5 +1,10 @@
 import React from 'react';
-import { Button, Card, Form, InputNumber, Modal, Select } from 'antd';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Form from 'antd/es/form';
+import InputNumber from 'antd/es/input-number';
+import Modal from 'antd/es/modal';
+import Select from 'antd/es/select';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
@@ -172,4 +177,3 @@ function ActivityEditModal({
 }
 
 export default ActivityEditModal;
-

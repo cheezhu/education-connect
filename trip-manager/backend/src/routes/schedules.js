@@ -108,7 +108,44 @@ const normalizeScheduleId = (value) => {
   return Math.floor(parsed);
 };
 
-// 鑾峰彇鎸囧畾鍥㈢粍鐨勬棩绋嬭鎯?
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+const normalizeDate = (value) => {
+  const dateText = typeof value === 'string' ? value.trim() : '';
+  if (!DATE_RE.test(dateText)) return null;
+  const parsed = Date.parse(`${dateText}T00:00:00Z`);
+  return Number.isFinite(parsed) ? dateText : null;
+};
+
+const normalizeTime = (value) => {
+  const timeText = typeof value === 'string' ? value.trim() : '';
+  return TIME_RE.test(timeText) ? timeText : null;
+};
+
+const timeToMinutes = (value) => {
+  const normalized = normalizeTime(value);
+  if (!normalized) return null;
+  const [hourText, minuteText] = normalized.split(':');
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  return hour * 60 + minute;
+};
+
+const normalizeLocationId = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.floor(parsed);
+};
+
+const normalizeOptionalText = (value, fallback = '') => {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  return fallback;
+};
+
+// 获取指定团组的日程详情
 router.get('/groups/:groupId/schedules', (req, res) => {
   const groupId = Number(req.params.groupId);
   if (!Number.isFinite(groupId)) {
@@ -198,7 +235,7 @@ router.get('/groups/:groupId/schedules/designer-source', requireRole(['admin']),
   });
 });
 
-// 鑾峰彇鎵€鏈夋棩绋嬶紙璋冭瘯鐢ㄩ€旓級
+// 获取所有日程（调试用途）
 router.get('/schedules', (req, res) => {
   const rows = req.db.prepare(`
     SELECT id, group_id, activity_date, start_time, end_time, type,
@@ -210,7 +247,7 @@ router.get('/schedules', (req, res) => {
   res.json(rows.map(mapScheduleRow));
 });
 
-// 鎵归噺淇濆瓨鍥㈢粍鏃ョ▼锛堟浛鎹㈣鍥㈢粍鐨勫叏閮ㄦ棩绋嬶級
+// 批量保存团组日程（替换该团组全部日程）
 router.post('/groups/:groupId/schedules/batch', requireEditLock, (req, res) => {
   const groupId = Number(req.params.groupId);
   if (!Number.isFinite(groupId)) {
@@ -228,10 +265,44 @@ router.post('/groups/:groupId/schedules/batch', requireEditLock, (req, res) => {
   }
 
   const scheduleList = Array.isArray(req.body.scheduleList) ? req.body.scheduleList : [];
+  const existingScheduleIds = new Set(
+    req.db.prepare('SELECT id FROM schedules WHERE group_id = ?').all(groupId).map((row) => Number(row.id))
+  );
+  const normalizedSchedules = [];
+  for (let i = 0; i < scheduleList.length; i += 1) {
+    const item = scheduleList[i] || {};
+    const date = normalizeDate(item.date);
+    const startTime = normalizeTime(item.startTime);
+    const endTime = normalizeTime(item.endTime);
+    if (!date || !startTime || !endTime) {
+      return res.status(400).json({
+        error: `Invalid schedule at index ${i}: date/startTime/endTime`
+      });
+    }
 
-  const invalid = scheduleList.find((item) => !item.date || !item.startTime || !item.endTime);
-  if (invalid) {
-    return res.status(400).json({ error: 'Missing required schedule fields: date/startTime/endTime' });
+    const startMinutes = timeToMinutes(startTime);
+    const endMinutes = timeToMinutes(endTime);
+    if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes) || startMinutes >= endMinutes) {
+      return res.status(400).json({
+        error: `Invalid schedule at index ${i}: startTime must be earlier than endTime`
+      });
+    }
+
+    const normalizedId = normalizeScheduleId(item.id);
+    normalizedSchedules.push({
+      id: normalizedId && existingScheduleIds.has(normalizedId) ? normalizedId : null,
+      date,
+      startTime,
+      endTime,
+      type: normalizeOptionalText(item.type, 'visit'),
+      title: normalizeOptionalText(item.title, ''),
+      location: normalizeOptionalText(item.location, ''),
+      description: normalizeOptionalText(item.description, ''),
+      color: normalizeOptionalText(item.color, null),
+      resourceId: normalizeOptionalText(item.resourceId, null),
+      isFromResource: item.isFromResource ? 1 : 0,
+      locationId: normalizeLocationId(item.locationId)
+    });
   }
 
   const insert = req.db.prepare(`
@@ -251,25 +322,25 @@ router.post('/groups/:groupId/schedules/batch', requireEditLock, (req, res) => {
 
     items.forEach((item) => {
       insert.run({
-        id: normalizeScheduleId(item.id),
+        id: item.id,
         groupId,
         date: item.date,
         startTime: item.startTime,
         endTime: item.endTime,
-        type: item.type || 'visit',
-        title: item.title || '',
-        location: item.location || '',
-        description: item.description || '',
-        color: item.color || null,
-        resourceId: item.resourceId || null,
-        isFromResource: item.isFromResource ? 1 : 0,
-        locationId: item.locationId ?? null
+        type: item.type,
+        title: item.title,
+        location: item.location,
+        description: item.description,
+        color: item.color,
+        resourceId: item.resourceId,
+        isFromResource: item.isFromResource,
+        locationId: item.locationId
       });
     });
   });
 
   try {
-    replaceAll(scheduleList);
+    replaceAll(normalizedSchedules);
 
     const nextRevision = bumpScheduleRevision(req.db, groupId);
 

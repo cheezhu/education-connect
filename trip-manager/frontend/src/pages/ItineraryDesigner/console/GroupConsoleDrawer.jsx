@@ -1,5 +1,6 @@
 import React from 'react';
-import { Button, Drawer } from 'antd';
+import Button from 'antd/es/button';
+import Drawer from 'antd/es/drawer';
 import { CloseOutlined, DragOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
@@ -259,4 +260,3 @@ function GroupConsoleDrawer({
 }
 
 export default GroupConsoleDrawer;
-

@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Form, Input, Modal, Select, message } from 'antd';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import Modal from 'antd/es/modal';
+import Select from 'antd/es/select';
+import message from 'antd/es/message';
 import api from '../../../../services/api';
 import MemberRow from './MemberRow';
 

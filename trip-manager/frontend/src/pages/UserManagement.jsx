@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Form, Input, Modal, Select, Table, Tag, Typography, message } from 'antd';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import message from 'antd/es/message';
+import Modal from 'antd/es/modal';
+import Select from 'antd/es/select';
+import Table from 'antd/es/table';
+import Tag from 'antd/es/tag';
+import Typography from 'antd/es/typography';
 import api from '../services/api';
 
 const { Text } = Typography;

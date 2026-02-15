@@ -1,21 +1,19 @@
 ﻿import React, { useEffect, useState } from 'react';
-import {
-  Button,
-  Card,
-  Checkbox,
-  Col,
-  DatePicker,
-  Form,
-  Popconfirm,
-  Row,
-  Space,
-  Table,
-  Tag,
-  Typography,
-  Switch,
-  message,
-  Result
-} from 'antd';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Checkbox from 'antd/es/checkbox';
+import Col from 'antd/es/col';
+import DatePicker from 'antd/es/date-picker';
+import Form from 'antd/es/form';
+import message from 'antd/es/message';
+import Popconfirm from 'antd/es/popconfirm';
+import Result from 'antd/es/result';
+import Row from 'antd/es/row';
+import Space from 'antd/es/space';
+import Switch from 'antd/es/switch';
+import Table from 'antd/es/table';
+import Tag from 'antd/es/tag';
+import Typography from 'antd/es/typography';
 import dayjs from 'dayjs';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';

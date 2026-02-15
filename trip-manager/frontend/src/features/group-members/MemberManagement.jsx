@@ -1,21 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Table,
-  Button,
-  Space,
-  Modal,
-  Form,
-  Input,
-  Select,
-  message,
-  Tag,
-  Popconfirm,
-  Upload,
-  Card,
-  Row,
-  Col,
-  Statistic
-} from 'antd';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Col from 'antd/es/col';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import message from 'antd/es/message';
+import Modal from 'antd/es/modal';
+import Popconfirm from 'antd/es/popconfirm';
+import Row from 'antd/es/row';
+import Select from 'antd/es/select';
+import Space from 'antd/es/space';
+import Statistic from 'antd/es/statistic';
+import Table from 'antd/es/table';
+import Tag from 'antd/es/tag';
+import Upload from 'antd/es/upload';
 import {
   PlusOutlined,
   DeleteOutlined,

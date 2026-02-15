@@ -1,6 +1,10 @@
 export type GroupType = 'primary' | 'secondary' | 'vip' | string;
 
 export type MustVisitMode = 'plan' | 'manual' | string;
+import {
+  GROUP_TYPE_DISPLAY_ALIASES,
+  GROUP_TYPE_LABELS
+} from '../../../shared/domain/groupMeta.mjs';
 
 // Backend returns mostly snake_case for groups (see backend/src/routes/groups.js hydrateGroup()).
 export type Group = {
@@ -46,16 +50,14 @@ const normalizeGroupType = (type: GroupType | null | undefined): string => {
 
   if (
     normalized === 'primary'
-    || raw === '\u5c0f\u5b66'
-    || raw === '\u5c0f\u5b78'
+    || GROUP_TYPE_DISPLAY_ALIASES.primary.includes(raw)
   ) {
     return 'primary';
   }
 
   if (
     normalized === 'secondary'
-    || raw === '\u4e2d\u5b66'
-    || raw === '\u4e2d\u5b78'
+    || GROUP_TYPE_DISPLAY_ALIASES.secondary.includes(raw)
   ) {
     return 'secondary';
   }
@@ -70,9 +72,9 @@ const normalizeGroupType = (type: GroupType | null | undefined): string => {
 export const getGroupTypeLabel = (type: GroupType | null | undefined): string => {
   const normalized = normalizeGroupType(type);
   if (!normalized) return '';
-  if (normalized === 'primary') return '\u5c0f\u5b66';
-  if (normalized === 'secondary') return '\u4e2d\u5b66';
-  if (normalized === 'vip') return 'VIP';
+  if (normalized === 'primary' || normalized === 'secondary' || normalized === 'vip') {
+    return GROUP_TYPE_LABELS[normalized];
+  }
   return String(type);
 };
 

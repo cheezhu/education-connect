@@ -1,5 +1,7 @@
 import React from 'react';
-import { Button, Modal, Tooltip } from 'antd';
+import Button from 'antd/es/button';
+import Modal from 'antd/es/modal';
+import Tooltip from 'antd/es/tooltip';
 import { CloseOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
@@ -87,4 +89,3 @@ function GroupCalendarDetailModal({
 }
 
 export default GroupCalendarDetailModal;
-

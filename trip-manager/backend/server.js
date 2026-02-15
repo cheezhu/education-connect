@@ -8,6 +8,7 @@ const dotenv = require('dotenv');
 const { requireRole, requireAccess } = require('./src/middleware/permission');
 const { startAutoSnapshotScheduler } = require('./src/services/versionSnapshots');
 const { publishChange } = require('./src/realtime/hub');
+const { normalizeGroupType, isValidGroupType } = require('./src/services/groups/groupHelpers');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -157,6 +158,27 @@ db.exec(`
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE TABLE IF NOT EXISTS resource_restaurants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    address TEXT,
+    city TEXT,
+    notes TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS resource_flights (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    flight_no TEXT,
+    airline TEXT,
+    notes TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE INDEX IF NOT EXISTS idx_logistics_days_group_date ON group_logistics_days(group_id, activity_date);
   CREATE INDEX IF NOT EXISTS idx_logistics_meals_day_type ON group_logistics_meals(day_id, meal_type);
   CREATE INDEX IF NOT EXISTS idx_logistics_meals_resource ON group_logistics_meals(resource_id);
@@ -168,6 +190,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_resource_hotels_city ON resource_hotels(city);
   CREATE INDEX IF NOT EXISTS idx_resource_hotels_name ON resource_hotels(name);
   CREATE INDEX IF NOT EXISTS idx_resource_vehicles_plate ON resource_vehicles(plate);
+  CREATE INDEX IF NOT EXISTS idx_resource_restaurants_name ON resource_restaurants(name);
+  CREATE INDEX IF NOT EXISTS idx_resource_restaurants_address ON resource_restaurants(address);
+  CREATE INDEX IF NOT EXISTS idx_resource_flights_no ON resource_flights(flight_no);
+  CREATE INDEX IF NOT EXISTS idx_resource_flights_airline ON resource_flights(airline);
 `);
 
 db.exec(`
@@ -318,10 +344,20 @@ db.exec("UPDATE groups SET must_visit_mode = 'plan' WHERE must_visit_mode NOT IN
 db.exec("UPDATE groups SET manual_must_visit_location_ids = '[]' WHERE manual_must_visit_location_ids IS NULL OR TRIM(manual_must_visit_location_ids) = ''");
 db.exec("UPDATE groups SET notes_images = '[]' WHERE notes_images IS NULL OR TRIM(notes_images) = ''");
 db.exec("UPDATE groups SET group_code = 'TG' || printf('%06d', id) WHERE group_code IS NULL OR TRIM(group_code) = ''");
-// Normalize historical/non-canonical type values to avoid mojibake in UI.
-db.exec("UPDATE groups SET type = 'primary' WHERE type IN ('小学', '小學', '灏忓', 'å°å­¦')");
-db.exec("UPDATE groups SET type = 'secondary' WHERE type IN ('中学', '中學', '涓', 'ä¸­å­¦')");
-db.exec("UPDATE groups SET type = 'vip' WHERE lower(trim(type)) = 'vip'");
+// Normalize legacy/non-canonical type values once at startup to keep DB values canonical.
+const normalizeStoredGroupTypes = () => {
+  const rows = db.prepare('SELECT id, type FROM groups').all();
+  if (!Array.isArray(rows) || rows.length === 0) return;
+
+  const updateStmt = db.prepare('UPDATE groups SET type = ? WHERE id = ?');
+  rows.forEach((row) => {
+    const normalizedType = normalizeGroupType(row?.type);
+    if (!normalizedType || !isValidGroupType(normalizedType)) return;
+    if (normalizedType === row?.type) return;
+    updateStmt.run(normalizedType, row.id);
+  });
+};
+normalizeStoredGroupTypes();
 db.exec(`
   WITH duplicate_codes AS (
     SELECT group_code
@@ -551,7 +587,7 @@ app.use((err, req, res, next) => {
       message: 'Request payload is too large. Please upload fewer/smaller images.'
     });
   }
-  res.status(Number.isFinite(status) ? status : 500).json({ 
+  res.status(Number.isFinite(status) ? status : 500).json({
     error: '服务器错误',
     message: process.env.NODE_ENV === 'development' ? err.message : undefined
   });

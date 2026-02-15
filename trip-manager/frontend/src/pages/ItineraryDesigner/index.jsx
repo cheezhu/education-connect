@@ -1,5 +1,5 @@
 ﻿﻿﻿﻿﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Result } from 'antd';
+import Result from 'antd/es/result';
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import dayjs from 'dayjs';

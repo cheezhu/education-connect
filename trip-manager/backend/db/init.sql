@@ -1,6 +1,6 @@
--- 研学行程管理系统数据库初始化脚本
+﻿-- 鐮斿琛岀▼绠＄悊绯荤粺鏁版嵁搴撳垵濮嬪寲鑴氭湰
 
--- 1. 用户表
+-- 1. 鐢ㄦ埛琛?
 CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE users (
     last_login DATETIME
 );
 
--- 2. 团组表
+-- 2. 鍥㈢粍琛?
 CREATE TABLE groups (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name VARCHAR(200) NOT NULL,
@@ -40,7 +40,7 @@ CREATE TABLE groups (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. 参访地点表
+-- 3. 鍙傝鍦扮偣琛?
 CREATE TABLE locations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name VARCHAR(200) NOT NULL,
@@ -50,16 +50,15 @@ CREATE TABLE locations (
     color VARCHAR(20) DEFAULT '#1890ff',
     contact_person VARCHAR(100),
     contact_phone VARCHAR(20),
-    blocked_weekdays VARCHAR(20), -- '3,4' 表示周三周四不可用
-    open_hours TEXT, -- JSON: { "default": [{"start":9,"end":17}], "3": [{"start":9,"end":12}] }
+    blocked_weekdays VARCHAR(20), -- '3,4' 琛ㄧず鍛ㄤ笁鍛ㄥ洓涓嶅彲鐢?    open_hours TEXT, -- JSON: { "default": [{"start":9,"end":17}], "3": [{"start":9,"end":12}] }
     closed_dates TEXT, -- JSON: ["2025-01-01"]
-    target_groups VARCHAR(20), -- 'primary' 或 'secondary' 或 'all'
+    target_groups VARCHAR(20), -- 'primary' 鎴?'secondary' 鎴?'all'
     notes TEXT,
     is_active BOOLEAN DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4. 活动安排表
+-- 4. 娲诲姩瀹夋帓琛?
 CREATE TABLE activities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     schedule_id INTEGER,
@@ -74,7 +73,7 @@ CREATE TABLE activities (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4.5 日程详情表（团组日历详情）
+-- 4.5 鏃ョ▼璇︽儏琛紙鍥㈢粍鏃ュ巻璇︽儏锛?
 CREATE TABLE schedules (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
@@ -93,7 +92,7 @@ CREATE TABLE schedules (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4.8 每日卡片主表
+-- 4.8 姣忔棩鍗＄墖涓昏〃
 CREATE TABLE group_logistics_days (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
@@ -120,7 +119,7 @@ CREATE TABLE group_logistics_days (
     UNIQUE(group_id, activity_date)
 );
 
--- 4.9 每日卡片-餐饮
+-- 4.9 姣忔棩鍗＄墖-椁愰ギ
 CREATE TABLE group_logistics_meals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     day_id INTEGER NOT NULL REFERENCES group_logistics_days(id) ON DELETE CASCADE,
@@ -138,7 +137,7 @@ CREATE TABLE group_logistics_meals (
     UNIQUE(day_id, meal_type)
 );
 
--- 4.10 每日卡片-接送站
+-- 4.10 姣忔棩鍗＄墖-鎺ラ€佺珯
 CREATE TABLE group_logistics_transfers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     day_id INTEGER NOT NULL REFERENCES group_logistics_days(id) ON DELETE CASCADE,
@@ -159,8 +158,7 @@ CREATE TABLE group_logistics_transfers (
     UNIQUE(day_id, transfer_type)
 );
 
--- 4.11 自定义资源模板（资源库-其他）
-CREATE TABLE group_schedule_templates (
+-- 4.11 鑷畾涔夎祫婧愭ā鏉匡紙璧勬簮搴?鍏朵粬锛?CREATE TABLE group_schedule_templates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     template_hash TEXT NOT NULL,
@@ -173,8 +171,7 @@ CREATE TABLE group_schedule_templates (
     UNIQUE(group_id, template_hash)
 );
 
--- 4.12 人员资源（司机/导游/安保）
-CREATE TABLE resource_people (
+-- 4.12 浜哄憳璧勬簮锛堝徃鏈?瀵兼父/瀹変繚锛?CREATE TABLE resource_people (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     role TEXT CHECK(role IN ('driver', 'guide', 'security')) NOT NULL,
     name TEXT NOT NULL,
@@ -185,7 +182,7 @@ CREATE TABLE resource_people (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4.13 住宿资源（酒店）
+-- 4.13 浣忓璧勬簮锛堥厭搴楋級
 CREATE TABLE resource_hotels (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -201,21 +198,30 @@ CREATE TABLE resource_hotels (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4.14 车辆资源
-CREATE TABLE resource_vehicles (
+-- 4.14 杞﹁締璧勬簮
+
+
+CREATE TABLE resource_restaurants (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    plate TEXT NOT NULL,
-    brand TEXT,
-    model TEXT,
-    seats INTEGER,
+    name TEXT,
+    address TEXT,
+    city TEXT,
     notes TEXT,
     is_active BOOLEAN DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4.6 行程方案表
-CREATE TABLE itinerary_plans (
+CREATE TABLE resource_flights (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    flight_no TEXT,
+    airline TEXT,
+    notes TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+琛岀▼鏂规琛?CREATE TABLE itinerary_plans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name VARCHAR(200) NOT NULL,
     description TEXT,
@@ -230,8 +236,7 @@ CREATE TABLE itinerary_plan_items (
     sort_order INTEGER NOT NULL DEFAULT 0
 );
 
--- 4.7 团组成员表
-CREATE TABLE group_members (
+-- 4.7 鍥㈢粍鎴愬憳琛?CREATE TABLE group_members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
@@ -248,7 +253,7 @@ CREATE TABLE group_members (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4.8 意见反馈主表
+-- 4.8 鎰忚鍙嶉涓昏〃
 CREATE TABLE feedback_posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -262,7 +267,7 @@ CREATE TABLE feedback_posts (
     resolved_at DATETIME
 );
 
--- 4.9 意见反馈评论
+-- 4.9 鎰忚鍙嶉璇勮
 CREATE TABLE feedback_comments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER NOT NULL REFERENCES feedback_posts(id) ON DELETE CASCADE,
@@ -273,7 +278,7 @@ CREATE TABLE feedback_comments (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4.10 意见反馈点赞
+-- 4.10 鎰忚鍙嶉鐐硅禐
 CREATE TABLE feedback_reactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER NOT NULL REFERENCES feedback_posts(id) ON DELETE CASCADE,
@@ -283,7 +288,7 @@ CREATE TABLE feedback_reactions (
     UNIQUE(post_id, username, reaction_type)
 );
 
--- 5. 编辑锁表
+-- 5. 缂栬緫閿佽〃
 CREATE TABLE edit_lock (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     locked_by VARCHAR(50),
@@ -292,7 +297,7 @@ CREATE TABLE edit_lock (
     auto_release_at DATETIME
 );
 
--- 6. 系统配置表
+-- 6. 绯荤粺閰嶇疆琛?
 CREATE TABLE system_config (
     key VARCHAR(50) PRIMARY KEY,
     value TEXT,
@@ -300,7 +305,7 @@ CREATE TABLE system_config (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 创建索引优化查询性能
+-- 鍒涘缓绱㈠紩浼樺寲鏌ヨ鎬ц兘
 CREATE INDEX idx_activities_date ON activities(activity_date);
 CREATE INDEX idx_activities_group ON activities(group_id);
 CREATE INDEX idx_activities_location ON activities(location_id);
@@ -322,13 +327,17 @@ CREATE INDEX idx_resource_people_name ON resource_people(name);
 CREATE INDEX idx_resource_hotels_city ON resource_hotels(city);
 CREATE INDEX idx_resource_hotels_name ON resource_hotels(name);
 CREATE INDEX idx_resource_vehicles_plate ON resource_vehicles(plate);
+CREATE INDEX idx_resource_restaurants_name ON resource_restaurants(name);
+CREATE INDEX idx_resource_restaurants_address ON resource_restaurants(address);
+CREATE INDEX idx_resource_flights_no ON resource_flights(flight_no);
+CREATE INDEX idx_resource_flights_airline ON resource_flights(airline);
 CREATE INDEX idx_feedback_posts_status ON feedback_posts(status);
 CREATE INDEX idx_feedback_posts_module ON feedback_posts(module_key);
 CREATE INDEX idx_feedback_posts_pinned ON feedback_posts(is_pinned, created_at DESC);
 CREATE INDEX idx_feedback_comments_post ON feedback_comments(post_id, created_at);
 CREATE INDEX idx_feedback_reactions_post ON feedback_reactions(post_id, reaction_type);
 
--- 创建视图简化查询
+-- 鍒涘缓瑙嗗浘绠€鍖栨煡璇?
 CREATE VIEW calendar_view AS
 SELECT 
     a.id,
@@ -347,30 +356,31 @@ JOIN groups g ON a.group_id = g.id
 LEFT JOIN locations l ON a.location_id = l.id
 ORDER BY a.activity_date, a.time_slot;
 
--- 插入默认用户
+-- 鎻掑叆榛樿鐢ㄦ埛
 INSERT INTO users (username, password, display_name, role) VALUES
-('admin', '$2b$10$7RRAOCIs.j63Y7g/i6wnpu6xQeJ1d8qjgISCI1TYkGYf8l2PfbzSq', '系统管理员', 'admin'),
-('viewer1', '$2b$10$7RRAOCIs.j63Y7g/i6wnpu6xQeJ1d8qjgISCI1TYkGYf8l2PfbzSq', '查看用户1', 'viewer');
+('admin', '$2b$10$7RRAOCIs.j63Y7g/i6wnpu6xQeJ1d8qjgISCI1TYkGYf8l2PfbzSq', '绯荤粺绠＄悊鍛?, 'admin'),
+('viewer1', '$2b$10$7RRAOCIs.j63Y7g/i6wnpu6xQeJ1d8qjgISCI1TYkGYf8l2PfbzSq', '鏌ョ湅鐢ㄦ埛1', 'viewer');
 
--- 插入默认地点
+-- 鎻掑叆榛樿鍦扮偣
 INSERT INTO locations (name, capacity, blocked_weekdays, target_groups, address) VALUES
-('香港科学馆', 200, '4', 'all', '尖沙咀科学馆道2号'),
-('香港警队博物馆', 100, '', 'primary', '山顶甘道27号'),
-('诺亚方舟', 150, '3', 'all', '新界马湾珀欣路33号'),
-('香港海洋公园', 500, '', 'all', '香港仔黄竹坑道180号'),
-('西九文化区', 300, '', 'all', '西九龙文化区'),
-('香港太空馆', 100, '', 'all', '尖沙咀梳士巴利道10号'),
-('香港大学', 150, '', 'all', '薄扶林道'),
-('驻港部队展览中心', 100, '', 'secondary', '中环军营');
+('棣欐腐绉戝棣?, 200, '4', 'all', '灏栨矙鍜€绉戝棣嗛亾2鍙?),
+('棣欐腐璀﹂槦鍗氱墿棣?, 100, '', 'primary', '灞遍《鐢橀亾27鍙?),
+('璇轰簹鏂硅垷', 150, '3', 'all', '鏂扮晫椹咕鐝€娆ｈ矾33鍙?),
+('棣欐腐娴锋磱鍏洯', 500, '', 'all', '棣欐腐浠旈粍绔瑰潙閬?80鍙?),
+('瑗夸節鏂囧寲鍖?, 300, '', 'all', '瑗夸節榫欐枃鍖栧尯'),
+('棣欐腐澶┖棣?, 100, '', 'all', '灏栨矙鍜€姊冲＋宸村埄閬?0鍙?),
+('棣欐腐澶у', 150, '', 'all', '钖勬壎鏋楅亾'),
+('椹绘腐閮ㄩ槦灞曡涓績', 100, '', 'secondary', '涓幆鍐涜惀');
 
--- 初始化编辑锁
+-- 鍒濆鍖栫紪杈戦攣
 INSERT INTO edit_lock (id, locked_by, locked_at, expires_at) 
 VALUES (1, NULL, NULL, NULL);
 
--- 系统配置
+-- 绯荤粺閰嶇疆
 INSERT INTO system_config (key, value, description) VALUES
-('lock_timeout', '300', '编辑锁超时时间（秒）'),
-('auto_backup', 'true', '是否自动备份'),
-('backup_time', '02:00', '自动备份时间'),
-('max_groups', '100', '最大团组数量'),
-('itinerary_group_row_align', 'true', '行程设计器团组行对齐');
+('lock_timeout', '300', '缂栬緫閿佽秴鏃舵椂闂达紙绉掞級'),
+('auto_backup', 'true', '鏄惁鑷姩澶囦唤'),
+('backup_time', '02:00', '鑷姩澶囦唤鏃堕棿'),
+('max_groups', '100', '鏈€澶у洟缁勬暟閲?),
+('itinerary_group_row_align', 'true', '琛岀▼璁捐鍣ㄥ洟缁勮瀵归綈');
+

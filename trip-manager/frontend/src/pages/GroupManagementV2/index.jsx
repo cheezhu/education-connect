@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useState } from 'react';
-import { message } from 'antd';
+import message from 'antd/es/message';
 import { useLocation } from 'react-router-dom';
 import GroupList from './components/Sidebar/GroupList';
 import TabBar from './components/Detail/TabBar';

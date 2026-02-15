@@ -345,6 +345,96 @@ router.post('/groups/:groupId/logistics', requireEditLock, (req, res) => {
     WHERE id = ?
   `);
 
+  const selectRestaurantByNameAddress = req.db.prepare(`
+    SELECT id, name, address
+    FROM resource_restaurants
+    WHERE name = ? AND address = ?
+    ORDER BY id DESC
+    LIMIT 1
+  `);
+
+  const selectRestaurantByName = req.db.prepare(`
+    SELECT id, name, address
+    FROM resource_restaurants
+    WHERE name = ?
+    ORDER BY id DESC
+    LIMIT 1
+  `);
+
+  const selectRestaurantByAddress = req.db.prepare(`
+    SELECT id, name, address
+    FROM resource_restaurants
+    WHERE address = ?
+    ORDER BY id DESC
+    LIMIT 1
+  `);
+
+  const insertRestaurant = req.db.prepare(`
+    INSERT INTO resource_restaurants (name, address, city, notes, is_active)
+    VALUES (?, ?, ?, '', 1)
+  `);
+
+  const updateRestaurant = req.db.prepare(`
+    UPDATE resource_restaurants
+    SET
+      name = CASE WHEN name IS NULL OR name = '' THEN ? ELSE name END,
+      address = CASE WHEN address IS NULL OR address = '' THEN ? ELSE address END,
+      city = CASE WHEN city IS NULL OR city = '' THEN ? ELSE city END,
+      is_active = 1,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+
+  const updateRestaurantActive = req.db.prepare(`
+    UPDATE resource_restaurants
+    SET is_active = 1, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+
+  const selectFlightByNoAirline = req.db.prepare(`
+    SELECT id, flight_no, airline
+    FROM resource_flights
+    WHERE flight_no = ? AND airline = ?
+    ORDER BY id DESC
+    LIMIT 1
+  `);
+
+  const selectFlightByNo = req.db.prepare(`
+    SELECT id, flight_no, airline
+    FROM resource_flights
+    WHERE flight_no = ?
+    ORDER BY id DESC
+    LIMIT 1
+  `);
+
+  const selectFlightByAirlineOnly = req.db.prepare(`
+    SELECT id, flight_no, airline
+    FROM resource_flights
+    WHERE airline = ? AND (flight_no IS NULL OR flight_no = '')
+    ORDER BY id DESC
+    LIMIT 1
+  `);
+
+  const insertFlight = req.db.prepare(`
+    INSERT INTO resource_flights (flight_no, airline, notes, is_active)
+    VALUES (?, ?, '', 1)
+  `);
+
+  const updateFlightAirline = req.db.prepare(`
+    UPDATE resource_flights
+    SET
+      airline = CASE WHEN airline IS NULL OR airline = '' THEN ? ELSE airline END,
+      is_active = 1,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+
+  const updateFlightActive = req.db.prepare(`
+    UPDATE resource_flights
+    SET is_active = 1, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+
   const replaceAll = req.db.transaction((items) => {
     req.db.prepare('DELETE FROM group_logistics_days WHERE group_id = ?').run(groupId);
 
@@ -401,6 +491,73 @@ router.post('/groups/:groupId/logistics', requireEditLock, (req, res) => {
         insertVehicle.run(cleanPlate);
       } else {
         updateVehicle.run(row.id);
+      }
+    };
+
+    const upsertRestaurant = (name, address, city) => {
+      const cleanName = normalizeText(name);
+      const cleanAddress = normalizeText(address);
+      if (!cleanName && !cleanAddress) return;
+      const cleanCity = normalizeText(city);
+
+      let row = null;
+      if (cleanName && cleanAddress) {
+        row = selectRestaurantByNameAddress.get(cleanName, cleanAddress);
+      }
+      if (!row && cleanName) {
+        row = selectRestaurantByName.get(cleanName);
+      }
+      if (!row && cleanAddress) {
+        row = selectRestaurantByAddress.get(cleanAddress);
+      }
+
+      if (!row) {
+        insertRestaurant.run(cleanName || cleanAddress, cleanAddress || null, cleanCity || null);
+        return;
+      }
+
+      if (cleanName && cleanAddress && row.name && row.address && (row.name !== cleanName || row.address !== cleanAddress)) {
+        insertRestaurant.run(cleanName, cleanAddress, cleanCity || null);
+        return;
+      }
+
+      if (cleanName || cleanAddress || cleanCity) {
+        updateRestaurant.run(cleanName || null, cleanAddress || null, cleanCity || null, row.id);
+      } else {
+        updateRestaurantActive.run(row.id);
+      }
+    };
+
+    const upsertFlight = (flightNo, airline) => {
+      const cleanFlightNo = normalizeText(flightNo).toUpperCase();
+      const cleanAirline = normalizeText(airline);
+      if (!cleanFlightNo && !cleanAirline) return;
+
+      let row = null;
+      if (cleanFlightNo && cleanAirline) {
+        row = selectFlightByNoAirline.get(cleanFlightNo, cleanAirline);
+      }
+      if (!row && cleanFlightNo) {
+        row = selectFlightByNo.get(cleanFlightNo);
+      }
+      if (!row && cleanAirline && !cleanFlightNo) {
+        row = selectFlightByAirlineOnly.get(cleanAirline);
+      }
+
+      if (!row) {
+        insertFlight.run(cleanFlightNo || '', cleanAirline || '');
+        return;
+      }
+
+      if (cleanFlightNo && cleanAirline && row.airline && row.airline !== cleanAirline) {
+        insertFlight.run(cleanFlightNo, cleanAirline);
+        return;
+      }
+
+      if (cleanAirline && (!row.airline || row.airline === '')) {
+        updateFlightAirline.run(cleanAirline, row.id);
+      } else {
+        updateFlightActive.run(row.id);
       }
     };
 
@@ -493,6 +650,19 @@ router.post('/groups/:groupId/logistics', requireEditLock, (req, res) => {
       upsertPerson('driver', item.vehicle?.driver || item.vehicle?.name, item.vehicle?.phone);
       upsertPerson('guide', item.guide?.name || item.guide, item.guide?.phone);
       upsertPerson('security', item.security?.name || item.security, item.security?.phone);
+
+      ['breakfast', 'lunch', 'dinner'].forEach((key) => {
+        const mealDisabled = Boolean(meals[`${key}_disabled`]);
+        if (mealDisabled) return;
+        upsertRestaurant(
+          meals[key],
+          meals[`${key}_place`],
+          item.city || item.arrival_city || item.departure_city
+        );
+      });
+
+      upsertFlight(item.pickup?.flight_no, item.pickup?.airline);
+      upsertFlight(item.dropoff?.flight_no, item.dropoff?.airline);
     });
   });
 

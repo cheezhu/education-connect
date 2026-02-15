@@ -1,5 +1,10 @@
 import React from 'react';
-import { Button, DatePicker, Form, Modal, Select, Tooltip } from 'antd';
+import Button from 'antd/es/button';
+import DatePicker from 'antd/es/date-picker';
+import Form from 'antd/es/form';
+import Modal from 'antd/es/modal';
+import Select from 'antd/es/select';
+import Tooltip from 'antd/es/tooltip';
 
 const { Option } = Select;
 

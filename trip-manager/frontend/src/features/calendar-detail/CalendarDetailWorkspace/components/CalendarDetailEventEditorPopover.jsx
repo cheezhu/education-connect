@@ -8,6 +8,13 @@ import {
 } from '../../../../domain/resourceId';
 import { resolveSourceMetaByKind } from '../../../../domain/resourceSource';
 import { formatShixingResourceDetail } from '../../../../domain/shixingResource';
+import {
+  LEGACY_MEAL_TITLES,
+  SHIXING_MEAL_DEFAULTS,
+  SHIXING_MEAL_KEYS,
+  SHIXING_MEAL_LABELS,
+  SHIXING_TRANSFER_LABELS
+} from '../../../../domain/shixingConfig';
 
 const DEFAULT_WIDTH = 420;
 const GAP = 10;
@@ -25,22 +32,6 @@ const COLOR_SWATCHES = [
   '#8c8c8c'
 ];
 const MEAL_DEFAULT_COLOR = '#52c41a';
-const LEGACY_MEAL_TITLES = new Set(['早餐', '午餐', '晚餐', '早饭', '午饭', '晚饭']);
-const SHIXING_MEAL_KEYS = ['breakfast', 'lunch', 'dinner'];
-const SHIXING_MEAL_LABELS = {
-  breakfast: '早餐',
-  lunch: '午餐',
-  dinner: '晚餐'
-};
-const SHIXING_TRANSFER_LABELS = {
-  pickup: '接站',
-  dropoff: '送站'
-};
-const SHIXING_MEAL_DEFAULTS = {
-  breakfast: { start: '07:30', end: '08:30' },
-  lunch: { start: '12:00', end: '13:00' },
-  dinner: { start: '18:00', end: '19:00' }
-};
 
 const buildMealState = (drafts = {}) => {
   const result = {};

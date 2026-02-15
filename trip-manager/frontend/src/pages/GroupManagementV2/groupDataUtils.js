@@ -8,27 +8,14 @@ import {
 } from '../../domain/resourceId';
 import { toMinutes } from '../../domain/time';
 import { hashString } from '../../domain/hash';
+import {
+  LEGACY_MEAL_TITLES,
+  SHIXING_MEAL_DEFAULTS,
+  SHIXING_MEAL_LABELS
+} from '../../domain/shixingConfig';
 
-export const SHIXING_MEAL_DEFAULTS = {
-  breakfast: { start: '07:30', end: '08:30' },
-  lunch: { start: '12:00', end: '13:00' },
-  dinner: { start: '18:00', end: '19:00' }
-};
-
-export const MEAL_LABELS = {
-  breakfast: '早餐',
-  lunch: '午餐',
-  dinner: '晚餐'
-};
-
-export const LEGACY_MEAL_TITLES = new Set([
-  '早餐',
-  '午餐',
-  '晚餐',
-  '早饭',
-  '午饭',
-  '晚饭'
-]);
+export { SHIXING_MEAL_DEFAULTS, LEGACY_MEAL_TITLES };
+export const MEAL_LABELS = SHIXING_MEAL_LABELS;
 
 export const GROUP_UPDATE_FIELDS = [
   'name',

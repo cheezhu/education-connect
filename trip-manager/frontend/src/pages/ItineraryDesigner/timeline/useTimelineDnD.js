@@ -1,4 +1,4 @@
-import { message } from 'antd';
+import message from 'antd/es/message';
 import { useCallback, useState } from 'react';
 
 import { getLocationUnavailableReason } from '../shared/locationAvailability';
@@ -99,4 +99,3 @@ export default function useTimelineDnD({
     handleDrop
   };
 }
-

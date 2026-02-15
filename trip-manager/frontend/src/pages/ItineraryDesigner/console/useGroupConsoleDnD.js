@@ -1,4 +1,5 @@
-import { Modal, message } from 'antd';
+import message from 'antd/es/message';
+import Modal from 'antd/es/modal';
 import { useCallback, useState } from 'react';
 
 import { isDateWithinGroupRange } from '../shared/groupRules';
@@ -221,4 +222,3 @@ export default function useGroupConsoleDnD({
     onClearSlot
   };
 }
-

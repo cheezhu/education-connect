@@ -4,12 +4,14 @@ const requireEditLock = require('../middleware/editLock');
 const { bumpScheduleRevision } = require('../utils/scheduleRevision');
 const {
   CANCELLED_STATUS,
+  GROUP_TYPE_VALUES,
   assignGroupCodeById,
   hydrateGroup,
   normalizeGroupPayload,
   isValidGroupType,
   buildGroupUpdateMutation
 } = require('../services/groups/groupHelpers');
+const INVALID_GROUP_TYPE_MESSAGE = `团组类型无效（仅支持 ${GROUP_TYPE_VALUES.join('/')}）`;
 
 router.get('/', (req, res) => {
   const groups = req.db.prepare('SELECT * FROM groups ORDER BY created_at DESC').all();
@@ -19,7 +21,7 @@ router.get('/', (req, res) => {
 router.get('/:id', (req, res) => {
   const group = req.db.prepare('SELECT * FROM groups WHERE id = ?').get(req.params.id);
   if (!group) {
-    return res.status(404).json({ error: '\u56e2\u7ec4\u4e0d\u5b58\u5728' });
+    return res.status(404).json({ error: '团组不存在' });
   }
   res.json(hydrateGroup(group));
 });
@@ -52,7 +54,7 @@ router.post('/batch', requireEditLock, (req, res) => {
         throw new Error(`第 ${index + 1} 行缺少必要字段`);
       }
       if (!isValidGroupType(normalized.type)) {
-        throw new Error(`第 ${index + 1} 行团组类型无效（仅支持 primary/secondary/vip）`);
+        throw new Error(`第 ${index + 1} 行${INVALID_GROUP_TYPE_MESSAGE}`);
       }
 
       const result = insertStmt.run(
@@ -98,11 +100,11 @@ router.post('/', requireEditLock, (req, res) => {
 
   if (!normalized.name || !normalized.type || !normalized.startDate || !normalized.endDate) {
     return res.status(400).json({
-      error: '\u7f3a\u5c11\u5fc5\u9700\u5b57\u6bb5: name, type, start_date, end_date'
+      error: '缺少必需字段: name, type, start_date, end_date'
     });
   }
   if (!isValidGroupType(normalized.type)) {
-    return res.status(400).json({ error: '\u56e2\u7ec4\u7c7b\u578b\u65e0\u6548\uff08\u4ec5\u652f\u6301 primary/secondary/vip\uff09' });
+    return res.status(400).json({ error: INVALID_GROUP_TYPE_MESSAGE });
   }
 
   try {
@@ -140,8 +142,8 @@ router.post('/', requireEditLock, (req, res) => {
     const newGroup = req.db.prepare('SELECT * FROM groups WHERE id = ?').get(result.lastInsertRowid);
     res.json({ success: true, group: hydrateGroup(newGroup) });
   } catch (error) {
-    console.error('\u521b\u5efa\u56e2\u7ec4\u5931\u8d25:', error);
-    res.status(500).json({ error: '\u521b\u5efa\u56e2\u7ec4\u5931\u8d25' });
+    console.error('创建团组失败:', error);
+    res.status(500).json({ error: '创建团组失败' });
   }
 });
 
@@ -238,11 +240,11 @@ router.put('/:id', requireEditLock, (req, res) => {
   const shouldClearSchedules = normalizedBody.status === CANCELLED_STATUS;
 
   if (normalizedBody.type !== undefined && !isValidGroupType(normalizedBody.type)) {
-    return res.status(400).json({ error: '\u56e2\u7ec4\u7c7b\u578b\u65e0\u6548\uff08\u4ec5\u652f\u6301 primary/secondary/vip\uff09' });
+    return res.status(400).json({ error: INVALID_GROUP_TYPE_MESSAGE });
   }
 
   if (updates.length === 0) {
-    return res.status(400).json({ error: '\u6ca1\u6709\u8981\u66f4\u65b0\u7684\u5b57\u6bb5' });
+    return res.status(400).json({ error: '没有要更新的字段' });
   }
 
   updates.push('updated_at = CURRENT_TIMESTAMP');
@@ -272,13 +274,13 @@ router.put('/:id', requireEditLock, (req, res) => {
 
     const result = updateGroup();
     if (result?.notFound) {
-      return res.status(404).json({ error: '\u56e2\u7ec4\u4e0d\u5b58\u5728' });
+      return res.status(404).json({ error: '团组不存在' });
     }
 
     res.json({ success: true, group: result.updatedGroup });
   } catch (error) {
-    console.error('\u66f4\u65b0\u56e2\u7ec4\u5931\u8d25:', error);
-    res.status(500).json({ error: '\u66f4\u65b0\u56e2\u7ec4\u5931\u8d25' });
+    console.error('更新团组失败:', error);
+    res.status(500).json({ error: '更新团组失败' });
   }
 });
 

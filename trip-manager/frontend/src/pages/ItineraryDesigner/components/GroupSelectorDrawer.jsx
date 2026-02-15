@@ -1,5 +1,8 @@
 import React from 'react';
-import { Button, Card, Checkbox, Drawer } from 'antd';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Checkbox from 'antd/es/checkbox';
+import Drawer from 'antd/es/drawer';
 import dayjs from 'dayjs';
 import { getGroupTypeLabel } from '../../../domain/group';
 
